@@ -49,6 +49,42 @@ body,
   min-height: 0;
 }
 
+/* --- 좁은 화면 안내 (2차 판단: 완전 반응형 대신 안내로 대체) --- */
+.narrow-screen-notice {
+  display: none;
+}
+
+@media (max-width: 1279px) {
+  .app-layout {
+    display: none;
+  }
+  .narrow-screen-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 24px;
+    text-align: center;
+    background: var(--bg);
+  }
+  .narrow-screen-notice-box {
+    max-width: 420px;
+  }
+  .narrow-screen-notice-box .app-name {
+    font-size: 24px;
+    margin-bottom: 12px;
+  }
+  .narrow-screen-notice-box p {
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .narrow-screen-notice-en {
+    margin-top: 16px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+}
+
 /* --- 툴바 --- */
 .toolbar {
   display: flex;

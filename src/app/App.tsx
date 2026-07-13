@@ -57,17 +57,32 @@ export function App(): ReactElement {
   }, []);
 
   return (
-    <div className="app-layout">
-      <Toolbar />
-      <div className="app-main">
-        <Palette />
-        <EditorCanvas />
-        {equipmentOpen && <EquipmentView />}
-        <PropertyPanel />
+    <>
+      <div className="app-layout">
+        <Toolbar />
+        <div className="app-main">
+          <Palette />
+          <EditorCanvas />
+          {equipmentOpen && <EquipmentView />}
+          <PropertyPanel />
+        </div>
+        <DiagramPanel />
+        <PlcPanel />
+        <StatusBar />
       </div>
-      <DiagramPanel />
-      <PlcPanel />
-      <StatusBar />
-    </div>
+      <div className="narrow-screen-notice">
+        <div className="narrow-screen-notice-box">
+          <p className="app-name">HYD</p>
+          <p>
+            이 회로 작도 도구는 정밀한 마우스 조작이 필요해 PC·노트북의 넓은 화면에
+            최적화되어 있습니다. 태블릿(가로모드)이나 PC에서 이용해 주세요.
+          </p>
+          <p className="narrow-screen-notice-en">
+            This circuit editor requires precise mouse input and a wide screen.
+            Please use a PC/laptop or a tablet in landscape mode.
+          </p>
+        </div>
+      </div>
+    </>
   );
 }
