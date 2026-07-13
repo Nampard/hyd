@@ -303,7 +303,7 @@ export const hydCylinderDouble: ComponentDefinition = {
     { key: "strokeTime", label: "전 행정 시간", type: "number", default: 2, min: 0.2, max: 20, step: 0.1, unit: "초" },
   ],
   symbolId: "hyd.cylinder.double",
-  bounds: { x: -40, y: -25, width: 90, height: 50 },
+  bounds: { x: -40, y: -32, width: 130, height: 57 },
   behavior: { role: "cylinder", headPort: "HEAD", rodPort: "ROD" },
 };
 

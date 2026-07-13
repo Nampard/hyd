@@ -29,8 +29,8 @@ function CylinderSprite({ properties, runtime }: SymbolProps): ReactElement {
   return (
     <g>
       {/* 로드 */}
-      <rect x={rodX} y={-3} width={58} height={6} rx={2} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
-      <rect x={rodX + 52} y={-7} width={8} height={14} rx={2} fill="#475569" />
+      <rect x={rodX} y={-3} width={72} height={6} rx={2} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
+      <rect x={rodX + 66} y={-7} width={8} height={14} rx={2} fill="#475569" />
       {/* 바디 */}
       <rect x={-40} y={-13} width={62} height={26} rx={4} fill="#93b6d6" stroke="#33506b" strokeWidth={1.5} />
       <rect x={-40} y={-13} width={62} height={9} rx={4} fill="#b7d0e6" opacity={0.7} />

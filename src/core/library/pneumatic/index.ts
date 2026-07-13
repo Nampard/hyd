@@ -397,7 +397,7 @@ export const cylinderDouble: ComponentDefinition = {
     { key: "strokeTime", label: "전 행정 시간", type: "number", default: 1, min: 0.2, max: 10, step: 0.1, unit: "초" },
   ],
   symbolId: "pneu.cylinder.double",
-  bounds: { x: -40, y: -25, width: 90, height: 50 },
+  bounds: { x: -40, y: -32, width: 130, height: 57 },
   behavior: { role: "cylinder", headPort: "HEAD", rodPort: "ROD" },
 };
 
@@ -414,7 +414,7 @@ export const cylinderSingle: ComponentDefinition = {
     { key: "strokeTime", label: "전 행정 시간", type: "number", default: 1, min: 0.2, max: 10, step: 0.1, unit: "초" },
   ],
   symbolId: "pneu.cylinder.single",
-  bounds: { x: -40, y: -25, width: 90, height: 50 },
+  bounds: { x: -40, y: -32, width: 130, height: 57 },
   behavior: { role: "cylinder", headPort: "HEAD", singleActing: true },
 };
 

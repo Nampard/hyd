@@ -189,7 +189,8 @@ export function EquipmentView(): ReactElement {
                   e.stopPropagation();
                   if (actuatable) {
                     const sim = useSimStore.getState();
-                    if (isToggle) sim.toggleManual(comp.id);
+                    // Shift+클릭: 누른 상태 고정 (동시 조작용)
+                    if (isToggle || e.shiftKey) sim.toggleManual(comp.id);
                     else {
                       sim.setManual(comp.id, true);
                       const release = () => {

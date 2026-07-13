@@ -70,11 +70,17 @@ function SpringH({ x, dir }: { x: number; dir: 1 | -1 }) {
   );
 }
 
+/** 활성 조작부 강조 (초록 글로우) */
+function ActiveGlow({ cx, cy = 0, r = 15 }: { cx: number; cy?: number; r?: number }) {
+  return <circle cx={cx} cy={cy} r={r} fill="#4ade80" opacity={0.4} stroke="none" />;
+}
+
 /** 푸시버튼 조작부 (왼쪽 끝, active 시 눌린 표현) */
 function PushButton({ x, active }: { x: number; active?: boolean }) {
-  const ox = active ? 4 : 0; // 눌리면 몸통 쪽으로
+  const ox = active ? 8 : 0; // 눌리면 몸통 쪽으로 깊게
   return (
     <g>
+      {active && <ActiveGlow cx={x - 10 + ox} />}
       <line x1={x} y1={0} x2={x - 8 + ox} y2={0} {...S} />
       <line x1={x - 8 + ox} y1={-8} x2={x - 8 + ox} y2={8} {...S} />
       <line x1={x - 14 + ox} y1={-8} x2={x - 14 + ox} y2={8} {...S} />
@@ -87,13 +93,14 @@ function PushButton({ x, active }: { x: number; active?: boolean }) {
 
 /** 레버(디텐트) 조작부 */
 function Lever({ x, active }: { x: number; active?: boolean }) {
-  const tilt = active ? 8 : -8;
+  const tilt = active ? 14 : -14; // 기울기를 크게 해 상태가 눈에 띄게
   return (
     <g>
+      {active && <ActiveGlow cx={x - 13} />}
       <line x1={x} y1={0} x2={x - 8} y2={0} {...S} />
       <line x1={x - 8} y1={8} x2={x - 8} y2={-8} {...S} />
-      <line x1={x - 8} y1={0} x2={x - 18} y2={tilt} {...S} />
-      <circle cx={x - 18} cy={tilt} r={3} fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={x - 8} y1={0} x2={x - 19} y2={tilt} {...S} />
+      <circle cx={x - 19} cy={tilt} r={3.5} fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.5} />
       {/* 디텐트 표시 */}
       <line x1={x - 6} y1={10} x2={x - 2} y2={10} {...Sthin} />
       <line x1={x - 6} y1={13} x2={x - 2} y2={13} {...Sthin} />
@@ -103,11 +110,13 @@ function Lever({ x, active }: { x: number; active?: boolean }) {
 
 /** 롤러 조작부 */
 function Roller({ x, active }: { x: number; active?: boolean }) {
+  const ox = active ? 5 : 0; // 캠에 눌리면 플런저가 들어감
   return (
     <g>
-      <line x1={x} y1={0} x2={x - 8} y2={0} {...S} />
-      <line x1={x - 8} y1={-8} x2={x - 8} y2={8} {...S} />
-      <circle cx={x - 13} cy={0} r={5} fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.5} />
+      {active && <ActiveGlow cx={x - 10} r={13} />}
+      <line x1={x} y1={0} x2={x - 8 + ox} y2={0} {...S} />
+      <line x1={x - 8 + ox} y1={-8} x2={x - 8 + ox} y2={8} {...S} />
+      <circle cx={x - 13 + ox} cy={0} r={5} fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.5} />
     </g>
   );
 }
@@ -134,13 +143,16 @@ function ValveBody({
   boxes,
   restIndex,
   current,
+  sliding,
   children,
 }: {
   boxW: number;
   boxes: ReactNode[]; // 박스별 내부 유로 (각 박스 원점 = 박스 왼쪽 위 모서리 기준 아님 — 박스 왼쪽 x)
   restIndex: number;
   current: number;
-  children?: ReactNode; // 고정 요소 (포트 스텁, 라벨)
+  /** 본체와 함께 슬라이드하는 요소 (조작부·스프링 — 실물처럼 몸통에 부착) */
+  sliding?: ReactNode;
+  children?: ReactNode; // 고정 요소 (포트 스텁, 라벨, 파일럿 포트)
 }) {
   const shift = (restIndex - current) * boxW;
   // restIndex 박스의 왼쪽 x = 0이 되도록 배치: box i 왼쪽 x = (i - restIndex) * boxW
@@ -156,6 +168,7 @@ function ValveBody({
             </g>
           );
         })}
+        {sliding}
       </g>
       {children}
     </g>
@@ -226,7 +239,24 @@ function Valve32({ properties, runtime, leftKind }: SymbolProps & { leftKind: "m
   ];
   return (
     <g>
-      <ValveBody boxW={40} boxes={boxes} restIndex={1} current={current}>
+      <ValveBody
+        boxW={40}
+        boxes={boxes}
+        restIndex={1}
+        current={current}
+        sliding={
+          <>
+            {leftKind === "roller" ? (
+              <Roller x={-40} active={current === 0} />
+            ) : isLever ? (
+              <Lever x={-40} active={active} />
+            ) : (
+              <PushButton x={-40} active={active} />
+            )}
+            <SpringH x={40} dir={1} />
+          </>
+        }
+      >
         {/* 포트 스텁 + 라벨 (고정) */}
         <line x1={20} y1={-20} x2={20} y2={-30} {...S} />
         <line x1={10} y1={20} x2={10} y2={30} {...S} />
@@ -235,15 +265,6 @@ function Valve32({ properties, runtime, leftKind }: SymbolProps & { leftKind: "m
         <text x={2} y={40} fontSize={9} fill="currentColor" stroke="none">P</text>
         <text x={34} y={40} fontSize={9} fill="currentColor" stroke="none">R</text>
       </ValveBody>
-      {/* 조작부/스프링 — 본체 정지 기준 양 끝에 고정 표기 */}
-      {leftKind === "roller" ? (
-        <Roller x={-40} active={current === 0} />
-      ) : isLever ? (
-        <Lever x={-40} active={active} />
-      ) : (
-        <PushButton x={-40} active={active} />
-      )}
-      <SpringH x={40} dir={1} />
       {leftKind === "roller" && (
         <text x={-62} y={34} fontSize={9} fill="currentColor" stroke="none">
           {String(properties.cylinderLabel ?? "")}
@@ -293,11 +314,20 @@ function Valve52Manual({ properties, runtime }: SymbolProps): ReactElement {
   const isLever = (properties.actuation ?? "lever") === "lever";
   return (
     <g>
-      <ValveBody boxW={60} boxes={valve52Boxes} restIndex={1} current={current}>
+      <ValveBody
+        boxW={60}
+        boxes={valve52Boxes}
+        restIndex={1}
+        current={current}
+        sliding={
+          <>
+            {isLever ? <Lever x={-60} active={active} /> : <PushButton x={-60} active={active} />}
+            <SpringH x={60} dir={1} />
+          </>
+        }
+      >
         <Valve52Stubs />
       </ValveBody>
-      {isLever ? <Lever x={-60} active={active} /> : <PushButton x={-60} active={active} />}
-      <SpringH x={60} dir={1} />
     </g>
   );
 }
@@ -323,12 +353,17 @@ function Valve52SinglePilot({ runtime }: SymbolProps): ReactElement {
   const current = runtime?.valvePosition ?? 1;
   return (
     <g>
-      <ValveBody boxW={60} boxes={valve52Boxes} restIndex={1} current={current}>
+      <ValveBody
+        boxW={60}
+        boxes={valve52Boxes}
+        restIndex={1}
+        current={current}
+        sliding={<SpringH x={60} dir={1} />}
+      >
         <Valve52Stubs />
       </ValveBody>
       <PilotGlyph x={-60} dir={-1} />
       <text x={-69} y={-11} fontSize={9} fill="currentColor" stroke="none">X</text>
-      <SpringH x={60} dir={1} />
     </g>
   );
 }
@@ -345,7 +380,9 @@ function CylinderDouble({ properties, runtime }: SymbolProps): ReactElement {
     <g>
       <rect x={-40} y={-15} width={70} height={30} {...S} />
       <line x1={pistonX} y1={-15} x2={pistonX} y2={15} {...S} strokeWidth={4} />
-      <line x1={pistonX} y1={0} x2={pistonX + 36} y2={0} {...S} strokeWidth={3} />
+      {/* 로드: 후진 시에도 몸통 밖으로 돌출 (피스톤 + 70) */}
+      <line x1={pistonX} y1={0} x2={pistonX + 70} y2={0} {...S} strokeWidth={3} />
+      <line x1={pistonX + 70} y1={-6} x2={pistonX + 70} y2={6} {...S} strokeWidth={3} />
       <line x1={-30} y1={15} x2={-30} y2={20} {...S} />
       <line x1={20} y1={15} x2={20} y2={20} {...S} />
       <text x={-40} y={-19} fontSize={10} fontWeight={700} fill="currentColor" stroke="none">
@@ -361,8 +398,10 @@ function CylinderSingle({ properties, runtime }: SymbolProps): ReactElement {
     <g>
       <rect x={-40} y={-15} width={70} height={30} {...S} />
       <line x1={pistonX} y1={-15} x2={pistonX} y2={15} {...S} strokeWidth={4} />
-      <line x1={pistonX} y1={0} x2={pistonX + 36} y2={0} {...S} strokeWidth={3} />
-      {/* 복귀 스프링 */}
+      {/* 로드: 후진 시에도 몸통 밖으로 돌출 (피스톤 + 70) */}
+      <line x1={pistonX} y1={0} x2={pistonX + 70} y2={0} {...S} strokeWidth={3} />
+      <line x1={pistonX + 70} y1={-6} x2={pistonX + 70} y2={6} {...S} strokeWidth={3} />
+      {/* 복귀 스프링 (피스톤~로드측 단부 사이 압축) */}
       <polyline
         points={`${pistonX + 2},0 ${pistonX + 8},-9 ${pistonX + 14},9 ${pistonX + 20},-9 ${Math.min(pistonX + 26, 28)},9 30,0`}
         {...Sthin}
@@ -375,21 +414,44 @@ function CylinderSingle({ properties, runtime }: SymbolProps): ReactElement {
   );
 }
 
+/**
+ * 일방향 유량제어밸브 (속도제어밸브) — ISO 1219:
+ * 점선 테두리 안에 가변 교축(마주보는 호 + 대각 화살표)과 병렬 체크밸브(볼·시트).
+ * 체크 자유 흐름 A→B, 교축은 B→A 방향에 작용 (restrictor 동작 명세와 일치).
+ */
 function SpeedController({ properties }: SymbolProps): ReactElement {
   return (
     <g>
-      <rect x={-20} y={-18} width={40} height={36} {...Sthin} strokeDasharray="3 2" />
-      <line x1={-30} y1={0} x2={-20} y2={0} {...S} />
-      <line x1={20} y1={0} x2={30} y2={0} {...S} />
-      {/* 교축 (양쪽 호) */}
-      <path d="M -6 -12 Q 0 -4 -6 4" {...Sthin} />
-      <path d="M 6 -12 Q 0 -4 6 4" {...Sthin} />
-      <line x1={-14} y1={0} x2={14} y2={0} {...Sthin} />
-      {/* 자유 흐름 방향 A→B */}
-      <FlowArrow x1={-14} y1={12} x2={14} y2={12} />
-      <text x={-26} y={-22} fontSize={9} fill="currentColor" stroke="none">A</text>
-      <text x={20} y={-22} fontSize={9} fill="currentColor" stroke="none">B</text>
-      <text x={-16} y={30} fontSize={8} fill="currentColor" stroke="none">
+      <rect x={-22} y={-22} width={44} height={44} {...Sthin} strokeDasharray="3 2" />
+      {/* 외부 포트 접속 + 내부 분기 */}
+      <line x1={-30} y1={0} x2={-18} y2={0} {...S} />
+      <line x1={18} y1={0} x2={30} y2={0} {...S} />
+      <circle cx={-18} cy={0} r={1.5} fill="currentColor" stroke="none" />
+      <circle cx={18} cy={0} r={1.5} fill="currentColor" stroke="none" />
+
+      {/* 상단 가지: 가변 교축 */}
+      <line x1={-18} y1={0} x2={-18} y2={-10} {...Sthin} />
+      <line x1={18} y1={0} x2={18} y2={-10} {...Sthin} />
+      <line x1={-18} y1={-10} x2={-4} y2={-10} {...Sthin} />
+      <line x1={4} y1={-10} x2={18} y2={-10} {...Sthin} />
+      <path d="M -6 -17 Q 0 -10 -6 -3" {...Sthin} />
+      <path d="M 6 -17 Q 0 -10 6 -3" {...Sthin} />
+      <line x1={-4} y1={-10} x2={4} y2={-10} {...Sthin} />
+      {/* 가변(조절) 대각 화살표 */}
+      <line x1={-9} y1={-1} x2={9} y2={-19} {...Sthin} />
+      <polygon points="9,-19 3.5,-17.5 7.5,-13.5" fill="currentColor" stroke="none" />
+
+      {/* 하단 가지: 체크밸브 (자유 흐름 A→B, 볼이 시트에서 밀려남) */}
+      <line x1={-18} y1={0} x2={-18} y2={12} {...Sthin} />
+      <line x1={18} y1={0} x2={18} y2={12} {...Sthin} />
+      <line x1={-18} y1={12} x2={-8} y2={12} {...Sthin} />
+      <line x1={8} y1={12} x2={18} y2={12} {...Sthin} />
+      <polyline points="-8,7 -2,12 -8,17" {...Sthin} />
+      <circle cx={3} cy={12} r={4.5} {...Sthin} />
+
+      <text x={-30} y={-12} fontSize={9} fill="currentColor" stroke="none">A</text>
+      <text x={25} y={-12} fontSize={9} fill="currentColor" stroke="none">B</text>
+      <text x={-20} y={34} fontSize={8} fill="currentColor" stroke="none">
         개도 {Number(properties.openness ?? 0.5).toFixed(2)}
       </text>
     </g>
@@ -449,6 +511,7 @@ function SolenoidGlyph({ x, dir, label, active }: { x: number; dir: 1 | -1; labe
   const x0 = dir === -1 ? x - w : x;
   return (
     <g>
+      {active && <ActiveGlow cx={x0 + w / 2} r={14} />}
       <rect x={x0} y={-8} width={w} height={16} {...Sthin} fill={active ? "currentColor" : "none"} />
       <line x1={x0} y1={8} x2={x0 + w} y2={-8} {...Sthin} />
       <text x={x0 - 2} y={dir === -1 ? -12 : 22} fontSize={9} fill="currentColor" stroke="none">
@@ -472,7 +535,18 @@ function Valve32Solenoid({ properties, runtime }: SymbolProps): ReactElement {
   ];
   return (
     <g>
-      <ValveBody boxW={40} boxes={boxes} restIndex={1} current={current}>
+      <ValveBody
+        boxW={40}
+        boxes={boxes}
+        restIndex={1}
+        current={current}
+        sliding={
+          <>
+            <SolenoidGlyph x={-40} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
+            <SpringH x={40} dir={1} />
+          </>
+        }
+      >
         <line x1={20} y1={-20} x2={20} y2={-30} {...S} />
         <line x1={10} y1={20} x2={10} y2={30} {...S} />
         <line x1={30} y1={20} x2={30} y2={30} {...S} />
@@ -480,8 +554,6 @@ function Valve32Solenoid({ properties, runtime }: SymbolProps): ReactElement {
         <text x={2} y={40} fontSize={9} fill="currentColor" stroke="none">P</text>
         <text x={34} y={40} fontSize={9} fill="currentColor" stroke="none">R</text>
       </ValveBody>
-      <SolenoidGlyph x={-40} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
-      <SpringH x={40} dir={1} />
     </g>
   );
 }
@@ -490,11 +562,20 @@ function Valve52Solenoid({ properties, runtime }: SymbolProps): ReactElement {
   const current = runtime?.valvePosition ?? 1;
   return (
     <g>
-      <ValveBody boxW={60} boxes={valve52Boxes} restIndex={1} current={current}>
+      <ValveBody
+        boxW={60}
+        boxes={valve52Boxes}
+        restIndex={1}
+        current={current}
+        sliding={
+          <>
+            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
+            <SpringH x={60} dir={1} />
+          </>
+        }
+      >
         <Valve52Stubs />
       </ValveBody>
-      <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
-      <SpringH x={60} dir={1} />
     </g>
   );
 }
@@ -504,11 +585,20 @@ function Valve52DoubleSolenoid({ properties, runtime }: SymbolProps): ReactEleme
   const current = runtime?.valvePosition ?? rest;
   return (
     <g>
-      <ValveBody boxW={60} boxes={valve52Boxes} restIndex={1} current={current}>
+      <ValveBody
+        boxW={60}
+        boxes={valve52Boxes}
+        restIndex={1}
+        current={current}
+        sliding={
+          <>
+            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
+            <SolenoidGlyph x={60} dir={1} label={String(properties.solenoidRight ?? "")} active={current === 1} />
+          </>
+        }
+      >
         <Valve52Stubs />
       </ValveBody>
-      <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
-      <SolenoidGlyph x={60} dir={1} label={String(properties.solenoidRight ?? "")} active={current === 1} />
     </g>
   );
 }
@@ -542,13 +632,22 @@ function Valve53DoubleSolenoid({ properties, runtime }: SymbolProps): ReactEleme
   return (
     <g transform="translate(-30, 0)">
       {/* ValveBody는 restIndex 박스 왼쪽을 x=0으로 두므로 -30 이동해 부품 원점(중앙 박스 중심)과 맞춘다 */}
-      <ValveBody boxW={60} boxes={boxes} restIndex={1} current={current}>
+      <ValveBody
+        boxW={60}
+        boxes={boxes}
+        restIndex={1}
+        current={current}
+        sliding={
+          <>
+            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
+            <SolenoidGlyph x={120} dir={1} label={String(properties.solenoidRight ?? "")} active={current === 2} />
+            <g transform="translate(-8,0)"><SpringH x={-60} dir={-1} /></g>
+            <g transform="translate(8,0)"><SpringH x={120} dir={1} /></g>
+          </>
+        }
+      >
         <Valve52Stubs />
       </ValveBody>
-      <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
-      <SolenoidGlyph x={120} dir={1} label={String(properties.solenoidRight ?? "")} active={current === 2} />
-      <g transform="translate(-8,0)"><SpringH x={-60} dir={-1} /></g>
-      <g transform="translate(8,0)"><SpringH x={120} dir={1} /></g>
     </g>
   );
 }
@@ -650,11 +749,20 @@ function HydValve42Lever({ properties, runtime }: SymbolProps): ReactElement {
   const isLever = (properties.actuation ?? "lever") === "lever";
   return (
     <g>
-      <ValveBody boxW={60} boxes={valve42Boxes} restIndex={1} current={current}>
+      <ValveBody
+        boxW={60}
+        boxes={valve42Boxes}
+        restIndex={1}
+        current={current}
+        sliding={
+          <>
+            {isLever ? <Lever x={-60} active={active} /> : <PushButton x={-60} active={active} />}
+            <SpringH x={60} dir={1} />
+          </>
+        }
+      >
         <Valve4Stubs />
       </ValveBody>
-      {isLever ? <Lever x={-60} active={active} /> : <PushButton x={-60} active={active} />}
-      <SpringH x={60} dir={1} />
     </g>
   );
 }
@@ -689,11 +797,20 @@ function HydValve43({ properties, runtime, center }: SymbolProps & { center: "cl
   ];
   return (
     <g transform="translate(-30, 0)">
-      <ValveBody boxW={60} boxes={boxes} restIndex={1} current={current}>
+      <ValveBody
+        boxW={60}
+        boxes={boxes}
+        restIndex={1}
+        current={current}
+        sliding={
+          <>
+            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
+            <SolenoidGlyph x={120} dir={1} label={String(properties.solenoidRight ?? "")} active={current === 2} />
+          </>
+        }
+      >
         <Valve4Stubs />
       </ValveBody>
-      <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
-      <SolenoidGlyph x={120} dir={1} label={String(properties.solenoidRight ?? "")} active={current === 2} />
     </g>
   );
 }
@@ -804,9 +921,10 @@ function ElecPushbutton({ properties, runtime }: SymbolProps): ReactElement {
       <ContactGlyph closed={closed} />
       {isNC && <NcBar />}
       {/* 조작부 (왼쪽): 버튼 캡 + 점선 연결 */}
-      <line x1={-18} y1={0} x2={-6} y2={0} {...Sthin} strokeDasharray="2 2" />
-      <line x1={-18} y1={-6} x2={-18} y2={6} {...S} />
-      <line x1={-24 + (pressed ? 3 : 0)} y1={-6} x2={-24 + (pressed ? 3 : 0)} y2={6} {...S} />
+      {pressed && <ActiveGlow cx={-20} r={12} />}
+      <line x1={-18 + (pressed ? 5 : 0)} y1={0} x2={-6} y2={0} {...Sthin} strokeDasharray="2 2" />
+      <line x1={-18 + (pressed ? 5 : 0)} y1={-6} x2={-18 + (pressed ? 5 : 0)} y2={6} {...S} />
+      <line x1={-24 + (pressed ? 5 : 0)} y1={-6} x2={-24 + (pressed ? 5 : 0)} y2={6} {...S} />
       <text x={6} y={4} fontSize={9} fill="currentColor" stroke="none">
         {String(properties.name ?? "")}
       </text>

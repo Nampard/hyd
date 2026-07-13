@@ -5,6 +5,35 @@ import { getPortWorldPosition } from "../../core/model/operations";
 import { getSymbol, type SymbolRuntime } from "../symbols";
 import { PORT_COLORS } from "./colors";
 import { useSimStore } from "../sim/simStore";
+import { useEditorStore } from "./store";
+
+/**
+ * 실린더에 연결된 감지 부품(리밋 스위치·롤러 밸브)의 이름을
+ * 후진단/전진단 위치별로 모아 마커로 표시할 데이터를 만든다.
+ */
+function detectionMarkers(
+  component: ComponentInstance,
+  allComponents: ComponentInstance[],
+): { x: number; names: string[] }[] {
+  const label = String(component.properties.label ?? "");
+  if (!label) return [];
+  const linked = allComponents.filter((c) => {
+    const b = getComponentDefinition(c.type).behavior;
+    const senses =
+      (b?.role === "valve" && (b.left.kind === "roller" || b.right.kind === "roller")) ||
+      (b?.role === "elec-contact" && b.source === "limit");
+    return senses && String(c.properties.cylinderLabel ?? "") === label;
+  });
+  const namesAt = (trigger: string) =>
+    linked
+      .filter((c) => String(c.properties.triggerAt ?? "extended") === trigger)
+      .map((c) => String(c.properties.name ?? "롤러"));
+  // 피스톤 스트로크 끝 위치 (기호 로컬 좌표): 후진단 -26, 전진단 +14
+  return [
+    { x: -26, names: namesAt("retracted") },
+    { x: 14, names: namesAt("extended") },
+  ].filter((m) => m.names.length > 0);
+}
 
 interface Props {
   component: ComponentInstance;
@@ -30,9 +59,11 @@ export function ComponentView({
   const def = getComponentDefinition(component.type);
   const Symbol = getSymbol(def.symbolId);
   const { bounds } = def;
+  const allComponents = useEditorStore((s) => s.document.components);
 
   const simRunning = runtime != null;
   const behavior = def.behavior;
+  const markers = behavior?.role === "cylinder" ? detectionMarkers(component, allComponents) : [];
   const manualValve =
     behavior?.role === "valve" &&
     (behavior.left.kind === "manual" || behavior.right.kind === "manual");
@@ -53,7 +84,8 @@ export function ComponentView({
     }
     if (actuatable) {
       const sim = useSimStore.getState();
-      if (isToggle) {
+      if (isToggle || e.shiftKey) {
+        // Shift+클릭: 모멘터리 버튼도 누른 상태로 고정 (AND 회로 등 동시 조작용)
         sim.toggleManual(component.id);
       } else {
         sim.setManual(component.id, true);
@@ -110,6 +142,24 @@ export function ComponentView({
           />
         )}
         <Symbol properties={component.properties} runtime={runtime ?? undefined} />
+        {/* 감지 마커: 연결된 리밋 스위치·롤러 밸브의 감지 위치 안내 */}
+        {markers.map((m) => (
+          <g key={m.x} pointerEvents="none">
+            <line
+              x1={m.x}
+              y1={-16}
+              x2={m.x}
+              y2={-24}
+              stroke="var(--err)"
+              strokeWidth={1.5}
+              strokeDasharray="2 2"
+            />
+            <polygon points={`${m.x - 3},-24 ${m.x + 3},-24 ${m.x},-18`} fill="var(--err)" stroke="none" />
+            <text x={m.x} y={-27} textAnchor="middle" fontSize={8} fill="var(--err)" stroke="none">
+              {m.names.join(",")}
+            </text>
+          </g>
+        ))}
       </g>
 
       {def.ports.map((port) => {
