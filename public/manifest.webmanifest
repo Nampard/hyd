@@ -1,0 +1,18 @@
+{
+  "name": "HYD — 공압·유압·전기·PLC 시뮬레이터",
+  "short_name": "HYD",
+  "description": "교육용 회로 작도 + 시뮬레이션 (공압/유압/전기/PLC)",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#2563eb",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+import type { CircuitDocument } from "../core/model/types";
+import { parseDocument, serializeDocument } from "../core/model/schema";
+
+/** 문서를 .json 파일로 다운로드 */
+export function downloadDocument(doc: CircuitDocument): void {
+  const blob = new Blob([serializeDocument(doc)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${doc.meta.title || "circuit"}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** 회로도 캔버스를 인쇄용 SVG 파일로 내보내기 */
+export function exportCircuitSvg(title = "circuit"): void {
+  const svg = document.querySelector<SVGSVGElement>(".editor-canvas");
+  const world = svg?.querySelector("g");
+  if (!svg || !world) return;
+
+  const bbox = (world as SVGGElement).getBBox();
+  if (bbox.width === 0 && bbox.height === 0) return;
+
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.querySelectorAll('rect[fill="url(#grid)"]').forEach((el) => el.remove());
+  clone.querySelector("g")?.removeAttribute("transform");
+  const pad = 24;
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute(
+    "viewBox",
+    `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad * 2} ${bbox.height + pad * 2}`,
+  );
+  clone.setAttribute("width", String(bbox.width + pad * 2));
+  clone.setAttribute("height", String(bbox.height + pad * 2));
+  clone.removeAttribute("class");
+  // 독립 파일에서 CSS 변수 해석되도록 값 인라인
+  clone.setAttribute(
+    "style",
+    "--symbol:#1d2430;--accent:#2563eb;--ok:#16a34a;--err:#dc2626;--canvas-bg:#ffffff;" +
+      "--pneumatic:#0284c7;--hydraulic:#b45309;--electric:#dc2626;" +
+      "--flow-pressurized:#0369a1;--flow-exhaust:#93bcd9;--flow-blocked:#a3adba;" +
+      "--energized:#fecaca;--lamp-on:#fde047;background:#ffffff;",
+  );
+
+  const blob = new Blob([new XMLSerializer().serializeToString(clone)], {
+    type: "image/svg+xml",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${title}.svg`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** 파일 선택 대화상자를 열어 문서를 읽는다 */
+export function openDocumentFile(): Promise<{ ok: boolean; document?: CircuitDocument; error?: string }> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) {
+        resolve({ ok: false, error: "파일이 선택되지 않았습니다." });
+        return;
+      }
+      const text = await file.text();
+      resolve(parseDocument(text));
+    };
+    // 취소 시(파일 미선택) 아무 일도 하지 않음 — resolve하지 않아도 GC됨
+    input.click();
+  });
+}
