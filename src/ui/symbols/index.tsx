@@ -441,13 +441,13 @@ function SpeedController({ properties }: SymbolProps): ReactElement {
       <line x1={-9} y1={-1} x2={9} y2={-19} {...Sthin} />
       <polygon points="9,-19 3.5,-17.5 7.5,-13.5" fill="currentColor" stroke="none" />
 
-      {/* 하단 가지: 체크밸브 (자유 흐름 A→B, 볼이 시트에서 밀려남) */}
+      {/* 하단 가지: 체크밸브 (자유 흐름 A→B) — 시트(역V)에 볼이 얹힌 표준 표기 */}
       <line x1={-18} y1={0} x2={-18} y2={12} {...Sthin} />
       <line x1={18} y1={0} x2={18} y2={12} {...Sthin} />
-      <line x1={-18} y1={12} x2={-8} y2={12} {...Sthin} />
-      <line x1={8} y1={12} x2={18} y2={12} {...Sthin} />
-      <polyline points="-8,7 -2,12 -8,17" {...Sthin} />
-      <circle cx={3} cy={12} r={4.5} {...Sthin} />
+      <line x1={-18} y1={12} x2={-9} y2={12} {...Sthin} />
+      <line x1={2} y1={12} x2={18} y2={12} {...Sthin} />
+      <polyline points="-3,6.5 -9,12 -3,17.5" {...Sthin} />
+      <circle cx={-5} cy={12} r={4.5} {...Sthin} />
 
       <text x={-30} y={-12} fontSize={9} fill="currentColor" stroke="none">A</text>
       <text x={25} y={-12} fontSize={9} fill="currentColor" stroke="none">B</text>
