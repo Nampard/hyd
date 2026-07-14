@@ -76,6 +76,29 @@ codex-review IP 게이트 대응 문서. 이 원장은 법적 판단이 아니�
     레이아웃. 우측 플로터에는 **실제 수치 축(2000·1500·1000…)이 찍힌 정량
     시뮬레이션 그래프**가 표시된다. 제조사 카탈로그 연동, ISO 준거 심벌 수천 종,
     Unity 3D·OPC·PLC 연동, BOM·기술문서 생성 등 산업용 전문 CAD 도구.
+  - **Automation Studio 편집기 실화면 대조** (Hydraulic Manifold Block Module
+    섹션의 애니메이션 캐러셀 `Block-Manifold-loop.gif`, 전 프레임을 원본 해상도로
+    확인): 실제 편집기 화면이 노출된 유일한 자료라 프레임별로 대조했다.
+    - *2D 회로 편집 화면*: 흰 배경에 **남색 계열 단색 심벌** 선, 점 격자 없음,
+      매니폴드 경계를 나타내는 점선 사각형과 Windows 편집 커서·연필 글리프.
+      배관 색상은 도메인 구분 없이 단색이다.
+    - *3D 매니폴드 레이아웃 화면*: 리본 툴바 + "Routing Solutions" 대화상자에
+      3D 매니폴드 블록 후보 렌더링 3종, Drillings·Hole Closures·Manifold
+      Dimensions·Weight·Volume 수치 표, 우측 대형 3D CAD 모델.
+    - *Production Drawing 화면*: 치수 기입선·홀 패턴·나사 규격(SAE, Spotface)이
+      들어간 기계 가공 도면. 상단 탭: Project Parameters / 3D Manifold Layout /
+      Part List / Technical Data / Technical Drawing / Machining Parameters /
+      Production Drawing.
+    - *HYD 대조*: HYD의 회로 화면은 **점 격자 배경**, 어두운 회색(#1d2430) 심벌,
+      **도메인별 배관 색상**(공압 파랑·유압 주황·전기 빨강), 좌측 팔레트·우측
+      속성 패널·하단 변위단계선도의 웹 레이아웃이다. 3D·매니폴드·가공도면·수치
+      표는 존재하지 않으며 구현 계획도 없다(non-goal).
+    - *심벌 유사성에 대한 판단*: 2D 회로 화면의 4/3 밸브(양측 센터링 스프링)와
+      릴리프 밸브(스프링) 형태가 HYD의 해당 심벌과 닮아 보일 수 있으나, 이는
+      **ISO 1219 계열 표준이 규정하는 기능적·관용적 표기**이며 특정 제품의 창작적
+      표현이 아니다. 표준을 따르는 어떤 도면·소프트웨어에서도 동일하게 나타나는
+      형태로, 저작권 보호 대상인 표현의 유사성으로 볼 수 없다(합체 원칙 /
+      scènes à faire).
   - **HYD와의 비교 판단**: 표현상 실질적 유사성이 발견되지 않았다.
     (1) 플랫폼: 데스크톱 리본 앱 vs 웹앱(브라우저). (2) 레이아웃: 트리+도킹
     패널 vs 툴바+팔레트+격자 캔버스+속성 패널. (3) 렌더링: 3D 모델 vs 2D SVG
@@ -83,10 +106,14 @@ codex-review IP 게이트 대응 문서. 이 원장은 법적 판단이 아니�
     없음 — HYD의 명시적 non-goal). (5) 색상·타이포·아이콘·브랜딩 상이. 겹치는
     것은 "유공압·전기·PLC 회로를 작도하고 시뮬레이션한다"는 기능 영역(아이디어)
     수준이며, 저작권이 보호하는 표현의 유사성이 아니다.
-  - **한계**: 이 검토는 저장소 소유자가 공개된 마케팅 자료(제품 소개 페이지의
-    스크린샷)만으로 수행한 1차 확인이며, 실제 편집기의 전 기능 화면·비공개
-    자료와의 대조나 법률 자문을 대체하지 않는다. 비교 대상은 V-AMT 소개
-    페이지와 Automation Studio Professional Edition 소개 페이지다.
+  - **한계**: 이 검토는 저장소 소유자가 **공개된 마케팅 자료**(제품 소개 페이지에
+    게시된 스크린샷·애니메이션)만으로 수행한 1차 확인이며, 제품을 설치해 전 기능
+    화면을 열람하거나 비공개 자료와 대조한 것이 아니고 법률 자문을 대체하지도
+    않는다. 비교 대상은 V-AMT 소개 페이지와 Automation Studio Professional
+    Edition 소개 페이지(Hydraulic Manifold Block Module 캐러셀 포함)다.
+    Educational Edition의 회로 편집 화면(제품 페이지 캐러셀의 hydraulics·
+    electrical·pneumatics 이미지)은 축소 썸네일로만 노출되어 세부 대조는
+    수행하지 못했다 — 필요 시 원본 해상도 확보 후 재검토 대상.
 - [x] V-AMT 구매계약/EULA, Automation Studio EUSLMA 수락 이력 확인 — **소유자 확인 완료
   (2026-07-15): 소유자 및 개발 관여자는 V-AMT·Automation Studio를 설치·사용한 이력이
   없으며, 따라서 두 제품의 EULA/구매계약에 동의한 사실도 없다.** 향후 다른 기여자가
