@@ -23,6 +23,8 @@ export interface Viewport {
 
 interface EditorState {
   document: CircuitDocument;
+  /** 마지막 저장/불러오기 시점 문서 참조 — isDirty 판정 기준 (review-2 P0) */
+  savedDocument: CircuitDocument;
   past: CircuitDocument[];
   future: CircuitDocument[];
   /** 드래그 시작 시점 스냅숏 — 드래그 종료 시 한 번만 히스토리에 기록 */
@@ -46,6 +48,10 @@ interface EditorState {
   newDocument(): void;
   loadDocument(doc: CircuitDocument): void;
   setTitle(title: string): void;
+  /** 저장 성공 시 호출 — 현재 문서를 저장 기준점으로 표시 */
+  markSaved(): void;
+  /** 저장 기준점 이후 변경 여부 (제목·PLC·속성 등 모든 변경 포함) */
+  isDirty(): boolean;
 
   // 편집
   placeComponent(pos: Point): void;
@@ -87,8 +93,11 @@ function pushHistory(state: EditorState, snapshot: CircuitDocument) {
   return { past, future: [] as CircuitDocument[] };
 }
 
+const initialDocument = createEmptyDocument();
+
 export const useEditorStore = create<EditorState>((set, get) => ({
-  document: createEmptyDocument(),
+  document: initialDocument,
+  savedDocument: initialDocument,
   past: [],
   future: [],
   dragStartDoc: null,
@@ -102,8 +111,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   diagramPanelOpen: false,
 
   newDocument() {
+    const doc = createEmptyDocument();
     set({
-      document: createEmptyDocument(),
+      document: doc,
+      savedDocument: doc,
       past: [],
       future: [],
       selection: null,
@@ -116,6 +127,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   loadDocument(doc) {
     set({
       document: doc,
+      savedDocument: doc,
       past: [],
       future: [],
       selection: null,
@@ -125,6 +137,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // PLC 프로그램이 있는 문서는 래더 패널 자동 표시
       plcPanelOpen: (doc.plcProgram?.rungs.length ?? 0) > 0,
     });
+  },
+
+  markSaved() {
+    set({ savedDocument: get().document });
+  },
+
+  isDirty() {
+    // 문서는 불변 갱신되므로 참조 비교로 충분 (동일 내용 undo 복귀는 보수적으로 dirty 취급)
+    return get().document !== get().savedDocument;
   },
 
   setTitle(title) {

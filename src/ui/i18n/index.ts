@@ -9,6 +9,8 @@ export type Lang = "ko" | "en";
 
 const ko = {
   run: "▶ 실행",
+  runStep: "▶ 구분 실행",
+  nextStep: "다음 동작 ▶",
   stop: "■ 정지",
   openExample: "예제 열기…",
   newCircuit: "새 회로",
@@ -36,6 +38,11 @@ const ko = {
   statusPlacing: "캔버스를 클릭해 부품을 배치하세요. (우클릭/Esc 취소)",
   statusWiring: "연결할 포트를 클릭하세요. (우클릭/Esc 취소)",
   statusRunning: "시뮬레이션 실행 중 — 초록 점선 부품을 클릭해 조작하세요. (Shift+클릭: 누름 고정)",
+  statusStepPaused: "동작 {n} 완료 — 빈 곳을 클릭하면 다음 동작을 진행합니다.",
+  statusStepCycle: "사이클 완료 (동작 {n}) ↻ 처음 동작으로 돌아갑니다 — 빈 곳을 클릭해 계속.",
+  statusStepRunning: "구분동작 진행 중 — 동작이 끝나면 자동으로 멈춥니다.",
+  statusUnstable:
+    "⚠ 회로가 안정되지 않습니다 — 접점이 자신의 코일을 반전 구동하는 등 자기모순 회로일 수 있습니다.",
   countParts: "부품",
   countWires: "배선",
   equipmentHead: "장비 뷰 (일러스트)",
@@ -47,6 +54,8 @@ const ko = {
 
 const en: Record<keyof typeof ko, string> = {
   run: "▶ Run",
+  runStep: "▶ Step run",
+  nextStep: "Next step ▶",
   stop: "■ Stop",
   openExample: "Open example…",
   newCircuit: "New",
@@ -74,6 +83,11 @@ const en: Record<keyof typeof ko, string> = {
   statusPlacing: "Click the canvas to place the component. (Right-click/Esc to cancel)",
   statusWiring: "Click a target port. (Right-click/Esc to cancel)",
   statusRunning: "Simulation running — click green-dashed parts to operate. (Shift+click: latch)",
+  statusStepPaused: "Step {n} done — click empty space to run the next step.",
+  statusStepCycle: "Cycle complete (step {n}) ↻ back to the first step — click empty space to continue.",
+  statusStepRunning: "Step mode — running until the current motion completes.",
+  statusUnstable:
+    "⚠ Circuit is not settling — it may contradict itself (e.g. an NC contact driving its own coil).",
   countParts: "parts",
   countWires: "wires",
   equipmentHead: "Equipment view (illustrated)",

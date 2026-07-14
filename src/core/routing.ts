@@ -41,8 +41,28 @@ export function computeOrthogonalRoute(
     (fromDir === "up" && toDir === "down") ||
     (fromDir === "down" && toDir === "up");
 
+  // 반대 방향이라도 서로 등지고 있으면(포트가 상대 반대쪽을 봄) 직선 연결이
+  // 두 부품을 관통해 역주행한다 — 옆으로 우회 (review-2 P1)
+  const facingAway =
+    opposite &&
+    (isHorizontal(fromDir)
+      ? fromDir === "right"
+        ? toPos.x < fromPos.x
+        : toPos.x > fromPos.x
+      : fromDir === "down"
+        ? toPos.y < fromPos.y
+        : toPos.y > fromPos.y);
+
   const mid: Point[] = [];
-  if ((a.x === b.x || a.y === b.y) && (opposite || fromDir === toDir)) {
+  if (facingAway) {
+    if (isHorizontal(fromDir)) {
+      const detourY = Math.min(a.y, b.y) - STUB;
+      mid.push({ x: a.x, y: detourY }, { x: b.x, y: detourY });
+    } else {
+      const detourX = Math.min(a.x, b.x) - STUB;
+      mid.push({ x: detourX, y: a.y }, { x: detourX, y: b.y });
+    }
+  } else if ((a.x === b.x || a.y === b.y) && (opposite || fromDir === toDir)) {
     if (opposite) {
       // 마주보는 포트가 일직선 — 경유점 불필요
     } else {

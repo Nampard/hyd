@@ -11,12 +11,30 @@ export function StatusBar(): ReactElement {
   const componentCount = useEditorStore((s) => s.document.components.length);
   const wireCount = useEditorStore((s) => s.document.wires.length);
   const running = useSimStore((s) => s.running);
+  const mode = useSimStore((s) => s.mode);
+  const stepPaused = useSimStore((s) => s.paused);
+  const lastStep = useSimStore((s) => s.lastStep);
   const simTime = useSimStore((s) => s.snapshot?.time ?? 0);
+  const diagnostics = useSimStore((s) => s.snapshot?.diagnostics);
   const t = useT();
 
+  // 솔버 미수렴 = 자기모순 회로(NC 자기 궤환 등) 가능성 — 최우선 경고 (review-2 P0)
+  const unstable =
+    running && diagnostics && (!diagnostics.electricConverged || !diagnostics.fluidConverged);
+
   let hint = message;
+  if (unstable) hint = t("statusUnstable");
   if (!hint) {
-    if (running) hint = t("statusRunning");
+    if (running && mode === "step") {
+      if (stepPaused && lastStep) {
+        hint = (lastStep.cycleComplete ? t("statusStepCycle") : t("statusStepPaused")).replace(
+          "{n}",
+          String(lastStep.step),
+        );
+      } else {
+        hint = t("statusStepRunning");
+      }
+    } else if (running) hint = t("statusRunning");
     else if (placingType) hint = t("statusPlacing");
     else if (pendingWire) hint = t("statusWiring");
     else hint = t("statusDefault");

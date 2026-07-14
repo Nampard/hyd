@@ -19,7 +19,8 @@ export interface DocumentStorage {
   /** 저장 성공 여부 — 용량 초과·사생활 보호 모드 등 실패를 호출자가 안내 (codex-review M7) */
   save(name: string, doc: CircuitDocument): boolean;
   load(name: string): CircuitDocument | null;
-  delete(name: string): void;
+  /** 삭제 성공 여부 — 실패 시 호출자가 안내 (review-2 P1) */
+  delete(name: string): boolean;
 }
 
 const STORAGE_KEY = "hyd.circuits.v1";
@@ -46,8 +47,10 @@ export class LocalDocumentStorage implements DocumentStorage {
       return {};
     }
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
-    const shape: StorageShape = {};
+    const shape: StorageShape = Object.create(null);
     for (const [name, entry] of Object.entries(raw as Record<string, unknown>)) {
+      // 프로토타입 오염 방어 — 특수 키는 저장 이름으로 쓰지 않는다 (review-2 P1)
+      if (name === "__proto__" || name === "constructor" || name === "prototype") continue;
       if (
         typeof entry === "object" &&
         entry !== null &&
@@ -97,13 +100,14 @@ export class LocalDocumentStorage implements DocumentStorage {
     return result.ok && result.document ? result.document : null;
   }
 
-  delete(name: string): void {
+  delete(name: string): boolean {
     try {
       const shape = this.read();
       delete shape[name];
       this.write(shape);
+      return true;
     } catch {
-      /* 저장소 접근 실패 — 삭제는 조용히 무시 */
+      return false; // 저장소 접근 실패 — 호출자가 안내
     }
   }
 }

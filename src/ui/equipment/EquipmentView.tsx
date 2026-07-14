@@ -104,6 +104,11 @@ export function EquipmentView(): ReactElement {
         className="equipment-canvas"
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerDown={(e) => {
+          // 구분동작 일시정지 중 빈 곳 클릭 → 다음 동작 (부품 클릭은 stopPropagation으로 제외됨)
+          const sim = useSimStore.getState();
+          if (e.button === 0 && sim.running && sim.mode === "step" && sim.paused) sim.advanceStep();
+        }}
       >
         <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
           {/* 배관/배선 = 호스 (자유 배치 좌표 기준 재라우팅) */}

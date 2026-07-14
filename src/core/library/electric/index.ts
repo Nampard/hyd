@@ -210,7 +210,7 @@ export const lamp: ComponentDefinition = {
 export const buzzer: ComponentDefinition = {
   type: "elec.buzzer",
   domain: "electric",
-  name: "부저",
+  name: "부저 (표시형 — 소리 없음)",
   category: "전기 · 출력",
   ports: twoPorts,
   propertySchema: [{ key: "name", label: "이름", type: "text", default: "BZ1" }],

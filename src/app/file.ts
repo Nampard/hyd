@@ -68,19 +68,26 @@ export function openDocumentFile(): Promise<OpenFileResult> {
     input.type = "file";
     input.accept = ".json,application/json";
     let settled = false;
+    /** change 도착 표시 — 큰 파일의 text() 읽기 중 포커스 폴백이 취소로 오판하지 않게 (review-2 P1) */
+    let chosen = false;
     const settle = (result: OpenFileResult) => {
       if (settled) return;
       settled = true;
       resolve(result);
     };
     input.onchange = async () => {
+      chosen = true;
       const file = input.files?.[0];
       if (!file) {
         settle({ ok: false, cancelled: true });
         return;
       }
-      const text = await file.text();
-      settle(parseDocument(text));
+      try {
+        const text = await file.text();
+        settle(parseDocument(text));
+      } catch {
+        settle({ ok: false, error: "파일을 읽지 못했습니다." });
+      }
     };
     // 최신 브라우저의 취소 이벤트 + 포커스 복귀 폴백
     input.addEventListener("cancel", () => settle({ ok: false, cancelled: true }));
@@ -88,7 +95,9 @@ export function openDocumentFile(): Promise<OpenFileResult> {
       "focus",
       () => {
         // 대화상자가 닫힌 뒤 change가 오지 않으면 취소로 간주
-        setTimeout(() => settle({ ok: false, cancelled: true }), 1000);
+        setTimeout(() => {
+          if (!chosen) settle({ ok: false, cancelled: true });
+        }, 1000);
       },
       { once: true },
     );

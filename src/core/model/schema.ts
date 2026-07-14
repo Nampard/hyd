@@ -18,7 +18,17 @@ export function serializeDocument(doc: CircuitDocument): string {
  * 구조 전체(부품 타입·ID·배선 참조와 kind 일치·PLC·ioMap·equipmentLayout)를 검증하고
  * 스키마 버전 마이그레이션을 수행한다. 실패 시 예외 대신 error 메시지를 반환한다.
  */
+/** 파일 크기 상한 (5MB) — 조작된 초대형 문서로 인한 멈춤 방지 (review-2 P1) */
+const MAX_JSON_BYTES = 5 * 1024 * 1024;
+/** 구조 복잡도 상한 */
+const LIMITS = { components: 2000, wires: 4000, waypoints: 128, rungs: 200, rows: 32, ioMap: 512 };
+/** 이름표·디바이스 등 문자열 필드 길이 상한 */
+const MAX_STRING = 200;
+
 export function parseDocument(json: string): ParseResult {
+  if (json.length > MAX_JSON_BYTES) {
+    return { ok: false, error: "파일이 너무 큽니다 (5MB 초과)." };
+  }
   let raw: unknown;
   try {
     raw = JSON.parse(json);
@@ -54,9 +64,14 @@ function validateShape(doc: Record<string, unknown>): string | null {
   if (!isRecord(meta) || typeof meta.title !== "string") {
     return "meta.title이 없습니다.";
   }
+  if (typeof meta.title === "string" && meta.title.length > MAX_STRING) {
+    return "문서 제목이 너무 깁니다.";
+  }
   if (!Array.isArray(doc.components) || !Array.isArray(doc.wires)) {
     return "components/wires 목록이 없습니다.";
   }
+  if (doc.components.length > LIMITS.components) return "부품 수가 상한(2000개)을 넘습니다.";
+  if (doc.wires.length > LIMITS.wires) return "배선 수가 상한(4000개)을 넘습니다.";
 
   // --- 부품 ---
   const componentIds = new Set<string>();
@@ -74,7 +89,12 @@ function validateShape(doc: Record<string, unknown>): string | null {
       return `부품 회전값이 잘못되었습니다: ${comp.id}`;
     }
     if (!isRecord(comp.properties)) return `부품 속성이 객체가 아닙니다: ${comp.id}`;
-    for (const port of getComponentDefinition(comp.type).ports) {
+    const def = getComponentDefinition(comp.type);
+    // propertySchema 기반 속성 검증 — 타입 불일치·NaN·범위 이탈을 거부하고,
+    // 누락 필드는 기본값으로 채운다 (review-2 P0: strokeTime:"invalid" 등)
+    const propError = validateProperties(comp.properties, def.propertySchema, comp.id);
+    if (propError) return propError;
+    for (const port of def.ports) {
       portKinds.set(`${comp.id}:${port.id}`, port.kind);
     }
   }
@@ -102,7 +122,11 @@ function validateShape(doc: Record<string, unknown>): string | null {
     if (kindFrom !== kindTo || wire.kind !== kindFrom) {
       return `배선 종류가 포트와 일치하지 않습니다: ${wire.id}`;
     }
-    if (!Array.isArray(wire.waypoints) || !wire.waypoints.every(isPoint)) {
+    if (
+      !Array.isArray(wire.waypoints) ||
+      wire.waypoints.length > LIMITS.waypoints ||
+      !wire.waypoints.every(isPoint)
+    ) {
       return `배선 경유점이 잘못되었습니다: ${wire.id}`;
     }
   }
@@ -113,27 +137,62 @@ function validateShape(doc: Record<string, unknown>): string | null {
     if (!isRecord(program) || !Array.isArray(program.rungs)) {
       return "plcProgram 형식이 잘못되었습니다.";
     }
+    if (program.rungs.length > LIMITS.rungs) return "PLC 렁 수가 상한(200개)을 넘습니다.";
     const validKinds: LadderCellKind[] = ["no", "nc", "hline", "coil", "set", "rst", "ton", "ctu", "toff", "ctd"];
+    const timerCounterKinds = new Set<string>(["ton", "toff", "ctu", "ctd"]);
+    const rungIds = new Set<string>();
     for (const rung of program.rungs) {
       if (!isRecord(rung) || typeof rung.id !== "string" || !Array.isArray(rung.cells)) {
         return "PLC 렁 형식이 잘못되었습니다.";
       }
-      if (!Array.isArray(rung.vlinks)) return `PLC 렁에 vlinks가 없습니다: ${rung.id}`;
-      for (const row of rung.cells) {
+      if (rungIds.has(rung.id)) return `PLC 렁 id가 중복되었습니다: ${rung.id}`;
+      rungIds.add(rung.id);
+      // 빈 렁(cells: [])은 스캐너에서 예외를 던진다 — 최소 1행 필요 (review-2 P0)
+      if (rung.cells.length === 0 || rung.cells.length > LIMITS.rows) {
+        return `PLC 렁 행 수가 잘못되었습니다: ${rung.id}`;
+      }
+      for (let r = 0; r < rung.cells.length; r++) {
+        const row = rung.cells[r];
         if (!Array.isArray(row) || row.length !== LADDER_COLS) {
           return `PLC 렁 행 폭이 잘못되었습니다: ${rung.id}`;
         }
-        for (const cell of row) {
+        for (let c = 0; c < row.length; c++) {
+          const cell = row[c];
           if (cell === null) continue;
           if (!isRecord(cell) || !validKinds.includes(cell.kind as LadderCellKind)) {
             return `PLC 셀 종류가 잘못되었습니다: ${rung.id}`;
           }
-          if (cell.kind !== "hline" && typeof cell.device !== "string") {
-            return `PLC 셀 디바이스가 없습니다: ${rung.id}`;
+          if (cell.kind !== "hline") {
+            // 디바이스 문법: P/M/T/C/D + 숫자 (XG5000 표기)
+            if (typeof cell.device !== "string" || !/^[PMTCD][0-9]{1,5}$/.test(cell.device)) {
+              return `PLC 셀 디바이스 표기가 잘못되었습니다: ${rung.id} (${String(cell.device)})`;
+            }
           }
-          if (isOutputKind(cell.kind as LadderCellKind) && row.indexOf(cell) !== LADDER_COLS - 1) {
-            // 출력 요소 위치는 에디터 규칙이므로 여기서는 관용 (스캐너가 무시)
+          if (timerCounterKinds.has(cell.kind as string)) {
+            const preset = cell.preset;
+            if (typeof preset !== "number" || !Number.isFinite(preset) || preset < 0 || preset > 1e6) {
+              return `PLC 타이머/카운터 설정값이 잘못되었습니다: ${rung.id}`;
+            }
           }
+          // 출력 요소는 마지막 열에만 — 다른 위치는 스캐너 의미가 정의되지 않음
+          if (isOutputKind(cell.kind as LadderCellKind) && c !== LADDER_COLS - 1) {
+            return `PLC 출력 요소는 마지막 열에만 놓을 수 있습니다: ${rung.id}`;
+          }
+        }
+      }
+      // vlinks: [{r, c}] — null 항목·범위 밖·마지막 행(아래 행 없음)은 거부 (review-2 P0)
+      if (!Array.isArray(rung.vlinks)) return `PLC 렁에 vlinks가 없습니다: ${rung.id}`;
+      for (const v of rung.vlinks) {
+        if (
+          !isRecord(v) ||
+          !Number.isInteger(v.r) ||
+          !Number.isInteger(v.c) ||
+          (v.r as number) < 0 ||
+          (v.r as number) >= rung.cells.length - 1 ||
+          (v.c as number) < 0 ||
+          (v.c as number) > LADDER_COLS
+        ) {
+          return `PLC 세로 연결(vlink)이 잘못되었습니다: ${rung.id}`;
         }
       }
     }
@@ -142,10 +201,15 @@ function validateShape(doc: Record<string, unknown>): string | null {
   // --- ioMap ---
   if (doc.ioMap !== undefined) {
     if (!Array.isArray(doc.ioMap)) return "ioMap 형식이 잘못되었습니다.";
+    if (doc.ioMap.length > LIMITS.ioMap) return "ioMap 항목 수가 상한(512개)을 넘습니다.";
+    const compById = new Map(
+      (doc.components as Record<string, unknown>[]).map((c) => [c.id as string, c]),
+    );
     for (const entry of doc.ioMap) {
       if (
         !isRecord(entry) ||
         typeof entry.device !== "string" ||
+        !/^P[0-9]{1,5}$/.test(entry.device) ||
         (entry.direction !== "input" && entry.direction !== "output") ||
         typeof entry.componentId !== "string"
       ) {
@@ -153,6 +217,17 @@ function validateShape(doc: Record<string, unknown>): string | null {
       }
       if (entry.componentId !== "" && !componentIds.has(entry.componentId)) {
         return `ioMap이 존재하지 않는 부품을 참조합니다: ${entry.device}`;
+      }
+      // 방향↔부품 역할 적합성: 입력=접점, 출력=부하 (review-2 P0)
+      if (entry.componentId !== "") {
+        const comp = compById.get(entry.componentId)!;
+        const role = getComponentDefinition(comp.type as string).behavior?.role;
+        if (entry.direction === "input" && role !== "elec-contact") {
+          return `ioMap 입력 ${entry.device}에 접점이 아닌 부품이 연결되었습니다.`;
+        }
+        if (entry.direction === "output" && role !== "elec-load") {
+          return `ioMap 출력 ${entry.device}에 부하가 아닌 부품이 연결되었습니다.`;
+        }
       }
     }
   }
@@ -166,6 +241,57 @@ function validateShape(doc: Record<string, unknown>): string | null {
     }
   }
 
+  return null;
+}
+
+/**
+ * propertySchema 기반 부품 속성 검증·정규화.
+ * 누락 필드는 기본값으로 채우고(구버전 문서 호환), 타입 불일치·NaN·범위 이탈은 거부한다.
+ */
+function validateProperties(
+  props: Record<string, unknown>,
+  schema: import("../library/types").PropertyField[],
+  compId: string,
+): string | null {
+  for (const field of schema) {
+    const value = props[field.key];
+    if (value === undefined) {
+      props[field.key] = field.default; // 이후 버전에서 추가된 속성 — 기본값으로 채움
+      continue;
+    }
+    switch (field.type) {
+      case "number": {
+        if (typeof value !== "number" || !Number.isFinite(value)) {
+          return `부품 속성 ${field.key}이(가) 숫자가 아닙니다: ${compId}`;
+        }
+        if (field.min !== undefined && value < field.min) {
+          return `부품 속성 ${field.key}이(가) 최솟값(${field.min}) 미만입니다: ${compId}`;
+        }
+        if (field.max !== undefined && value > field.max) {
+          return `부품 속성 ${field.key}이(가) 최댓값(${field.max})을 넘습니다: ${compId}`;
+        }
+        break;
+      }
+      case "text":
+        if (typeof value !== "string") {
+          return `부품 속성 ${field.key}이(가) 문자열이 아닙니다: ${compId}`;
+        }
+        if (value.length > MAX_STRING) {
+          return `부품 속성 ${field.key}이(가) 너무 깁니다: ${compId}`;
+        }
+        break;
+      case "boolean":
+        if (typeof value !== "boolean") {
+          return `부품 속성 ${field.key}이(가) 불리언이 아닙니다: ${compId}`;
+        }
+        break;
+      case "select":
+        if (typeof value !== "string" || !field.options.some((o) => o.value === value)) {
+          return `부품 속성 ${field.key} 값이 허용 목록에 없습니다: ${compId}`;
+        }
+        break;
+    }
+  }
   return null;
 }
 

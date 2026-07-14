@@ -73,6 +73,13 @@ export function EditorCanvas(): ReactElement {
   const onBackgroundPointerDown = (e: React.PointerEvent) => {
     const s = useEditorStore.getState();
 
+    // 구분동작 일시정지 중 빈 곳 클릭 → 다음 동작 진행 (Phase 11)
+    const sim = useSimStore.getState();
+    if (e.button === 0 && sim.running && sim.mode === "step" && sim.paused) {
+      sim.advanceStep();
+      return;
+    }
+
     if (e.button === 0 && placingType) {
       s.placeComponent(screenToWorld(e.clientX, e.clientY));
       return;

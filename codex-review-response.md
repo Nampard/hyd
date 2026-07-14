@@ -76,3 +76,44 @@
 - `npm test`: 14 files, **82 passed** (추가된 회귀: solver-fixes 8, plc-integration 4, plc-scanner 6, schema-validation 14)
 - `npm run build`: 성공
 - 브라우저 수동 확인: 아래 세션 기록 참조 (릴리프 20bar 제한 표시 등)
+
+---
+
+# 2차 대응 (codex-review-2.md, 2026-07-14)
+
+2차 리뷰가 1차 대응의 판정 오류와 잔여 결함을 지적했다. 아래는 판정 정정과 조치 내역.
+검증: `npm test` 113개 통과, `tsc` 클린, `npm run build` 성공.
+
+## 판정 정정 (1차 표의 상태를 아래로 대체)
+
+| 항목 | 1차 판정 | 2차 리뷰 지적 | 최종 조치 |
+|---|---|---|---|
+| H1 문서 검증 | FIXED | 구조만 검증하고 값·문법 미검증: `cells:[]` 렁 → 스캐너 TypeError, `vlinks:[null]` → TypeError, `strokeTime:"invalid"` → NaN 전파 | **FIXED(2차)** — propertySchema 기반 속성 검증(타입·유한성·min/max·select 목록, 누락은 기본값 채움), PLC 렁(행 수 1~32·행 폭·렁 id 유일·디바이스 문법 `[PMTCD]\d{1,5}`·preset 범위·출력 요소 마지막 열 강제), vlink(레코드·정수·범위·마지막 행 금지), ioMap(P 문법 + 방향↔부품 역할 적합성), 크기 상한(5MB/부품 2000/배선 4000/렁 200/경유점 128/ioMap 512, 문자열 200자). 회귀: `schema-hardening.test.ts` 18건 + "파싱 통과 문서는 엔진 첫 틱 무예외" 전 예제 왕복 |
+| H4 유압 범위 | FIXED | 4/3 오픈 센터가 추가만 되고 의미 오류: 중립에서 P/A/B와 실린더 양측이 40bar 가압 표시 | **FIXED(2차)** — 배기 완화에서 supply 가드 제거로 "탱크로 열린 유로"를 일반 계산, 공급∧탱크개방 동시 도달 넷은 언로딩(배기·레벨 0)으로 분류. 오픈/탠덤 센터의 펌프 무부하와 실린더 자유 상태가 부품 분기 없이 표현됨. 골든 테스트: 중립 전 포트 배기·레벨 0, 솔레노이드 통전 시 P→A 가압 전진, 복귀 시 재언로딩 (`review2-engine.test.ts`) |
+| H5 미저장 폐기 확인 | FIXED | `components.length` 기준이라 제목·PLC만 바꾼 변경은 확인 없이 폐기 | **FIXED(2차)** — 에디터 스토어에 `savedDocument` 기준점 + `isDirty()`(참조 비교) 도입. 저장(.json 다운로드/브라우저 저장)·불러오기·새 문서에서 기준점 갱신. `confirmDiscard()`가 isDirty 사용 |
+| H6 릴리프 | FIXED | 기호가 P 레벨≥설정압을 UI에서 재추론 — 솔버 판정과 어긋날 수 있음 | **FIXED(2차)** — 솔버가 `reliefActive`(탱크 도달 ∧ 공급 ∧ 레벨≥설정압)를 계산해 스냅숏으로 전달, 기호는 그 값만 표시 |
+| M1 SW 프리캐시 | FIXED | 개별 자산 실패를 무시해 반쪽 셸이 캐시될 수 있음 | **FIXED(2차)** — 원자적 설치: 모든 셸 자산 fetch 성공을 확인한 뒤에만 캐시 기록, 하나라도 실패하면 install 실패로 이전 SW/캐시 유지. 캐시 hyd-v3 |
+| M5 틱 계약 문서화 | FIXED | 고정점 수렴 미보장(발진 회로에서 조용히 임의 상태) 미해결 | **FIXED(2차)** — 전기 고정점 반복 상한을 디바이스 수 비례로, 유체 동적 반복 상한을 동적 부품 수 비례로 확장. `snapshot.diagnostics.{electricConverged,fluidConverged}` 노출, 미수렴 시 상태바 경고. NC 자기 궤환 발진 테스트: 무예외 + `electricConverged=false` |
+| M6 E2E/프레임 | DEFERRED | ROADMAP 후순위에 실제 미등재 | **FIXED(2차)** — ROADMAP 후순위 후보에 등재 (WATCH 항목들 포함) |
+| M10 라우팅 | FIXED | 같은 방향만 수정 — 반대 방향이 등지고 배치되면 여전히 직선 관통 | **FIXED(2차)** — 등지는(facing-away) 반대 방향 판정 추가, 옆으로 우회. 4방향 테이블 테스트 추가 |
+| L2 파일 취소 | FIXED | 포커스 폴백 1초 타이머가 큰 파일 `text()` 읽기와 경합해 취소로 오판 가능 | **FIXED(2차)** — change 도착 시 `chosen` 플래그, 폴백은 미선택일 때만 취소 처리. `text()` 실패도 오류로 완료 |
+
+## 2차 신규 조치
+
+| 항목 | 조치 |
+|---|---|
+| 전기 이름표 네임스페이스 혼용 (P0) | 디바이스 코일 집계를 `종류:이름표` 채널로 분리 — 솔레노이드 K1이 릴레이 K1 접점을 닫는 오염 차단. `validateForSimulation()`이 종류 간 이름표 공유를 경고. 테스트: 솔레노이드 K1 통전에도 릴레이 접점 K1 미닫힘 |
+| 셔틀 양측 가압 (P1) | 볼이 한쪽에 앉는 의미 반영: 높은 압력 입력이 출력을 지배, 동률이면 inA. 입력 간 역급기 차단 유지 |
+| 저장소 삭제 실패 무시 (P1) | `delete()`가 boolean 반환, 툴바가 실패 안내. `__proto__`/constructor/prototype 키는 저장 이름에서 배제(프로토타입 오염 방어), 내부 shape은 `Object.create(null)` |
+| 실린더 이름표 중복 (L) | 검증 경고 추가 (첫 실린더만 참조됨을 안내) |
+| XG5000 고지 (P2) | 앱 내 PLC 패널에도 비제휴·비호환 고지 표시 (README와 병행) |
+| 부저 (P2) | 소리 미구현이므로 부품명을 "부저 (표시형 — 소리 없음)"로 정정 |
+| 제3자 고지 (P0-문서) | `public/THIRD_PARTY_NOTICES.txt` 신설 — react/react-dom/scheduler/zustand 정확 버전 + MIT 전문. loose-envify·js-tokens는 번들 미포함을 빌드 산출물 검사로 확인 |
+| 출처 원장 (P0-문서) | `ASSET_PROVENANCE.md`를 증거 수준 3단계([A] 저장소 검증 가능 / [B] 기여자 진술 필요 / [C] 법률·소유자 판단 대기)로 재구성. "모든 그래픽은 JSX" 부정확 기재(icon.svg 누락) 정정 |
+| ARCHITECTURE 정정 | 모듈 트리를 실제 구조로 갱신(actuator.ts 등 부재 파일 제거, plc/ 경로·ui 구성 실화), PLC 디바이스 기재를 P/M/T/C로 정정(D는 후순위) |
+
+## 2차 검증 스냅숏
+
+- `npx tsc -b`: 오류 없음
+- `npm test`: 17 files, **113 passed** (2차 추가: schema-hardening 18, review2-engine 5, step-controller 4, 라우팅 등지기 4)
+- `npm run build`: 성공

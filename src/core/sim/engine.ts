@@ -42,6 +42,9 @@ export class SimulationEngine {
   private plcForced = new Map<string, boolean>();
   private time = 0;
   private listeners = new Set<(snap: SimulationSnapshot) => void>();
+  /** 최근 솔브 수렴 여부 (발진 회로 진단, review-2 P0) */
+  private electricConverged = true;
+  private fluidConverged = true;
 
   constructor(doc: CircuitDocument) {
     this.doc = doc;
@@ -67,10 +70,7 @@ export class SimulationEngine {
         // 이름표가 있는 디바이스 등록 (같은 이름표 코일은 OR로 병합)
         const label = String(comp.properties.label ?? "");
         if (label && ["relay", "timer-on", "timer-off", "counter"].includes(behavior.device)) {
-          const kind =
-            behavior.device === "timer-on" && comp.properties.mode === "off-delay"
-              ? "timer-off"
-              : (behavior.device as DeviceState["kind"]);
+          const kind = deviceKind(behavior.device, comp);
           if (!this.devices.has(label)) {
             this.devices.set(label, {
               kind,
@@ -196,8 +196,11 @@ export class SimulationEngine {
       }
       runtime.portState = portState;
       runtime.portLevel = portLevel;
+      const relief = solve.reliefActive.get(comp.id);
+      if (relief !== undefined) runtime.reliefActive = relief;
     }
     this.lastWireState = solve.wireState;
+    this.fluidConverged = solve.converged !== false;
     return solve;
   }
 
@@ -212,7 +215,10 @@ export class SimulationEngine {
    * 타이머·카운터의 시간/에지 전이는 updateDevices에서 dt 기반으로 갱신된다.
    */
   private solveElectricFixpoint(): void {
-    for (let iter = 0; iter < 5; iter++) {
+    // 릴레이 체인 길이에 비례한 반복 상한 (디바이스 하나당 1단계 전파)
+    const maxIter = Math.max(5, this.devices.size + 3);
+    this.electricConverged = false;
+    for (let iter = 0; iter < maxIter; iter++) {
       // 접점 상태 확정 (현재 디바이스 출력·수동 입력·실린더 위치 기준)
       for (const comp of this.doc.components) {
         const behavior = getComponentDefinition(comp.type).behavior;
@@ -223,7 +229,9 @@ export class SimulationEngine {
       const result = solveElectric(this.doc, (id) => this.runtimes.get(id)?.contactClosed ?? false);
 
       let changed = false;
-      const coilByLabel = new Map<string, boolean>();
+      // 코일 집계는 "종류:이름표" 채널로 분리 — 솔레노이드 K1이 릴레이 K1을
+      // 구동하는 등의 종류 간 오염을 막는다 (review-2 P0: 이름표 네임스페이스)
+      const coilByChannel = new Map<string, boolean>();
       const solenoidByLabel = new Map<string, boolean>();
       for (const comp of this.doc.components) {
         const behavior = getComponentDefinition(comp.type).behavior;
@@ -234,10 +242,14 @@ export class SimulationEngine {
         runtime.energized = on;
 
         const label = String(comp.properties.label ?? "");
-        if (label) coilByLabel.set(label, (coilByLabel.get(label) ?? false) || on);
-        // 솔레노이드는 label별 OR로 집계 — 순회 순서에 따른 신호 소실 방지 (M2)
-        if (behavior.device === "solenoid" && label) {
+        if (!label) continue;
+        if (behavior.device === "solenoid") {
+          // 솔레노이드는 label별 OR로 집계 — 순회 순서에 따른 신호 소실 방지 (M2)
           solenoidByLabel.set(label, (solenoidByLabel.get(label) ?? false) || on);
+        } else if (["relay", "timer-on", "timer-off", "counter"].includes(behavior.device)) {
+          const kind = deviceKind(behavior.device, comp);
+          const ch = `${kind}:${label}`;
+          coilByChannel.set(ch, (coilByChannel.get(ch) ?? false) || on);
         }
       }
 
@@ -247,7 +259,7 @@ export class SimulationEngine {
 
       // 릴레이는 즉시 반응: coil → output. 타이머/카운터 코일 상태만 기록.
       for (const [label, device] of this.devices) {
-        device.coil = coilByLabel.get(label) ?? false;
+        device.coil = coilByChannel.get(`${device.kind}:${label}`) ?? false;
         if (device.kind === "relay") {
           if (device.output !== device.coil) changed = true;
           device.output = device.coil;
@@ -255,7 +267,10 @@ export class SimulationEngine {
       }
 
       this.lastElectricWireHot = result.wireHot;
-      if (!changed) break;
+      if (!changed) {
+        this.electricConverged = true;
+        break;
+      }
     }
   }
 
@@ -458,6 +473,7 @@ export class SimulationEngine {
         portState: { ...runtime.portState },
         portLevel: runtime.portLevel ? { ...runtime.portLevel } : undefined,
         motorAngle: runtime.motorAngle,
+        reliefActive: runtime.reliefActive,
       };
     }
     const wires: Record<string, PressureState> = {};
@@ -470,8 +486,19 @@ export class SimulationEngine {
       components,
       wires,
       plc: this.plcMonitor ?? undefined,
+      diagnostics: {
+        electricConverged: this.electricConverged,
+        fluidConverged: this.fluidConverged,
+      },
     };
   }
+}
+
+/** 부하의 실효 디바이스 종류 (timer-on + off-delay 모드 → timer-off) */
+function deviceKind(device: string, comp: ComponentInstance): DeviceState["kind"] {
+  return device === "timer-on" && comp.properties.mode === "off-delay"
+    ? "timer-off"
+    : (device as DeviceState["kind"]);
 }
 
 function initialValvePosition(

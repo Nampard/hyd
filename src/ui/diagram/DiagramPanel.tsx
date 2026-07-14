@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { useEditorStore } from "../editor/store";
-import { useSimStore, getRecorder } from "../sim/simStore";
+import { useSimStore, getRecorder, getStepController } from "../sim/simStore";
 import { useT } from "../i18n";
 
 /**
@@ -27,6 +27,7 @@ export function DiagramPanel(): ReactElement | null {
   const recorder = getRecorder();
   const tracks = recorder?.tracks() ?? [];
   const endTime = recorder?.endTime() ?? 0;
+  const stepBoundaries = getStepController()?.boundaries() ?? [];
 
   const width = 760;
   const plotWidth = width - LEFT - 16;
@@ -79,6 +80,38 @@ export function DiagramPanel(): ReactElement | null {
               </g>
             );
           })}
+
+          {/* 구분동작 경계: 동작 번호 점선, 사이클 완료는 강조 실선 ↻ (Phase 11) */}
+          {tracks.length > 0 &&
+            stepBoundaries
+              .filter((b) => b.time >= t0 && b.time <= t1)
+              .map((b) => {
+                const x = xOf(b.time);
+                const yBottom = TOP + tracks.length * (TRACK_HEIGHT + TRACK_GAP) - TRACK_GAP;
+                return (
+                  <g key={`step-${b.step}`}>
+                    <line
+                      x1={x}
+                      y1={TOP - 6}
+                      x2={x}
+                      y2={yBottom}
+                      stroke={b.cycleComplete ? "var(--err)" : "var(--text-dim)"}
+                      strokeWidth={b.cycleComplete ? 1.5 : 1}
+                      strokeDasharray={b.cycleComplete ? undefined : "4 3"}
+                    />
+                    <text
+                      x={x}
+                      y={TOP - 9}
+                      textAnchor="middle"
+                      fontSize={9}
+                      fontWeight={b.cycleComplete ? 700 : 400}
+                      fill={b.cycleComplete ? "var(--err)" : "var(--text-dim)"}
+                    >
+                      {b.cycleComplete ? `↻${b.step}` : b.step}
+                    </text>
+                  </g>
+                );
+              })}
 
           {/* 시간축 눈금 (1초 간격, 5초마다 라벨) */}
           {tracks.length > 0 &&

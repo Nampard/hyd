@@ -19,6 +19,8 @@ export interface ComponentRuntime {
   portLevel?: Record<string, number>;
   /** 모터: 누적 회전각 (도, 역회전 시 감소) */
   motorAngle?: number;
+  /** 릴리프 밸브가 릴리빙 중 (솔버가 판정, 기호 표시용) */
+  reliefActive?: boolean;
 }
 
 /** UI가 구독하는 스냅숏 (불변 평면 객체) */
@@ -35,6 +37,8 @@ export interface SimulationSnapshot {
       portState: Record<string, PressureState>;
       portLevel?: Record<string, number>;
       motorAngle?: number;
+  /** 릴리프 밸브가 릴리빙 중 (솔버가 판정, 기호 표시용) */
+  reliefActive?: boolean;
     }
   >;
   /**
@@ -48,6 +52,11 @@ export interface SimulationSnapshot {
     bits: Record<string, boolean>;
     /** T 경과 시간(초)·C 현재 계수 */
     values: Record<string, number>;
+  };
+  /** 솔버 수렴 진단 — false면 발진 회로 가능성 경고 (review-2 P0) */
+  diagnostics?: {
+    electricConverged: boolean;
+    fluidConverged: boolean;
   };
 }
 

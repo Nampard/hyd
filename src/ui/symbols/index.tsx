@@ -11,6 +11,8 @@ export interface SymbolRuntime {
   portState?: Record<string, PressureState>;
   portLevel?: Record<string, number>;
   motorAngle?: number;
+  /** 릴리프 밸브가 릴리빙 중 (솔버 판정) */
+  reliefActive?: boolean;
 }
 
 export interface SymbolProps {
@@ -700,15 +702,14 @@ function HydGauge({ runtime }: SymbolProps): ReactElement {
 }
 
 function HydRelief({ properties, runtime }: SymbolProps): ReactElement {
-  // 작동 판정: P 라인 레벨이 설정압에 도달 (릴리프가 상한을 잡고 있는 상태)
+  // 작동 판정은 솔버가 내려준 reliefActive를 그대로 표시 — UI 재추론 금지 (review-2 P1)
   const setpoint = Number(properties.pressure ?? 50);
-  const levelP = runtime?.portLevel?.P ?? 0;
-  const relieving = runtime != null && levelP >= setpoint && levelP > 0;
+  const relieving = runtime?.reliefActive === true;
   return (
     <g>
       <rect x={-15} y={-20} width={30} height={40} {...S} fill={relieving ? "var(--energized)" : "none"} />
-      {/* 정상 차단 + 압력 초과 시 열림 — 작동 시 유로 화살표가 중앙 정렬 */}
-      <FlowArrow x1={relieving ? 0 : -8} y1={14} x2={relieving ? 0 : -8} y2={-14} />
+      {/* 정상 차단 + 압력 초과 시 열림 — 흐름 방향은 P(위)→T(아래), 작동 시 유로가 중앙 정렬 */}
+      <FlowArrow x1={relieving ? 0 : -8} y1={-14} x2={relieving ? 0 : -8} y2={14} />
       <SpringH x={15} dir={1} />
       <line x1={0} y1={-30} x2={0} y2={-20} {...S} />
       <line x1={0} y1={20} x2={0} y2={30} {...S} />

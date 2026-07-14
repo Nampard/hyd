@@ -304,6 +304,10 @@ export function PlcPanel(): ReactElement | null {
       </div>
 
       <div className="plc-side">
+        <div className="plc-disclaimer">
+          XG5000 표기 관례를 참고한 교육용 독립 구현 — LS ELECTRIC과 무관하며 .xgp 등
+          XG5000 파일과 호환되지 않습니다.
+        </div>
         <strong>I/O 매핑 (P 디바이스 ↔ 부품)</strong>
         <table className="plc-iomap">
           <thead>

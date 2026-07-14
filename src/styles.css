@@ -143,6 +143,22 @@ body,
   border-color: var(--run-stop) !important;
 }
 
+.run-button.step {
+  background: #0e7490 !important;
+  border-color: #0e7490 !important;
+}
+
+.run-button.next-step {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  animation: next-step-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes next-step-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
 .run-button:disabled {
   opacity: 0.4;
 }
@@ -552,6 +568,16 @@ body,
   background: var(--panel-bg);
   cursor: pointer;
   font-size: 11px;
+}
+
+.plc-disclaimer {
+  margin-bottom: 8px;
+  padding: 4px 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  background: #f8fafc;
+  border-radius: 4px;
 }
 
 .plc-bits {

@@ -169,4 +169,20 @@ describe("M10: 같은 방향 일직선 포트 라우팅", () => {
     );
     expect(detoured).toBe(true);
   });
+
+  it.each([
+    ["right", "left", { x: 100, y: 0 }, { x: 0, y: 0 }],
+    ["left", "right", { x: 0, y: 0 }, { x: 100, y: 0 }],
+    ["down", "up", { x: 0, y: 100 }, { x: 0, y: 0 }],
+    ["up", "down", { x: 0, y: 0 }, { x: 0, y: 100 }],
+  ] as const)(
+    "%s→%s 등지는 배치는 두 부품 사이 직선을 관통하지 않고 우회한다 (review-2 P1)",
+    (fromDir, toDir, from, to) => {
+      const route = computeOrthogonalRoute(from, fromDir, to, toDir);
+      // 직선 연결(경유점 0)은 두 부품을 관통 — 우회점이 있어야 한다
+      expect(route.length).toBeGreaterThan(0);
+      const detoured = route.some((p) => (from.y === to.y ? p.y !== from.y : p.x !== from.x));
+      expect(detoured).toBe(true);
+    },
+  );
 });

@@ -17,13 +17,15 @@ export function Toolbar(): ReactElement {
   const equipmentOpen = useEditorStore((s) => s.equipmentViewOpen);
   const diagramOpen = useEditorStore((s) => s.diagramPanelOpen);
   const running = useSimStore((s) => s.running);
+  const stepPaused = useSimStore((s) => s.paused);
   const t = useT();
   const lang = useI18nStore((s) => s.lang);
 
-  /** 미저장 작업 폐기 확인 — 새 회로/파일 열기/예제/브라우저 열기 공통 정책 (codex-review H5) */
+  /** 미저장 작업 폐기 확인 — 새 회로/파일 열기/예제/브라우저 열기 공통 정책 (codex-review H5).
+   *  저장 기준점 이후 변경(제목·PLC·속성 포함)이 있을 때만 묻는다 (review-2 P0). */
   const confirmDiscard = (): boolean => {
     const s = useEditorStore.getState();
-    if (s.document.components.length === 0) return true;
+    if (!s.isDirty()) return true;
     return window.confirm("현재 회로를 버릴까요? 저장하지 않은 변경은 사라집니다.");
   };
 
@@ -44,14 +46,14 @@ export function Toolbar(): ReactElement {
     }
   };
 
-  const handleRun = () => {
+  const handleRun = (mode: "continuous" | "step") => {
     const sim = useSimStore.getState();
     if (running) {
       sim.stop();
       useEditorStore.getState().setStatus("시뮬레이션을 정지했습니다.");
       return;
     }
-    sim.start();
+    sim.start(mode);
     const { warnings } = useSimStore.getState();
     if (warnings.length > 0) {
       const head = warnings.slice(0, 2).join(" · ");
@@ -73,6 +75,7 @@ export function Toolbar(): ReactElement {
     const name = s.document.meta.title || "제목 없음";
     if (browserStorage.save(name, s.document)) {
       setStorageVersion((v) => v + 1);
+      s.markSaved();
       s.setStatus(`브라우저에 "${name}" 저장 완료 (파일 없이 이 PC에 보관됩니다)`);
     } else {
       s.setStatus("브라우저 저장 실패 — 저장 공간이 가득 찼거나 사생활 보호 모드일 수 있습니다. .json 파일 저장을 이용하세요.");
@@ -97,9 +100,9 @@ export function Toolbar(): ReactElement {
       return;
     }
     if (!window.confirm(`브라우저 저장소에서 "${name}"을(를) 삭제할까요?`)) return;
-    browserStorage.delete(name);
+    if (browserStorage.delete(name)) s.setStatus(`"${name}" 삭제 완료`);
+    else s.setStatus(`"${name}" 삭제 실패 — 저장소에 접근할 수 없습니다.`);
     setStorageVersion((v) => v + 1);
-    s.setStatus(`"${name}" 삭제 완료`);
   };
 
   const handleExample = (id: string) => {
@@ -123,10 +126,26 @@ export function Toolbar(): ReactElement {
       <button
         className={`run-button${running ? " running" : ""}`}
         disabled={!running && !hasComponents}
-        onClick={handleRun}
+        onClick={() => handleRun("continuous")}
+        title={running ? undefined : "연속동작 실행"}
       >
         {running ? t("stop") : t("run")}
       </button>
+      {!running && (
+        <button
+          className="run-button step"
+          disabled={!hasComponents}
+          onClick={() => handleRun("step")}
+          title="구분동작 실행 — 동작 하나가 끝날 때마다 일시정지"
+        >
+          {t("runStep")}
+        </button>
+      )}
+      {running && stepPaused && (
+        <button className="run-button next-step" onClick={() => useSimStore.getState().advanceStep()}>
+          {t("nextStep")}
+        </button>
+      )}
       <div className="toolbar-group">
         <select
           className="example-select"
@@ -157,7 +176,11 @@ export function Toolbar(): ReactElement {
         </button>
         <button
           disabled={running}
-          onClick={() => downloadDocument(useEditorStore.getState().document)}
+          onClick={() => {
+            const s = useEditorStore.getState();
+            downloadDocument(s.document);
+            s.markSaved();
+          }}
         >
           {t("saveJson")}
         </button>

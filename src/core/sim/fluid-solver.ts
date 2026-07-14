@@ -28,6 +28,10 @@ export interface SolveResult {
   supplyLevel: Map<string, number>;
   /** wireId → 상태 */
   wireState: Map<string, PressureState>;
+  /** 동적 연결 반복이 상한 내에 수렴했는지 (발진 회로 진단, review-2) */
+  converged?: boolean;
+  /** 릴리프 밸브 compId → 이번 솔브에서 릴리빙 중인지 (기호 표시용, review-2 P1) */
+  reliefActive: Map<string, boolean>;
 }
 
 interface Edge {
@@ -208,7 +212,15 @@ export function solveFluid(
 
   let result: SolveResult | null = null;
 
-  for (let iter = 0; iter < 4; iter++) {
+  // 동적 연결 부품 수에 비례한 반복 상한 (긴 셔틀 체인 등도 한 틱에 수렴)
+  const dynamicCount = doc.components.filter((c) => {
+    const role = getComponentDefinition(c.type).behavior?.role;
+    return role === "shuttle" || role === "two-pressure" || role === "quick-exhaust" || role === "pilot-check";
+  }).length;
+  const maxIter = Math.max(4, dynamicCount + 2);
+  let converged = false;
+
+  for (let iter = 0; iter < maxIter; iter++) {
     const edges = [...staticEdges];
     const dynExhaustNets = new Set(exhaustNets);
 
@@ -221,11 +233,17 @@ export function solveFluid(
         // 가압된 입력만 출력과 연결 — 비활성 입력은 볼이 막으므로 역급기 금지 (codex-review 셔틀 결함)
         const aOn = stateOf(behavior.inA) === "pressurized";
         const bOn = stateOf(behavior.inB) === "pressurized";
-        if (aOn)
+        if (aOn && bOn) {
+          // 양측 가압: 볼은 한쪽에 앉는다 — 높은 압력 입력이 출력을 지배, 동률이면 inA (review-2 P1)
+          const levelA = portLevelPrev.get(portKey(comp.id, behavior.inA)) ?? 0;
+          const levelB = portLevelPrev.get(portKey(comp.id, behavior.inB)) ?? 0;
+          const winner = levelB > levelA ? behavior.inB : behavior.inA;
+          edges.push({ a: net(comp.id, winner), b: net(comp.id, behavior.out), factorAB: 1, factorBA: 1 });
+        } else if (aOn) {
           edges.push({ a: net(comp.id, behavior.inA), b: net(comp.id, behavior.out), factorAB: 1, factorBA: 1 });
-        if (bOn)
+        } else if (bOn) {
           edges.push({ a: net(comp.id, behavior.inB), b: net(comp.id, behavior.out), factorAB: 1, factorBA: 1 });
-        if (!aOn && !bOn) {
+        } else {
           // 두 입력 모두 무압: 출력이 갇히지 않도록 출력→입력 방향으로만 배기 허용
           edges.push({ a: net(comp.id, behavior.out), b: net(comp.id, behavior.inA), factorAB: 1, factorBA: 0 });
           edges.push({ a: net(comp.id, behavior.out), b: net(comp.id, behavior.inB), factorAB: 1, factorBA: 0 });
@@ -267,11 +285,11 @@ export function solveFluid(
     for (const n of sourceNets) supply[n] = 1;
     relax(supply, edges);
 
-    // 배기 전파 — 터미널 넷은 공급이 닿아도 대기/탱크 개방(언로딩)이므로 항상 시드.
-    // 단, 가압 넷을 "통과"하는 확산은 여전히 금지된다 (relaxExhaust 가드).
+    // 배기(탱크 개방) 전파 — 흐름 방향을 따라 배기 터미널까지 열린 유로 전체를 계산.
+    // 공급이 함께 닿은 넷은 관통 유로(언로딩)로 분류된다 (review-2: 오픈/탠덤 센터 무부하)
     const exhaust = new Array<number>(netCount).fill(0);
     for (const n of dynExhaustNets) exhaust[n] = 1;
-    relaxExhaust(exhaust, edges, supply);
+    relaxExhaust(exhaust, edges);
 
     // 압력 레벨 전파 (경로상 최소 캡, 준정량)
     const level = new Array<number>(netCount).fill(0);
@@ -280,22 +298,26 @@ export function solveFluid(
 
     // 릴리프 밸브: 탱크 경로가 살아 있고 라인이 설정압을 넘으면
     // 압력 포트가 속한 유로(간선으로 이어진 영역) 전체의 레벨을 설정값으로 제한 (H6)
+    const reliefActive = new Map<string, boolean>();
     for (const relief of reliefs) {
       const tankOk = exhaust[relief.netT] > 0;
+      const active = tankOk && supply[relief.netP] > 0 && level[relief.netP] >= relief.setpoint;
+      reliefActive.set(relief.compId, active);
       if (!tankOk || level[relief.netP] <= relief.setpoint) continue;
       for (const n of connectedRegion(relief.netP, netCount, edges)) {
         level[n] = Math.min(level[n], relief.setpoint);
       }
     }
 
-    // 결과 조립 — 배기 터미널을 포함한 넷은 공급이 닿아도 언로딩 상태(탱크 귀환)로 본다
+    // 결과 조립 — 공급과 탱크 개방 유로가 동시에 닿은 넷은 관통(언로딩) 상태:
+    // 오픈/탠덤 센터의 펌프 무부하와 실린더 자유 상태를 표현한다
     const portState = new Map<string, PressureState>();
     const supplyFactor = new Map<string, number>();
     const exhaustFactor = new Map<string, number>();
     const supplyLevel = new Map<string, number>();
     for (const k of allPortKeys) {
       const n = netOfPort.get(k)!;
-      const unloaded = dynExhaustNets.has(n);
+      const unloaded = exhaust[n] > 0 && supply[n] > 0;
       const st: PressureState = unloaded
         ? "exhausted"
         : supply[n] > 0
@@ -305,7 +327,7 @@ export function solveFluid(
             : "blocked";
       portState.set(k, st);
       supplyFactor.set(k, unloaded ? 0 : supply[n]);
-      exhaustFactor.set(k, unloaded ? 1 : exhaust[n]);
+      exhaustFactor.set(k, exhaust[n]);
       supplyLevel.set(k, !unloaded && supply[n] > 0 ? level[n] : 0);
     }
     const wireState = new Map<string, PressureState>();
@@ -313,7 +335,7 @@ export function solveFluid(
       if (wire.kind === "electric") continue;
       wireState.set(wire.id, portState.get(portKey(wire.from.componentId, wire.from.portId)) ?? "blocked");
     }
-    result = { portState, supplyFactor, exhaustFactor, supplyLevel, wireState };
+    result = { portState, supplyFactor, exhaustFactor, supplyLevel, wireState, reliefActive };
 
     // 고정점 검사 (상태 + 레벨)
     let changed = false;
@@ -328,9 +350,13 @@ export function solveFluid(
     }
     portStatePrev = portState;
     portLevelPrev = supplyLevel;
-    if (!changed) break;
+    if (!changed) {
+      converged = true;
+      break;
+    }
   }
 
+  result!.converged = converged;
   return result!;
 }
 
@@ -405,22 +431,24 @@ function relaxLevel(levels: number[], edges: Edge[]): void {
 }
 
 /**
- * 배기 완화: 배기 흐름은 노드→배기터미널 방향이므로 간선 계수는 전파 방향의 역방향 계수 사용.
- * 가압 넷(supply>0)은 배기 경로로 쓰지 않는다.
+ * 배기(탱크 개방) 완화: 배기 흐름은 노드→배기터미널 방향이므로
+ * 간선 계수는 전파 방향의 역방향 계수를 사용한다.
+ * 가압 넷도 유로가 열려 있으면 탱크 개방으로 계산되며,
+ * 공급∧배기 동시 도달 넷은 결과 조립 단계에서 언로딩으로 분류된다.
  */
-function relaxExhaust(values: number[], edges: Edge[], supply: number[]): void {
+function relaxExhaust(values: number[], edges: Edge[]): void {
   for (let i = 0; i < values.length + 1; i++) {
     let changed = false;
     for (const e of edges) {
       // b가 배기에 닿아 있으면 a도 배기 가능 (흐름 a→b: factorAB)
-      if (supply[e.a] === 0) {
+      {
         const via = Math.min(values[e.b], e.factorAB);
         if (via > values[e.a]) {
           values[e.a] = via;
           changed = true;
         }
       }
-      if (supply[e.b] === 0) {
+      {
         const via = Math.min(values[e.a], e.factorBA);
         if (via > values[e.b]) {
           values[e.b] = via;

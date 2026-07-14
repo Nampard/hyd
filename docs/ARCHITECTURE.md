@@ -18,32 +18,37 @@
 ```
 src/
   core/                  # React 무관, 순수 TypeScript
-    model/               # 회로 문서 모델 + 직렬화
-      document.ts        # CircuitDocument: components, wires, plcProgram, ioMap
-      component.ts       # ComponentInstance: type, position, rotation, properties
-      port.ts            # Port: id, kind(pneumatic|hydraulic|electric), direction
-      wire.ts            # Wire: 두 포트 연결 + 경유점(waypoints)
-      schema.ts          # JSON 스키마 버전, 마이그레이션
+    model/
+      types.ts           # CircuitDocument, ComponentInstance, Wire, Point 등
+      operations.ts      # 부품 추가/이동/삭제, 배선, 장비 배치 등 불변 갱신
+      schema.ts          # JSON 직렬화·파싱·경계 검증·버전 마이그레이션
     library/             # 부품 정의 (데이터 주도)
-      pneumatic/         # 부품별: 포트 정의, 속성 스키마, 시뮬레이션 동작, 기호 참조
-      hydraulic/
-      electric/
+      types.ts           # ComponentDefinition, Behavior, PropertyField
+      pneumatic/ hydraulic/ electric/   # 도메인별 부품 정의
       registry.ts        # 타입 ID → ComponentDefinition 레지스트리
-    sim/                 # 시뮬레이션 엔진
-      engine.ts          # 고정 틱 루프, 도메인 솔버 오케스트레이션
-      electric-solver.ts # 레일 간 연결성 해석
+    sim/
+      engine.ts          # 고정 틱 루프, 밸브 전환·실린더/모터 적분, 디바이스 상태
+      electric-solver.ts # 24V/0V 레일 간 연결성 해석
       fluid-solver.ts    # 압력 상태 전파 (공압/유압 공용)
-      actuator.ts        # 실린더 위치 적분, 리밋 스위치 이벤트
-      plc/               # 래더 모델 + 스캔 실행기
-        ladder-model.ts  # Rung, Cell(접점/코일/기능블록), 디바이스 메모리
-        scanner.ts       # 스캔 사이클 실행
+      step-controller.ts # 구분동작 실행 — 동작 경계·사이클 완료 감지 (Phase 11)
+      recorder.ts        # 변위단계선도용 실린더 위치 기록
+      validate.ts        # 실행 전 검증 (경고)
+      types.ts           # SimulationSnapshot, ComponentRuntime
+    plc/
+      model.ts           # LadderRung, LadderCell(접점/코일/TON/TOFF/CTU/CTD), vlink
+      scanner.ts         # 노드 도달성 기반 스캔 실행기 + 모니터
+    examples/index.ts    # 내장 예제 빌더
+    storage/index.ts     # 브라우저(localStorage) 문서 저장소 어댑터
+    routing.ts geometry.ts
   ui/
-    editor/              # 스키매틱 에디터 (캔버스, 팔레트, 속성 패널, 배선 도구)
-    symbols/             # ISO 1219 / 전기 기호 SVG 컴포넌트 (상태 → 시각 바인딩)
-    equipment/           # 일러스트 장비 뷰 (프로파일 보드)
-    ladder/              # XG5000 스타일 래더 에디터 + 모니터링
-    examples/            # 내장 예제 브라우저
-  app/                   # 레이아웃, 라우팅, 파일 저장/불러오기
+    editor/              # 스키매틱 에디터 (캔버스, 팔레트, 속성 패널, 툴바, 상태바)
+    symbols/             # ISO 1219 스타일 / 전기 기호 SVG 컴포넌트 (상태 → 시각 바인딩)
+    equipment/           # 일러스트 장비 뷰 (스프라이트 + 자유 배치)
+    plc/PlcPanel.tsx     # XG5000 스타일 래더 에디터 + 모니터링
+    diagram/             # 변위단계선도 패널
+    sim/simStore.ts      # 실행 루프(연속/구분 모드), 스냅숏 구독
+    i18n/                # ko/en 문자열
+  app/                   # 레이아웃(App.tsx), 파일 저장/불러오기(file.ts)
 ```
 
 **원칙: `core/`는 React를 import하지 않는다.** 엔진과 모델은 Node에서 단독 테스트 가능해야 한다.
@@ -131,7 +136,7 @@ interface ComponentDefinition {
 
 - 래더는 렁 목록, 렁은 셀 그리드(접점/수직·수평 연결선/코일/기능블록).
 - 스캔: ioMap을 통해 전기 도메인에서 입력 이미지 채움 → 렁을 위에서 아래로, 각 렁은 좌→우 통전 평가 → 출력 이미지를 ioMap으로 전기 도메인에 반영.
-- 디바이스 메모리: `P/M/T/C/D` 네임스페이스별 배열. T/C는 전기 타이머와 동일한 상태 기계 재사용.
+- 디바이스 메모리: `P/M/T/C` 비트 맵 (D 워드 디바이스는 후순위 — PRD 4.4). T/C는 전기 타이머와 동일한 상태 기계 재사용.
 - 모니터링: 스캔 결과의 셀별 통전 정보를 래더 UI에 오버레이.
 
 ### 4.6 장비 뷰 동기화

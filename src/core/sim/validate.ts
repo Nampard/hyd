@@ -25,19 +25,44 @@ export function validateForSimulation(doc: CircuitDocument): string[] {
   const cylinderLabels = new Set<string>();
   const deviceLabels = new Set<string>();
   const solenoidLabels = new Set<string>();
+  /** 이름표 → 사용한 부하 종류 집합 (종류 간 이름표 혼용 경고, review-2 P0) */
+  const labelKinds = new Map<string, Set<string>>();
   for (const comp of doc.components) {
     const behavior = getComponentDefinition(comp.type).behavior;
     if (behavior?.role === "cylinder") {
       const label = String(comp.properties.label ?? "");
-      if (label) cylinderLabels.add(label);
+      if (label) {
+        if (cylinderLabels.has(label)) {
+          warnings.push(`실린더 이름표 "${label}"가 중복되었습니다 — 리밋/롤러가 첫 실린더만 참조합니다.`);
+        }
+        cylinderLabels.add(label);
+      }
     }
     if (behavior?.role === "elec-load") {
       const label = String(comp.properties.label ?? "");
       if (!label) continue;
+      const kindGroup = ["relay", "timer-on", "timer-off", "counter"].includes(behavior.device)
+        ? behavior.device
+        : behavior.device === "solenoid"
+          ? "solenoid"
+          : null;
+      if (kindGroup) {
+        if (!labelKinds.has(label)) labelKinds.set(label, new Set());
+        labelKinds.get(label)!.add(kindGroup);
+      }
       if (["relay", "timer-on", "timer-off", "counter"].includes(behavior.device)) {
         deviceLabels.add(label);
       }
       if (behavior.device === "solenoid") solenoidLabels.add(label);
+    }
+  }
+  // 릴레이·타이머·카운터·솔레노이드는 이름표 채널이 분리되어 있다 —
+  // 같은 이름표를 다른 종류가 공유하면 접점이 의도한 코일을 따라가지 않을 수 있다
+  for (const [label, kinds] of labelKinds) {
+    if (kinds.size > 1) {
+      warnings.push(
+        `이름표 "${label}"를 서로 다른 종류(${[...kinds].join(", ")})가 공유합니다 — 종류별로 별개 채널로 동작하니 이름을 나누세요.`,
+      );
     }
   }
 
