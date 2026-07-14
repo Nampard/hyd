@@ -117,3 +117,53 @@
 - `npx tsc -b`: 오류 없음
 - `npm test`: 17 files, **113 passed** (2차 추가: schema-hardening 18, review2-engine 5, step-controller 4, 라우팅 등지기 4)
 - `npm run build`: 성공
+
+---
+
+# 3차 대응 (codex-review-3.md, 2026-07-14)
+
+3차 리뷰의 P0 기능·교육 결함과 P1/P2를 처리했다. 검증: `npm test` 122개 통과, `tsc` 클린, `npm run build` 성공.
+권리 게이트([C] 항목)는 소유자 결정 대기로 유지 — 아래 "사용자 결정 필요" 참조.
+
+## P0 조치
+
+| 리뷰 항목 | 조치 |
+|---|---|
+| 구분동작 조기 사이클 완료 (A+A−B+B−) | StepController에 참여 이력 상태기계 도입: 사이클 완료 = 모든 실린더 초기 복귀 ∧ **문서의 모든 실린더가 이번 사이클에서 초기 위치를 벗어난 적 있음**. 완료 시 참여 추적 리셋. 반례를 합성 스냅숏 단위 테스트로 고정: A− 경계에서 cycleComplete=false, B− 경계에서 true, 2사이클째 A만 왕복 시 false (`review3-engine.test.ts`) |
+| 릴리프 활성 표시 오류 (exact-setpoint/언로딩/다중) | 활성 판정을 모든 cap·언로딩 이후 최종 상태로 이동: `tankOk ∧ ¬언로딩 ∧ 공급 도달 ∧ (cap 전 레벨 > 설정압) ∧ (최종 레벨 ≥ 설정압)`. 공급압=설정압(초과분 없음) → 비활성, 오픈센터 0 bar → 비활성, 40/50 bar 이중 릴리프 → 40만 활성. 테스트 4건 |
+| D 디바이스 boolean 허용 | 스키마 문법을 `[PMTC]`로 축소(D는 word 디바이스 — 현재 범위에서 거부), PLC 패널 입력에서도 차단 + 안내. D word 설계는 ROADMAP 후순위로 명시 |
+| 전기 디바이스 순서 의존 (bare label) | 디바이스 key를 `종류:이름표`로 통일(등록·코일 대입·카운터 리셋), 접점 조회는 이름표의 종류별 채널 OR(순서 무관 결정적), preset 충돌은 결정적으로 max + 실행 전 검증 경고. 같은 T1 두 타이머(1s/2s)를 순서 반전으로 돌려 동일 동작 확인하는 테스트 추가 |
+| 4/3 밸브 센터링 스프링 부재 | `HydValve43` 양측에 센터링 스프링 글리프 추가 — `springCentered:true` 동작과 기호 일치 |
+| 릴리프 기호의 비작동 유로 화살표 | base 기호를 정상(차단) 위치로 고정 — 화살표 기하는 상태와 무관하게 오프셋 위치 유지, 작동 표시는 색상 overlay(채움)만. 규범 기호와 시뮬레이션 표시 분리 원칙 |
+| React 계열 MIT 고지 원문 불일치 | `THIRD_PARTY_NOTICES.txt`를 설치된 `node_modules/<pkg>/LICENSE` 원문을 무수정 복사해 재생성 (`Copyright (c) Facebook, Inc. and its affiliates.`) |
+| 표준/완료 주장 과대 | README·PRD·ARCHITECTURE의 "ISO 1219 기호/표준 준수"를 "통용 관례를 참고한 교육용 독자 단순화, 적합성 미인증"으로 완화. README 고지에 준정량 bar·overlay 비규범 명시. 앱 툴바에 상시 교육용 고지 태그라인 추가 |
+
+## P1 조치
+
+| 항목 | 조치 |
+|---|---|
+| save("__proto__") 성공 모순 | 예약어 이름은 저장 자체를 거부(false) — 읽기 필터와 짝. 테스트 추가 |
+| 파일 전체 읽기 후 크기 검사 | `File.size`를 `text()` 호출 전에 검사 |
+| UTF-16 length 상한 | length는 하한 선별로만 쓰고 초과 가능 구간은 `TextEncoder` byte 수로 정확 판정 |
+| warning이 step 안내 가림 | 상태바 우선순위 재정렬: 미수렴 경고 > 구분동작 일시정지 안내 > 일반 메시지 |
+| 툴바 줄바꿈·음절 분리 | 버튼 `white-space: nowrap` + 툴바 `flex-wrap`/`word-break: keep-all` |
+| 이전 문서 기록 잔존 | `clearSimHistory()` — 새 문서/열기/예제/브라우저 열기 시 레코더·StepController 폐기 |
+| SETTLE_TICKS 관찰 횟수 의존 | 시뮬레이션 시간 기준(0.12s)으로 변경 |
+| boundaries() 내부 배열 노출 | 복사본 반환 |
+| FRL·파워유닛 명칭 불일치 | "공압 서비스 유닛 (단순화 — 여과·윤활·정압 미모사)", "유압 파워유닛 (펌프+탱크 — 릴리프는 별도 부품)"으로 정정 |
+
+## P2·문서 조치
+
+- ARCHITECTURE: 전기 고정점 상한 "디바이스 수 비례 + 진단", 유체 "동적 부품 수 비례", 릴레이 체인 **same-tick** 수렴으로 정정. 릴리프 활성의 최종 상태 판정 명시
+- ROADMAP 후순위: 48종 표준 적합성 매트릭스(원문 확보 필요), Wire line function, base/overlay 분리 + 인쇄 중립 모드, p95 프레임 계측, D word 설계 등재
+- ASSET_PROVENANCE: KS B 0054 현행(2024-12-27 확인)·ISO 1219 판본 구체화, KS C 0102 폐지(2013-12-31) 주의 기재
+
+## 사용자 결정 필요 (개발 측에서 대신할 수 없음 — 리뷰 P0/RELEASE)
+
+- 공개 GitHub Pages **자동 배포의 유지/중단**: 리뷰는 권리 게이트(LICENSE·기여자 진술·EULA 확인) 완료 전 자동 배포 중지를 권고. 배포 파이프라인 변경은 소유자 결정 사항으로 보류 — 결정 시 `deploy.yml`을 workflow_dispatch(수동 승인)로 전환 가능
+- 프로젝트 LICENSE 선택, 기여자 사실확인서, side-by-side 검토, V-AMT/Automation Studio 계약 확인, AI chain of title (ASSET_PROVENANCE 4절)
+- 표준 원문(KS B 0054, ISO 1219, IEC 60617) 확보 및 48종 대조 검토자 지정
+
+## 3차 검증 스냅숏
+
+- `npx tsc -b`: 오류 없음 / `npm test`: **122 passed** (3차 추가: review3-engine 8, storage 예약어 1) / `npm run build`: 성공

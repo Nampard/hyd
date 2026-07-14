@@ -19,20 +19,30 @@ export interface StepBoundary {
   time: number;
   /** 완료된 동작 번호 (1부터) */
   step: number;
-  /** 이 경계에서 모든 실린더가 초기 위치로 복귀 — 사이클 완료 */
+  /**
+   * 사이클 완료 — 문서의 모든 실린더가 이번 사이클에서 초기 위치를 벗어났다가
+   * 전부 초기 위치로 복귀한 경계. 위치만 보는 파생값이 아니라 참여 이력을 추적하는
+   * 상태기계 이벤트다 (codex-review-3 P0: A+A−B+B− 조기 사이클 방지).
+   */
   cycleComplete: boolean;
 }
 
 const POS_EPS = 1e-6;
-/** 중간 정지 판정: 움직임이 멈춘 채 유지되어야 하는 틱 수 */
-const SETTLE_TICKS = 6;
+/** 초기 위치 이탈/복귀 판정 허용 오차 */
+const DEPART_EPS = 0.01;
+/** 중간 정지 판정: 움직임이 멈춘 채 유지되어야 하는 시뮬레이션 시간(초) —
+ * 관찰 주기(틱 수)가 아니라 시간 기준이라 tick 변경에 불변 (codex-review-3 P1) */
+const SETTLE_SECONDS = 0.12;
 
 export class StepController {
   private cylinderIds: string[] = [];
   private initial = new Map<string, number>();
   private prev = new Map<string, number>();
   private moving = false;
-  private settledTicks = 0;
+  private settledTime = 0;
+  private lastTime: number | null = null;
+  /** 이번 사이클에서 초기 위치를 벗어난 적 있는 실린더 (사이클 경계에서 리셋) */
+  private departed = new Set<string>();
   private stepCount = 0;
   private boundaries_: StepBoundary[] = [];
 
@@ -53,7 +63,7 @@ export class StepController {
   }
 
   boundaries(): StepBoundary[] {
-    return this.boundaries_;
+    return [...this.boundaries_]; // 내부 배열 노출 금지 (codex-review-3 P1)
   }
 
   currentStep(): number {
@@ -66,6 +76,9 @@ export class StepController {
    */
   observe(snapshot: SimulationSnapshot): "continue" | "pause" {
     if (this.cylinderIds.length === 0) return "continue";
+
+    const dt = this.lastTime === null ? 0 : Math.max(0, snapshot.time - this.lastTime);
+    this.lastTime = snapshot.time;
 
     let anyMoved = false;
     let arrivedAtEnd = false;
@@ -80,13 +93,15 @@ export class StepController {
         const wasAtEnd = prev <= POS_EPS || prev >= 1 - POS_EPS;
         if (atEnd && !wasAtEnd) arrivedAtEnd = true;
       }
+      // 사이클 참여 이력: 초기 위치를 이탈한 실린더 기록
+      if (Math.abs(pos - (this.initial.get(id) ?? 0)) > DEPART_EPS) this.departed.add(id);
       this.prev.set(id, pos);
     }
 
     if (!this.moving) {
       if (anyMoved && !arrivedAtEnd) {
         this.moving = true;
-        this.settledTicks = 0;
+        this.settledTime = 0;
         return "continue";
       }
       if (arrivedAtEnd) {
@@ -99,11 +114,11 @@ export class StepController {
     // 운동 중
     if (arrivedAtEnd) return this.emitBoundary(snapshot);
     if (anyMoved) {
-      this.settledTicks = 0;
+      this.settledTime = 0;
       return "continue";
     }
-    this.settledTicks += 1;
-    if (this.settledTicks >= SETTLE_TICKS) {
+    this.settledTime += dt;
+    if (this.settledTime >= SETTLE_SECONDS) {
       // 중간 정지 (조그 등)도 하나의 동작 완료로 취급
       return this.emitBoundary(snapshot);
     }
@@ -112,12 +127,18 @@ export class StepController {
 
   private emitBoundary(snapshot: SimulationSnapshot): "pause" {
     this.moving = false;
-    this.settledTicks = 0;
+    this.settledTime = 0;
     this.stepCount += 1;
-    const cycleComplete = this.cylinderIds.every((id) => {
+    // 사이클 완료 = (1) 모든 실린더가 초기 위치 복귀 + (2) 문서의 모든 실린더가
+    // 이번 사이클에서 초기 위치를 벗어난 적 있음. A+A−B+B−의 A− 경계처럼
+    // 아직 움직이지 않은 실린더가 남아 있으면 사이클이 아니다 (codex-review-3 P0)
+    const allAtInitial = this.cylinderIds.every((id) => {
       const pos = snapshot.components[id]?.cylinderPos ?? 0;
-      return Math.abs(pos - (this.initial.get(id) ?? 0)) <= 0.01;
+      return Math.abs(pos - (this.initial.get(id) ?? 0)) <= DEPART_EPS;
     });
+    const allParticipated = this.cylinderIds.every((id) => this.departed.has(id));
+    const cycleComplete = allAtInitial && allParticipated;
+    if (cycleComplete) this.departed.clear(); // 다음 사이클의 참여 추적 시작
     this.boundaries_.push({ time: snapshot.time, step: this.stepCount, cycleComplete });
     return "pause";
   }

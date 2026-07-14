@@ -53,3 +53,14 @@ describe("로컬 문서 저장소 (Phase 9)", () => {
     expect(storage.list()).toEqual([]);
   });
 });
+
+describe("review-3 P1: 예약어 저장 이름 거부", () => {
+  it('save("__proto__")는 false를 반환하고 목록에 나타나지 않는다', () => {
+    const storage = new LocalDocumentStorage(memoryStore());
+    const doc = createEmptyDocument("x");
+    for (const name of ["__proto__", "constructor", "prototype"]) {
+      expect(storage.save(name, doc)).toBe(false);
+    }
+    expect(storage.list()).toHaveLength(0);
+  });
+});

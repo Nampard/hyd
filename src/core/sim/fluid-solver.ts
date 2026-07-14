@@ -295,18 +295,36 @@ export function solveFluid(
     const level = new Array<number>(netCount).fill(0);
     for (const [n, lv] of sourceLevels) level[n] = lv;
     relaxLevel(level, edges);
+    /** cap 적용 전 레벨 — 릴리프의 "초과분 존재" 판정용 */
+    const preCapLevel = [...level];
 
     // 릴리프 밸브: 탱크 경로가 살아 있고 라인이 설정압을 넘으면
     // 압력 포트가 속한 유로(간선으로 이어진 영역) 전체의 레벨을 설정값으로 제한 (H6)
-    const reliefActive = new Map<string, boolean>();
+    // 1단계: 모든 릴리프의 cap을 먼저 적용 (다중 릴리프는 낮은 설정압이 최종 상한)
     for (const relief of reliefs) {
       const tankOk = exhaust[relief.netT] > 0;
-      const active = tankOk && supply[relief.netP] > 0 && level[relief.netP] >= relief.setpoint;
-      reliefActive.set(relief.compId, active);
       if (!tankOk || level[relief.netP] <= relief.setpoint) continue;
       for (const n of connectedRegion(relief.netP, netCount, edges)) {
         level[n] = Math.min(level[n], relief.setpoint);
       }
+    }
+    // 2단계: 활성 판정은 모든 cap·언로딩 이후의 최종 상태 기준 (codex-review-3 P0):
+    // 방출이 실제로 일어나려면 (1) 탱크 경로 존재, (2) P 라인이 언로딩(관통 배기)이 아니고
+    // (3) 최종 레벨이 설정압에 도달해 있으며 그 상한이 자신에 의한 것(설정압 초과분 방출)이어야 한다.
+    // 정확히 설정압과 같은 공급(초과분 없음)이나 더 낮은 설정압 밸브가 잡은 라인에서는 열리지 않는다.
+    const reliefActive = new Map<string, boolean>();
+    for (const relief of reliefs) {
+      const tankOk = exhaust[relief.netT] > 0;
+      const unloadedP = exhaust[relief.netP] > 0 && supply[relief.netP] > 0;
+      // 초과분 존재: cap 전 레벨이 설정압을 "초과" (같으면 방출 없음) +
+      // 최종 레벨이 설정압까지 잡혀 있음 (더 낮은 설정압 밸브가 잡은 라인이면 미달 → 비활성)
+      const active =
+        tankOk &&
+        !unloadedP &&
+        supply[relief.netP] > 0 &&
+        preCapLevel[relief.netP] > relief.setpoint &&
+        level[relief.netP] >= relief.setpoint;
+      reliefActive.set(relief.compId, active);
     }
 
     // 결과 조립 — 공급과 탱크 개방 유로가 동시에 닿은 넷은 관통(언로딩) 상태:

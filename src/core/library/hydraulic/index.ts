@@ -11,7 +11,7 @@ import type { ComponentDefinition } from "../types";
 export const powerUnit: ComponentDefinition = {
   type: "hyd.power-unit",
   domain: "hydraulic",
-  name: "유압 파워유닛 (펌프+탱크+릴리프)",
+  name: "유압 파워유닛 (펌프+탱크 — 릴리프는 별도 부품)",
   category: "유압 · 동력원",
   ports: [
     { id: "P", label: "P", kind: "hydraulic", offset: { x: -10, y: -30 }, direction: "up" },

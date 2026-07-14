@@ -27,6 +27,8 @@ export function validateForSimulation(doc: CircuitDocument): string[] {
   const solenoidLabels = new Set<string>();
   /** 이름표 → 사용한 부하 종류 집합 (종류 간 이름표 혼용 경고, review-2 P0) */
   const labelKinds = new Map<string, Set<string>>();
+  /** "종류:이름표" → preset (같은 디바이스의 설정 충돌 경고, review-3 P0) */
+  const devicePresets = new Map<string, number>();
   for (const comp of doc.components) {
     const behavior = getComponentDefinition(comp.type).behavior;
     if (behavior?.role === "cylinder") {
@@ -52,6 +54,20 @@ export function validateForSimulation(doc: CircuitDocument): string[] {
       }
       if (["relay", "timer-on", "timer-off", "counter"].includes(behavior.device)) {
         deviceLabels.add(label);
+        // 같은 종류·이름표의 preset/mode 충돌 — 하나의 디바이스로 병합되므로 값이 갈리면 경고
+        const kind =
+          behavior.device === "timer-on" && comp.properties.mode === "off-delay"
+            ? "timer-off"
+            : behavior.device;
+        const key = `${kind}:${label}`;
+        const preset = Number(comp.properties.preset ?? 0);
+        const prev = devicePresets.get(key);
+        if (prev !== undefined && prev !== preset) {
+          warnings.push(
+            `디바이스 "${label}"의 설정값이 코일마다 다릅니다 (${prev} vs ${preset}) — 큰 값이 적용됩니다. 이름을 나누거나 값을 맞추세요.`,
+          );
+        }
+        devicePresets.set(key, preset);
       }
       if (behavior.device === "solenoid") solenoidLabels.add(label);
     }

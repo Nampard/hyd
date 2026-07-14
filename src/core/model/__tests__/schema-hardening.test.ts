@@ -124,7 +124,8 @@ describe("PLC 프로그램: 렁/vlink/디바이스 문법", () => {
   });
 
   it("디바이스 표기 문법(P/M/T/C/D+숫자)을 벗어나면 거부한다", () => {
-    for (const device of ["X0", "P", "M99999999", "__proto__", ""]) {
+    // D는 word 디바이스 — bit 접점으로 허용하면 안 됨 (codex-review-3 P0)
+    for (const device of ["X0", "P", "M99999999", "__proto__", "", "D1", "D100"]) {
       const rung = { id: "r1", cells: [ROW([{ kind: "no", device }])], vlinks: [] };
       expect(reparse(withPlc([rung])).ok).toBe(false);
     }

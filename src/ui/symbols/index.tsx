@@ -707,9 +707,10 @@ function HydRelief({ properties, runtime }: SymbolProps): ReactElement {
   const relieving = runtime?.reliefActive === true;
   return (
     <g>
+      {/* base 기호는 정상(차단) 위치로 고정 — 유로 화살표는 P→T 방향, 유로선에서 오프셋.
+          작동(릴리빙)은 기호 기하를 바꾸지 않고 색상 overlay로만 표시 (review-3: 규범 기호와 시뮬레이션 표시 분리) */}
       <rect x={-15} y={-20} width={30} height={40} {...S} fill={relieving ? "var(--energized)" : "none"} />
-      {/* 정상 차단 + 압력 초과 시 열림 — 흐름 방향은 P(위)→T(아래), 작동 시 유로가 중앙 정렬 */}
-      <FlowArrow x1={relieving ? 0 : -8} y1={-14} x2={relieving ? 0 : -8} y2={14} />
+      <FlowArrow x1={-8} y1={-14} x2={-8} y2={14} />
       <SpringH x={15} dir={1} />
       <line x1={0} y1={-30} x2={0} y2={-20} {...S} />
       <line x1={0} y1={20} x2={0} y2={30} {...S} />
@@ -820,6 +821,13 @@ function HydValve43({ properties, runtime, center }: SymbolProps & { center: "cl
           <>
             <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
             <SolenoidGlyph x={120} dir={1} label={String(properties.solenoidRight ?? "")} active={current === 2} />
+            {/* 센터링 스프링 — springCentered 동작과 기호 일치 (review-3 P0) */}
+            <g transform="translate(-60, 14) scale(0.7)">
+              <SpringH x={0} dir={-1} />
+            </g>
+            <g transform="translate(120, 14) scale(0.7)">
+              <SpringH x={0} dir={1} />
+            </g>
           </>
         }
       >

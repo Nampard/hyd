@@ -1,5 +1,5 @@
 import type { CircuitDocument } from "../core/model/types";
-import { parseDocument, serializeDocument } from "../core/model/schema";
+import { MAX_JSON_BYTES, parseDocument, serializeDocument } from "../core/model/schema";
 
 /** 문서를 .json 파일로 다운로드 */
 export function downloadDocument(doc: CircuitDocument): void {
@@ -80,6 +80,11 @@ export function openDocumentFile(): Promise<OpenFileResult> {
       const file = input.files?.[0];
       if (!file) {
         settle({ ok: false, cancelled: true });
+        return;
+      }
+      // 전체 읽기 전에 파일 크기부터 검사 — 초대형 파일의 메모리 낭비 방지 (review-3 P1)
+      if (file.size > MAX_JSON_BYTES) {
+        settle({ ok: false, error: "파일이 너무 큽니다 (5MB 초과)." });
         return;
       }
       try {

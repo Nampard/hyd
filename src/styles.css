@@ -89,16 +89,25 @@ body,
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap; /* 좁은 폭에서는 그룹 단위로 줄바꿈 (버튼 내부 줄바꿈 금지) */
+  gap: 8px 12px;
   padding: 6px 12px;
   background: var(--panel-bg);
   border-bottom: 1px solid var(--panel-border);
+  word-break: keep-all;
 }
 
 .app-name {
   font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--accent);
+}
+
+.app-tagline {
+  font-size: 10px;
+  color: var(--text-dim);
+  max-width: 130px;
+  line-height: 1.2;
 }
 
 .title-input {
@@ -119,6 +128,7 @@ body,
   border-radius: 4px;
   background: var(--panel-bg);
   cursor: pointer;
+  white-space: nowrap; /* "다음 동작" 등 버튼 라벨의 음절 분리 방지 (review-3 P1) */
 }
 
 .toolbar button:hover:not(:disabled) {

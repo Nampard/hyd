@@ -18,15 +18,20 @@ export function serializeDocument(doc: CircuitDocument): string {
  * 구조 전체(부품 타입·ID·배선 참조와 kind 일치·PLC·ioMap·equipmentLayout)를 검증하고
  * 스키마 버전 마이그레이션을 수행한다. 실패 시 예외 대신 error 메시지를 반환한다.
  */
-/** 파일 크기 상한 (5MB) — 조작된 초대형 문서로 인한 멈춤 방지 (review-2 P1) */
-const MAX_JSON_BYTES = 5 * 1024 * 1024;
+/** 파일 크기 상한 (5MB, UTF-8 byte 기준) — 조작된 초대형 문서로 인한 멈춤 방지 (review-2 P1) */
+export const MAX_JSON_BYTES = 5 * 1024 * 1024;
 /** 구조 복잡도 상한 */
 const LIMITS = { components: 2000, wires: 4000, waypoints: 128, rungs: 200, rows: 32, ioMap: 512 };
 /** 이름표·디바이스 등 문자열 필드 길이 상한 */
 const MAX_STRING = 200;
 
 export function parseDocument(json: string): ParseResult {
-  if (json.length > MAX_JSON_BYTES) {
+  // UTF-16 code unit 수는 UTF-8 byte 수의 하한이므로 빠른 선별에 쓰고,
+  // 초과 가능 구간(비ASCII 포함 시 최대 3배)은 byte 수로 정확히 판정 (review-3 P1)
+  if (
+    json.length > MAX_JSON_BYTES ||
+    (json.length * 3 > MAX_JSON_BYTES && new TextEncoder().encode(json).length > MAX_JSON_BYTES)
+  ) {
     return { ok: false, error: "파일이 너무 큽니다 (5MB 초과)." };
   }
   let raw: unknown;
@@ -163,8 +168,9 @@ function validateShape(doc: Record<string, unknown>): string | null {
             return `PLC 셀 종류가 잘못되었습니다: ${rung.id}`;
           }
           if (cell.kind !== "hline") {
-            // 디바이스 문법: P/M/T/C/D + 숫자 (XG5000 표기)
-            if (typeof cell.device !== "string" || !/^[PMTCD][0-9]{1,5}$/.test(cell.device)) {
+            // 디바이스 문법: P/M/T/C + 숫자 (XG5000 스타일 bit 디바이스).
+            // D는 word 디바이스라 bit 논리 범위 밖 — 허용하면 교육 개념 오류 (codex-review-3 P0)
+            if (typeof cell.device !== "string" || !/^[PMTC][0-9]{1,5}$/.test(cell.device)) {
               return `PLC 셀 디바이스 표기가 잘못되었습니다: ${rung.id} (${String(cell.device)})`;
             }
           }

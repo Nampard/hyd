@@ -46,6 +46,17 @@ export function getStepController(): StepController | null {
   return stepController;
 }
 
+/**
+ * 마지막 실행 기록(변위 레코더·구분동작 경계) 폐기 — 새 문서/불러오기 시 호출해
+ * 이전 문서의 선도·경계가 새 문서 패널에 남지 않게 한다 (codex-review-3 P1).
+ * 실행 중에는 무시된다.
+ */
+export function clearSimHistory(): void {
+  if (engine) return;
+  recorder = null;
+  stepController = null;
+}
+
 export const useSimStore = create<SimStore>((set, get) => ({
   running: false,
   mode: "continuous",

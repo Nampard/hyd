@@ -123,4 +123,9 @@
 - 타이머/카운터 경과·계수의 스냅숏 노출 확대 (전기 부품 기호에 잔여 시간 표시)
 - propertySchema↔behavior 적합성 등록기 검사, 엔진 문서 참조 readonly화 (codex-review WATCH)
 - 미터인·카운터밸런스 전용 예제
+- 부품 48종 표준 적합성 매트릭스 (KS B 0054/ISO 1219/IEC 60617 항목별 대조 + 검토자 승인 — 원문 확보 필요, codex-review-3)
+- Wire에 line function(작동관/파일럿관/드레인관) 의미 필드 + 선종 표기 (codex-review-3 P1)
+- 규범 base 기호 / 시뮬레이션 overlay 레이어 분리 + 인쇄용 중립 모드 (codex-review-3 P1)
+- 브라우저 p95 프레임 계측 (엔진 tick 평균만으로 60fps 미입증 — codex-review-3)
+- D(워드) 디바이스: 타입·명령(MOV/비교)·표시를 갖춘 별도 설계 (현재는 스키마에서 거부)
 - LICENSE 선택·IP 게이트 마감 (ASSET_PROVENANCE.md — 사용자 결정 필요)

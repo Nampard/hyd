@@ -33,7 +33,7 @@ export const pneumaticSource: ComponentDefinition = {
 export const serviceUnit: ComponentDefinition = {
   type: "pneu.service-unit",
   domain: "pneumatic",
-  name: "서비스 유닛 (FRL)",
+  name: "공압 서비스 유닛 (단순화 — 여과·윤활·정압 미모사)",
   category: "공압 · 동력원",
   ports: [
     { id: "P", label: "IN", kind: "pneumatic", offset: { x: -30, y: 0 }, direction: "left" },

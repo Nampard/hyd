@@ -79,6 +79,9 @@ export class LocalDocumentStorage implements DocumentStorage {
   }
 
   save(name: string, doc: CircuitDocument): boolean {
+    // 프로토타입 오염 방어와 짝: 읽기에서 걸러지는 이름은 저장도 거부해
+    // "저장 성공인데 목록에 없음" 모순을 막는다 (review-3 P1)
+    if (name === "__proto__" || name === "constructor" || name === "prototype") return false;
     try {
       const shape = this.read();
       shape[name] = {

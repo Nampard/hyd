@@ -22,18 +22,19 @@ export function StatusBar(): ReactElement {
   const unstable =
     running && diagnostics && (!diagnostics.electricConverged || !diagnostics.fluidConverged);
 
+  // 우선순위: 미수렴 경고 > 구분동작 일시정지 안내 > 일반 메시지 > 모드별 기본 안내
+  // (경고 메시지가 다음 동작 진행법을 가리지 않도록, review-3 P1)
   let hint = message;
+  if (running && mode === "step" && stepPaused && lastStep) {
+    hint = (lastStep.cycleComplete ? t("statusStepCycle") : t("statusStepPaused")).replace(
+      "{n}",
+      String(lastStep.step),
+    );
+  }
   if (unstable) hint = t("statusUnstable");
   if (!hint) {
     if (running && mode === "step") {
-      if (stepPaused && lastStep) {
-        hint = (lastStep.cycleComplete ? t("statusStepCycle") : t("statusStepPaused")).replace(
-          "{n}",
-          String(lastStep.step),
-        );
-      } else {
-        hint = t("statusStepRunning");
-      }
+      hint = t("statusStepRunning");
     } else if (running) hint = t("statusRunning");
     else if (placingType) hint = t("statusPlacing");
     else if (pendingWire) hint = t("statusWiring");

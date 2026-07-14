@@ -67,14 +67,21 @@ export class SimulationEngine {
       }
       if (behavior?.role === "elec-load") {
         runtime.energized = false;
-        // 이름표가 있는 디바이스 등록 (같은 이름표 코일은 OR로 병합)
+        // 디바이스 등록 — key는 "종류:이름표" (typed identity, codex-review-3 P0).
+        // 같은 종류·이름표 코일은 하나의 디바이스로 병합되고, preset 충돌은
+        // 문서 순서와 무관하게 결정적으로 max를 취한다 (충돌은 실행 전 검증이 경고)
         const label = String(comp.properties.label ?? "");
         if (label && ["relay", "timer-on", "timer-off", "counter"].includes(behavior.device)) {
           const kind = deviceKind(behavior.device, comp);
-          if (!this.devices.has(label)) {
-            this.devices.set(label, {
+          const key = `${kind}:${label}`;
+          const preset = Number(comp.properties.preset ?? 0);
+          const existing = this.devices.get(key);
+          if (existing) {
+            existing.preset = Math.max(existing.preset, preset);
+          } else {
+            this.devices.set(key, {
               kind,
-              preset: Number(comp.properties.preset ?? 0),
+              preset,
               coil: false,
               output: false,
               elapsed: 0,
@@ -258,8 +265,8 @@ export class SimulationEngine {
       this.energizedSolenoids = nextSolenoids;
 
       // 릴레이는 즉시 반응: coil → output. 타이머/카운터 코일 상태만 기록.
-      for (const [label, device] of this.devices) {
-        device.coil = coilByChannel.get(`${device.kind}:${label}`) ?? false;
+      for (const [key, device] of this.devices) {
+        device.coil = coilByChannel.get(key) ?? false;
         if (device.kind === "relay") {
           if (device.output !== device.coil) changed = true;
           device.output = device.coil;
@@ -291,7 +298,8 @@ export class SimulationEngine {
       }
     }
 
-    for (const [label, device] of this.devices) {
+    for (const [key, device] of this.devices) {
+      const label = key.slice(key.indexOf(":") + 1);
       const prevOutput = device.output;
       switch (device.kind) {
         case "relay":
@@ -368,7 +376,7 @@ export class SimulationEngine {
         break;
       case "device": {
         const label = String(comp.properties.deviceLabel ?? "");
-        raw = this.devices.get(label)?.output ?? false;
+        raw = this.deviceOutputByLabel(label);
         break;
       }
       case "limit": {
@@ -451,6 +459,15 @@ export class SimulationEngine {
       case "none":
         return false;
     }
+  }
+
+  /** 이름표로 디바이스 출력 조회 — 종류(kind)별 채널의 OR. 문서 순서와 무관하게 결정적 */
+  private deviceOutputByLabel(label: string): boolean {
+    if (!label) return false;
+    for (const kind of ["relay", "timer-on", "timer-off", "counter"] as const) {
+      if (this.devices.get(`${kind}:${label}`)?.output) return true;
+    }
+    return false;
   }
 
   private findCylinderByLabel(label: string): ComponentInstance | undefined {

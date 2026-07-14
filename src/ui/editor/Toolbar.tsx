@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from "react";
 import { useEditorStore } from "./store";
-import { useSimStore } from "../sim/simStore";
+import { clearSimHistory, useSimStore } from "../sim/simStore";
 import { downloadDocument, exportCircuitSvg, openDocumentFile } from "../../app/file";
 import { examples, getExample } from "../../core/examples";
 import { createBrowserStorage } from "../../core/storage";
@@ -31,6 +31,7 @@ export function Toolbar(): ReactElement {
 
   const handleNew = () => {
     if (!confirmDiscard()) return;
+    clearSimHistory();
     useEditorStore.getState().newDocument();
   };
 
@@ -40,6 +41,7 @@ export function Toolbar(): ReactElement {
     if (result.cancelled) return;
     if (result.ok && result.document) {
       if (!confirmDiscard()) return;
+      clearSimHistory();
       s.loadDocument(result.document);
     } else if (result.error) {
       s.setStatus(`열기 실패: ${result.error}`);
@@ -87,7 +89,10 @@ export function Toolbar(): ReactElement {
     if (!confirmDiscard()) return;
     const s = useEditorStore.getState();
     const doc = browserStorage.load(name);
-    if (doc) s.loadDocument(doc);
+    if (doc) {
+      clearSimHistory();
+      s.loadDocument(doc);
+    }
     else s.setStatus(`"${name}"을(를) 불러오지 못했습니다.`);
   };
 
@@ -110,12 +115,16 @@ export function Toolbar(): ReactElement {
     const example = getExample(id);
     if (!example) return;
     if (!confirmDiscard()) return;
+    clearSimHistory();
     useEditorStore.getState().loadDocument(example.build());
   };
 
   return (
     <div className="toolbar">
-      <span className="app-name">HYD</span>
+      <span className="app-name" title="교육용 논리/상태 시뮬레이션 — 실제 설비 선정·압력 설정·안전 검증에 사용 금지">
+        HYD
+      </span>
+      <span className="app-tagline">{t("appTagline")}</span>
       <input
         className="title-input"
         value={title}

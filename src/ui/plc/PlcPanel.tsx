@@ -212,7 +212,15 @@ export function PlcPanel(): ReactElement | null {
               디바이스:
               <input
                 value={selectedCell.device ?? ""}
-                onChange={(e) => updateSelectedCell({ device: e.target.value.toUpperCase() })}
+                onChange={(e) => {
+                  const v = e.target.value.toUpperCase();
+                  // bit 디바이스(P/M/T/C)만 허용 — D는 word 디바이스라 범위 밖 (review-3 P0)
+                  if (v !== "" && !/^[PMTC][0-9]{0,5}$/.test(v)) {
+                    useEditorStore.getState().setStatus("디바이스는 P/M/T/C + 숫자만 사용할 수 있습니다 (D는 워드 디바이스 — 미지원).");
+                    return;
+                  }
+                  updateSelectedCell({ device: v });
+                }}
               />
               {["ton", "toff", "ctu", "ctd"].includes(selectedCell.kind) && (
                 <>
