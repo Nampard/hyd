@@ -89,10 +89,21 @@ const dictionaries: Record<Lang, Record<I18nKey, string>> = { ko, en };
 
 const LANG_KEY = "hyd.lang";
 
+function applyDocumentLang(lang: Lang): void {
+  try {
+    document.documentElement.lang = lang; // 보조기술·브라우저 번역이 언어를 인식하도록 (codex-review L3)
+  } catch {
+    /* 테스트 환경 */
+  }
+}
+
 function initialLang(): Lang {
   try {
     const saved = localStorage.getItem(LANG_KEY);
-    if (saved === "en" || saved === "ko") return saved;
+    if (saved === "en" || saved === "ko") {
+      applyDocumentLang(saved);
+      return saved;
+    }
   } catch {
     /* SSR/테스트 환경 */
   }
@@ -114,6 +125,7 @@ export const useI18nStore = create<I18nStore>((set) => ({
       } catch {
         /* 무시 */
       }
+      applyDocumentLang(lang);
       return { lang };
     });
   },

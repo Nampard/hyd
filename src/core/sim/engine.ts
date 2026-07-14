@@ -38,6 +38,8 @@ export class SimulationEngine {
   private energizedSolenoids = new Set<string>();
   private plcRunner: PlcRunner | null = null;
   private plcMonitor: PlcMonitor | null = null;
+  /** PLC 출력이 강제한 부하 통전 (componentId → on). 전기 고정점에서 회로 통전과 OR 결합 */
+  private plcForced = new Map<string, boolean>();
   private time = 0;
   private listeners = new Set<(snap: SimulationSnapshot) => void>();
 
@@ -88,7 +90,8 @@ export class SimulationEngine {
       this.plcRunner = new PlcRunner(doc.plcProgram);
     }
 
-    // 초기 상태 확정 (t=0 솔브)
+    // 초기 상태 확정 (t=0): 유체 먼저 풀어야 압력 스위치 접점이 올바른 초기값을 가진다
+    this.solveAndStore();
     this.solveElectricFixpoint();
     this.solveAndStore();
   }
@@ -204,7 +207,9 @@ export class SimulationEngine {
   /**
    * 전기 연결성 해석. 릴레이 접점이 회로 자신을 바꾸므로
    * 통전 결과가 안정될 때까지 반복 (≤5회, ARCHITECTURE 4.2).
-   * 타이머·카운터 출력은 이 안에서 바뀌지 않는다 (updateDevices에서 dt 기반 갱신).
+   * PLC 출력이 강제한 부하(plcForced)는 회로 통전과 OR로 결합되어
+   * 릴레이·타이머·카운터 코일 집계에 함께 반영된다 (codex-review H2).
+   * 타이머·카운터의 시간/에지 전이는 updateDevices에서 dt 기반으로 갱신된다.
    */
   private solveElectricFixpoint(): void {
     for (let iter = 0; iter < 5; iter++) {
@@ -219,22 +224,26 @@ export class SimulationEngine {
 
       let changed = false;
       const coilByLabel = new Map<string, boolean>();
+      const solenoidByLabel = new Map<string, boolean>();
       for (const comp of this.doc.components) {
         const behavior = getComponentDefinition(comp.type).behavior;
         if (behavior?.role !== "elec-load") continue;
         const runtime = this.runtimes.get(comp.id)!;
-        const on = result.energized.get(comp.id) ?? false;
+        const on = (result.energized.get(comp.id) ?? false) || (this.plcForced.get(comp.id) ?? false);
         if (runtime.energized !== on) changed = true;
         runtime.energized = on;
 
         const label = String(comp.properties.label ?? "");
         if (label) coilByLabel.set(label, (coilByLabel.get(label) ?? false) || on);
-
-        if (behavior.device === "solenoid") {
-          if (on) this.energizedSolenoids.add(label);
-          else this.energizedSolenoids.delete(label);
+        // 솔레노이드는 label별 OR로 집계 — 순회 순서에 따른 신호 소실 방지 (M2)
+        if (behavior.device === "solenoid" && label) {
+          solenoidByLabel.set(label, (solenoidByLabel.get(label) ?? false) || on);
         }
       }
+
+      const nextSolenoids = new Set<string>();
+      for (const [label, on] of solenoidByLabel) if (on) nextSolenoids.add(label);
+      this.energizedSolenoids = nextSolenoids;
 
       // 릴레이는 즉시 반응: coil → output. 타이머/카운터 코일 상태만 기록.
       for (const [label, device] of this.devices) {
@@ -250,8 +259,12 @@ export class SimulationEngine {
     }
   }
 
-  /** 타이머·카운터의 시간/에지 기반 상태 갱신 (틱당 1회) */
+  /**
+   * 타이머·카운터의 시간/에지 기반 상태 갱신 (틱당 1회).
+   * 출력이 바뀌면 접점이 같은 틱에 반영되도록 전기 고정점을 재실행한다.
+   */
   private updateDevices(dt: number): void {
+    let outputChanged = false;
     // 카운터 리셋 코일 수집
     const resetLabels = new Set<string>();
     for (const comp of this.doc.components) {
@@ -264,6 +277,7 @@ export class SimulationEngine {
     }
 
     for (const [label, device] of this.devices) {
+      const prevOutput = device.output;
       switch (device.kind) {
         case "relay":
           break;
@@ -292,7 +306,10 @@ export class SimulationEngine {
           break;
       }
       device.prevCoil = device.coil;
+      if (device.output !== prevOutput) outputChanged = true;
     }
+
+    if (outputChanged) this.solveElectricFixpoint();
   }
 
   /** PLC 스캔: ioMap 입력 → 스캔 → 출력 부품 통전 강제 */
@@ -309,19 +326,19 @@ export class SimulationEngine {
     const outputs = this.plcRunner.scan(dt, inputs);
     this.plcMonitor = this.plcRunner.getMonitor();
 
+    // 출력은 plcForced에만 기록하고, 전기 고정점 재실행으로 부하 통전·디바이스 코일·
+    // 솔레노이드 집계·후속 접점까지 일관되게 반영한다 (H2: PLC→릴레이/타이머/카운터 연동)
+    let changed = false;
     for (const entry of ioMap) {
       if (entry.direction !== "output") continue;
-      const comp = this.doc.components.find((c) => c.id === entry.componentId);
-      const runtime = this.runtimes.get(entry.componentId);
-      if (!comp || !runtime) continue;
+      if (!this.runtimes.has(entry.componentId)) continue;
       const on = outputs.get(entry.device) ?? false;
-      runtime.energized = on;
-      const behavior = getComponentDefinition(comp.type).behavior;
-      if (behavior?.role === "elec-load" && behavior.device === "solenoid") {
-        const label = String(comp.properties.label ?? "");
-        if (on) this.energizedSolenoids.add(label);
-        else this.energizedSolenoids.delete(label);
-      }
+      if ((this.plcForced.get(entry.componentId) ?? false) !== on) changed = true;
+      this.plcForced.set(entry.componentId, on);
+    }
+    if (changed) {
+      this.solveElectricFixpoint();
+      this.updateDevices(0); // 시간 경과 없이 에지/출력 전이만 반영
     }
   }
 

@@ -257,7 +257,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   undo() {
-    const state = get();
+    let state = get();
+    // 드래그 도중이면 먼저 드래그를 취소해 시작 스냅숏 재커밋을 막는다 (codex-review M9)
+    if (state.dragStartDoc) {
+      set({ document: state.dragStartDoc, dragStartDoc: null });
+      state = get();
+    }
     if (state.past.length === 0) return;
     const prev = state.past[state.past.length - 1];
     set({
@@ -269,7 +274,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   redo() {
-    const state = get();
+    let state = get();
+    if (state.dragStartDoc) {
+      set({ document: state.dragStartDoc, dragStartDoc: null });
+      state = get();
+    }
     if (state.future.length === 0) return;
     const next = state.future[0];
     set({

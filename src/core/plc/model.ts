@@ -21,7 +21,9 @@ export type LadderCellKind =
   | "set"
   | "rst"
   | "ton" // 온딜레이 타이머
-  | "ctu"; // 업 카운터
+  | "toff" // 오프딜레이 타이머
+  | "ctu" // 업 카운터
+  | "ctd"; // 다운 카운터
 
 export interface LadderCell {
   kind: LadderCellKind;
@@ -72,7 +74,7 @@ export function createEmptyProgram(): LadderProgram {
 
 /** 출력 전용 요소인지 */
 export function isOutputKind(kind: LadderCellKind): boolean {
-  return kind === "coil" || kind === "set" || kind === "rst" || kind === "ton" || kind === "ctu";
+  return ["coil", "set", "rst", "ton", "toff", "ctu", "ctd"].includes(kind);
 }
 
 /** 접점(도통 판정) 요소인지 */

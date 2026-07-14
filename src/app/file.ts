@@ -53,22 +53,45 @@ export function exportCircuitSvg(title = "circuit"): void {
   URL.revokeObjectURL(url);
 }
 
-/** 파일 선택 대화상자를 열어 문서를 읽는다 */
-export function openDocumentFile(): Promise<{ ok: boolean; document?: CircuitDocument; error?: string }> {
+export interface OpenFileResult {
+  ok: boolean;
+  document?: CircuitDocument;
+  error?: string;
+  /** 사용자가 대화상자를 취소함 — 오류 아님 (codex-review L2) */
+  cancelled?: boolean;
+}
+
+/** 파일 선택 대화상자를 열어 문서를 읽는다. 취소 시에도 반드시 완료된다 */
+export function openDocumentFile(): Promise<OpenFileResult> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".json,application/json";
+    let settled = false;
+    const settle = (result: OpenFileResult) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) {
-        resolve({ ok: false, error: "파일이 선택되지 않았습니다." });
+        settle({ ok: false, cancelled: true });
         return;
       }
       const text = await file.text();
-      resolve(parseDocument(text));
+      settle(parseDocument(text));
     };
-    // 취소 시(파일 미선택) 아무 일도 하지 않음 — resolve하지 않아도 GC됨
+    // 최신 브라우저의 취소 이벤트 + 포커스 복귀 폴백
+    input.addEventListener("cancel", () => settle({ ok: false, cancelled: true }));
+    window.addEventListener(
+      "focus",
+      () => {
+        // 대화상자가 닫힌 뒤 change가 오지 않으면 취소로 간주
+        setTimeout(() => settle({ ok: false, cancelled: true }), 1000);
+      },
+      { once: true },
+    );
     input.click();
   });
 }

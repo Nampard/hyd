@@ -35,9 +35,28 @@ export function computeOrthogonalRoute(
   const a = stubEnd(fromPos, fromDir);
   const b = stubEnd(toPos, toDir);
 
+  const opposite =
+    (fromDir === "left" && toDir === "right") ||
+    (fromDir === "right" && toDir === "left") ||
+    (fromDir === "up" && toDir === "down") ||
+    (fromDir === "down" && toDir === "up");
+
   const mid: Point[] = [];
-  if (a.x === b.x || a.y === b.y) {
-    // 스텁 끝이 일직선 — 경유점 불필요
+  if ((a.x === b.x || a.y === b.y) && (opposite || fromDir === toDir)) {
+    if (opposite) {
+      // 마주보는 포트가 일직선 — 경유점 불필요
+    } else {
+      // 같은 방향 일직선: 직선으로 이으면 목적지를 지나 역주행하므로 옆으로 우회 (codex-review M10)
+      if (isHorizontal(fromDir)) {
+        const detourY = Math.min(a.y, b.y) - STUB;
+        mid.push({ x: a.x, y: detourY }, { x: b.x, y: detourY });
+      } else {
+        const detourX = Math.min(a.x, b.x) - STUB;
+        mid.push({ x: detourX, y: a.y }, { x: detourX, y: b.y });
+      }
+    }
+  } else if (a.x === b.x || a.y === b.y) {
+    // 직교/기타 방향 조합의 일직선 — 경유점 불필요
   } else if (isHorizontal(fromDir) === isHorizontal(toDir)) {
     // 같은 축 방향끼리: Z자 경로 (중간에서 꺾음)
     if (isHorizontal(fromDir)) {

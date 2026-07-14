@@ -2,7 +2,7 @@ import type { CircuitDocument, Rotation } from "../model/types";
 import { createEmptyDocument } from "../model/types";
 import { addComponent, autoWire, canConnect, moveComponent, rerouteAttachedWires } from "../model/operations";
 import type { IoEntry, LadderCell, LadderProgram, VLink } from "../plc/model";
-import { LADDER_COLS } from "../plc/model";
+import { LADDER_COLS, isOutputKind } from "../plc/model";
 
 // ---- 래더 조립 헬퍼 ----
 
@@ -18,7 +18,7 @@ export function rungOf(rows: (LadderCell | null)[][], vlinks: VLink[] = [], id =
     const output = row[row.length - 1];
     const logic = row.slice(0, -1);
     logic.forEach((cell, i) => (padded[i] = cell));
-    if (output && (output.kind === "coil" || output.kind === "set" || output.kind === "rst" || output.kind === "ton" || output.kind === "ctu")) {
+    if (output && isOutputKind(output.kind)) {
       padded[LADDER_COLS - 1] = output;
       // 논리 마지막 셀부터 출력 열까지 hline 채움
       for (let c = logic.length; c < LADDER_COLS - 1; c++) {

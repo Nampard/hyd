@@ -20,11 +20,28 @@ export function Toolbar(): ReactElement {
   const t = useT();
   const lang = useI18nStore((s) => s.lang);
 
+  /** 미저장 작업 폐기 확인 — 새 회로/파일 열기/예제/브라우저 열기 공통 정책 (codex-review H5) */
+  const confirmDiscard = (): boolean => {
+    const s = useEditorStore.getState();
+    if (s.document.components.length === 0) return true;
+    return window.confirm("현재 회로를 버릴까요? 저장하지 않은 변경은 사라집니다.");
+  };
+
+  const handleNew = () => {
+    if (!confirmDiscard()) return;
+    useEditorStore.getState().newDocument();
+  };
+
   const handleOpen = async () => {
     const result = await openDocumentFile();
     const s = useEditorStore.getState();
-    if (result.ok && result.document) s.loadDocument(result.document);
-    else if (result.error) s.setStatus(`열기 실패: ${result.error}`);
+    if (result.cancelled) return;
+    if (result.ok && result.document) {
+      if (!confirmDiscard()) return;
+      s.loadDocument(result.document);
+    } else if (result.error) {
+      s.setStatus(`열기 실패: ${result.error}`);
+    }
   };
 
   const handleRun = () => {
@@ -54,20 +71,18 @@ export function Toolbar(): ReactElement {
     if (!browserStorage) return;
     const s = useEditorStore.getState();
     const name = s.document.meta.title || "제목 없음";
-    browserStorage.save(name, s.document);
-    setStorageVersion((v) => v + 1);
-    s.setStatus(`브라우저에 "${name}" 저장 완료 (파일 없이 이 PC에 보관됩니다)`);
+    if (browserStorage.save(name, s.document)) {
+      setStorageVersion((v) => v + 1);
+      s.setStatus(`브라우저에 "${name}" 저장 완료 (파일 없이 이 PC에 보관됩니다)`);
+    } else {
+      s.setStatus("브라우저 저장 실패 — 저장 공간이 가득 찼거나 사생활 보호 모드일 수 있습니다. .json 파일 저장을 이용하세요.");
+    }
   };
 
   const handleBrowserOpen = (name: string) => {
     if (!browserStorage || !name) return;
+    if (!confirmDiscard()) return;
     const s = useEditorStore.getState();
-    if (
-      s.document.components.length > 0 &&
-      !window.confirm("현재 회로를 버리고 저장된 회로를 열까요?")
-    ) {
-      return;
-    }
     const doc = browserStorage.load(name);
     if (doc) s.loadDocument(doc);
     else s.setStatus(`"${name}"을(를) 불러오지 못했습니다.`);
@@ -91,14 +106,8 @@ export function Toolbar(): ReactElement {
     if (!id) return;
     const example = getExample(id);
     if (!example) return;
-    const s = useEditorStore.getState();
-    if (
-      s.document.components.length > 0 &&
-      !window.confirm("현재 회로를 버리고 예제를 열까요? (저장하지 않은 변경은 사라집니다)")
-    ) {
-      return;
-    }
-    s.loadDocument(example.build());
+    if (!confirmDiscard()) return;
+    useEditorStore.getState().loadDocument(example.build());
   };
 
   return (
@@ -140,7 +149,7 @@ export function Toolbar(): ReactElement {
         </select>
       </div>
       <div className="toolbar-group">
-        <button disabled={running} onClick={() => useEditorStore.getState().newDocument()}>
+        <button disabled={running} onClick={handleNew}>
           {t("newCircuit")}
         </button>
         <button disabled={running} onClick={handleOpen}>

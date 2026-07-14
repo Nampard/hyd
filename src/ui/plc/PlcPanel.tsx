@@ -32,15 +32,19 @@ const TOOLS: { id: Tool; label: string; title: string }[] = [
   { id: "set", label: "(S)", title: "SET 코일" },
   { id: "rst", label: "(R)", title: "RST 코일" },
   { id: "ton", label: "TON", title: "온딜레이 타이머" },
+  { id: "toff", label: "TOFF", title: "오프딜레이 타이머" },
   { id: "ctu", label: "CTU", title: "업 카운터" },
+  { id: "ctd", label: "CTD", title: "다운 카운터" },
   { id: "erase", label: "지우기", title: "셀 비우기" },
 ];
 
 function defaultDevice(kind: LadderCellKind): string {
   switch (kind) {
     case "ton":
+    case "toff":
       return "T0";
     case "ctu":
+    case "ctd":
       return "C0";
     case "coil":
     case "set":
@@ -67,8 +71,12 @@ function cellLabel(cell: LadderCell): string {
       return `(R) ${cell.device ?? ""}`;
     case "ton":
       return `TON ${cell.device ?? ""} ${cell.preset ?? 0}s`;
+    case "toff":
+      return `TOFF ${cell.device ?? ""} ${cell.preset ?? 0}s`;
     case "ctu":
       return `CTU ${cell.device ?? ""} ×${cell.preset ?? 0}`;
+    case "ctd":
+      return `CTD ${cell.device ?? ""} ×${cell.preset ?? 0}`;
   }
 }
 
@@ -102,6 +110,10 @@ export function PlcPanel(): ReactElement | null {
     if (running) return;
     setSelected({ rungId: rung.id, r, c });
     if (tool === "vlink") {
+      if (r + 1 >= rung.cells.length) {
+        useEditorStore.getState().setStatus("수직 연결은 아랫줄이 있는 행에서만 만들 수 있습니다.");
+        return;
+      }
       // 셀 오른쪽 경계 (노드 열 c+1)에서 아랫줄 연결 토글
       updateRung(rung.id, (rg) => {
         const exists = rg.vlinks.some((v) => v.r === r && v.c === c + 1);
@@ -135,7 +147,7 @@ export function PlcPanel(): ReactElement | null {
     const newCell: LadderCell = {
       kind,
       device: kind === "hline" ? undefined : defaultDevice(kind),
-      preset: kind === "ton" ? 3 : kind === "ctu" ? 3 : undefined,
+      preset: ["ton", "toff", "ctu", "ctd"].includes(kind) ? 3 : undefined,
     };
     updateRung(rung.id, (rg) => ({
       ...rg,
@@ -202,14 +214,14 @@ export function PlcPanel(): ReactElement | null {
                 value={selectedCell.device ?? ""}
                 onChange={(e) => updateSelectedCell({ device: e.target.value.toUpperCase() })}
               />
-              {(selectedCell.kind === "ton" || selectedCell.kind === "ctu") && (
+              {["ton", "toff", "ctu", "ctd"].includes(selectedCell.kind) && (
                 <>
                   설정:
                   <input
                     type="number"
                     value={selectedCell.preset ?? 0}
                     min={0}
-                    step={selectedCell.kind === "ton" ? 0.1 : 1}
+                    step={selectedCell.kind === "ton" || selectedCell.kind === "toff" ? 0.1 : 1}
                     onChange={(e) => updateSelectedCell({ preset: Number(e.target.value) })}
                   />
                 </>
@@ -376,6 +388,14 @@ export function PlcPanel(): ReactElement | null {
                 .sort()
                 .join(" · ") || "(모두 OFF)"}
             </div>
+            {Object.keys(plcMonitor.values ?? {}).length > 0 && (
+              <div>
+                {Object.entries(plcMonitor.values)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(" · ")}
+              </div>
+            )}
           </div>
         )}
       </div>

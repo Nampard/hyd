@@ -101,8 +101,13 @@ export type Behavior =
   | { role: "check-valve"; portA: string; portB: string }
   /** 파일럿 조작 체크밸브: A→B 자유, B→A는 파일럿 가압 시에만 */
   | { role: "pilot-check"; portA: string; portB: string; pilotPort: string }
-  /** 감압밸브: 통과 시 압력 레벨을 properties.pressure로 제한 (Phase 7) */
+  /** 감압밸브: 정방향(portIn→portOut) 통과 시 압력 레벨을 properties.pressure로 제한 (Phase 7) */
   | { role: "reducer"; portIn: string; portOut: string }
+  /**
+   * 릴리프 밸브: 탱크 경로가 살아 있고 라인 압력이 properties.pressure를 넘으면
+   * 압력 포트가 속한 유로 전체의 레벨을 설정값으로 제한한다 (codex-review H6)
+   */
+  | { role: "pressure-relief"; pressurePort: string; tankPort: string }
   /** 유압 모터: A 가압·B 배출 → 정회전, 반대 → 역회전 (Phase 10) */
   | { role: "motor"; portA: string; portB: string }
   // --- 전기 (Phase 2) ---

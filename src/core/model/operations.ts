@@ -56,13 +56,16 @@ export function rotateComponent(doc: CircuitDocument, componentId: string): Circ
   };
 }
 
-/** 부품 삭제 시 연결된 배선·장비 배치도 함께 삭제 */
+/** 부품 삭제 시 연결된 배선·장비 배치·PLC 매핑도 함께 삭제 (codex-review M4) */
 export function deleteComponent(doc: CircuitDocument, componentId: string): CircuitDocument {
   let equipmentLayout = doc.equipmentLayout;
   if (equipmentLayout && componentId in equipmentLayout) {
     equipmentLayout = { ...equipmentLayout };
     delete equipmentLayout[componentId];
   }
+  const ioMap = doc.ioMap?.some((e) => e.componentId === componentId)
+    ? doc.ioMap.filter((e) => e.componentId !== componentId)
+    : doc.ioMap;
   return {
     ...doc,
     components: doc.components.filter((c) => c.id !== componentId),
@@ -70,6 +73,7 @@ export function deleteComponent(doc: CircuitDocument, componentId: string): Circ
       (w) => w.from.componentId !== componentId && w.to.componentId !== componentId,
     ),
     equipmentLayout,
+    ioMap,
   };
 }
 

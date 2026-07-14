@@ -46,6 +46,8 @@ export interface SimulationSnapshot {
   plc?: {
     nodePower: Record<string, boolean[][]>;
     bits: Record<string, boolean>;
+    /** T 경과 시간(초)·C 현재 계수 */
+    values: Record<string, number>;
   };
 }
 

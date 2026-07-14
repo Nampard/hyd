@@ -1,0 +1,78 @@
+# codex-review.md 대응 결과
+
+- 대응일: 2026-07-14
+- 대응 범위: 리뷰의 기능·아키텍처 발견 사항 전체. IP/법률 항목은 "사용자 결정 필요"로 분리
+- 검증: `npm test` 82개 통과 (기존 50 + 회귀 32 추가), `tsc` 클린, `npm run build` 성공
+
+## HIGH
+
+| 항목 | 상태 | 조치 |
+|---|---|---|
+| H1 외부 문서 검증 불완전 | **FIXED** | `parseDocument()`가 문서 전체를 경계 검증: 부품(등록 타입·ID 유일성·좌표·회전·속성 객체), 배선(참조 존재·포트 kind 일치·경유점), PLC 프로그램(렁/셀 구조·kind), ioMap(참조 무결성), equipmentLayout(참조·좌표). `src/core/model/schema.ts`. 회귀 테스트 8건 (`schema-validation.test.ts`) — 미등록 타입·중복 ID·끊어진 참조·kind 불일치·잘못된 회전/좌표/PLC 셀 모두 `ok:false` |
+| H2 PLC 출력→릴레이/타이머/카운터 미연동 | **FIXED** | PLC 출력을 `plcForced` 맵에 기록하고 전기 고정점이 회로 통전과 OR 결합 → 디바이스 코일 집계·접점·재솔브가 같은 틱에 일관 수행. PLC 스캔 후 출력 변경 시 고정점+디바이스 전이 재실행. `src/core/sim/engine.ts`. 통합 테스트: PLC→릴레이 접점→램프, PLC→타이머 지연 점등 (`plc-integration.test.ts`) |
+| H3 PRD 필수 PLC 범위 미구현 | **FIXED (구현+정정 병행)** | TOFF·CTD를 모델/스캐너/에디터/모니터에 구현 (`plc/model.ts`, `plc/scanner.ts`, `PlcPanel.tsx`), 경계 테스트 추가 (`plc-scanner.test.ts`). D 디바이스·MOV/비교는 워드 연산으로 비트 논리 교육 범위를 벗어나므로 PRD에서 후순위로 명시 이동 (`docs/PRD.md`) |
+| H4 유압 완료 주장 vs 실제 범위 | **FIXED (구현+정정 병행)** | 4/3 오픈 센터 밸브 추가 (`hyd.valve.4-3-open-solenoid` — 부품·기호). ROADMAP Phase 3 예제 설명을 실제 범위로 정정하고 미터인·카운터밸런스 전용 예제는 후순위로 명시 |
+| H5 새 회로/열기의 미저장 작업 폐기 | **FIXED** | `confirmDiscard()` 공통 정책을 새 회로·파일 열기·예제·브라우저 열기에 동일 적용 (`Toolbar.tsx`) |
+| H6 릴리프 밸브 no-op | **FIXED** | 범용 `pressure-relief` behavior 롤 신설. 솔버가 탱크 경로 도달성(배기 전파)을 확인한 뒤 압력 포트가 속한 유로 영역 전체의 레벨에 설정압 상한을 적용. 부품별 분기 없음. 기호는 작동 시 채움+유로 정렬로 개방 상태 표시, 설정압 병기. 경계 테스트 4건: 설정 이하/초과/탱크 미연결/20↔80bar 상이성 (`solver-fixes.test.ts`) |
+
+## MEDIUM
+
+| 항목 | 상태 | 조치 |
+|---|---|---|
+| M1 첫 방문 후 오프라인 미보장 | **FIXED** | SW install 단계에서 index.html을 받아 참조 자산(해시 파일명 포함)까지 프리캐시. activate는 `hyd-` 접두사 캐시만 정리 (WATCH 항목 동시 해소). 캐시 버전 hyd-v2 (`public/sw.js`) |
+| M2 동일 label 솔레노이드 순서 의존 | **FIXED** | 솔레노이드도 label별 OR 집계 후 집합을 원자적으로 교체. 순서 뒤집은 회귀 테스트 (`plc-integration.test.ts` it.each) |
+| M3 포트 타입 불일치 실행 전 경고 부재 | **FIXED (H1로 해소)** | 문서 경계에서 배선 kind·참조를 거부하므로 잘못된 문서가 솔버에 도달하지 않음. 리뷰 권고안("H1 우선 적용") 채택 |
+| M4 부품 삭제 시 ioMap 잔존 | **FIXED** | `deleteComponent()`가 ioMap 항목도 정리. 회귀 테스트 포함 |
+| M5 틱 의미와 문서 불일치 | **FIXED** | 구현 기준 틱 계약(전기 고정점→디바이스→PLC→밸브→유체→적분, 초기 유체→전기→유체)을 ARCHITECTURE 4.1에 명문화 |
+| M6 UI 회귀 테스트·렌더링 60fps 미검증 | **DEFERRED** | 브라우저 E2E·프레임 계측은 도구 도입(Playwright 등)이 필요한 별도 작업. ROADMAP 후순위에 등재 (아래 "미조치·후속" 참조) |
+| M7 localStorage 쓰기 실패 미처리 | **FIXED** | `save()`가 boolean 반환, 실패 시 상태바에 용량/사생활 보호 모드 안내 + .json 대안 제시 |
+| M8 손상된 localStorage 값으로 렌더 중단 | **FIXED** | `read()`가 shape·entry 단위 검증으로 손상 항목 격리. 손상 데이터 테스트 기존 유지 |
+| M9 드래그 중 undo가 redo 이력 파괴 | **FIXED** | undo/redo 진입 시 진행 중 드래그를 원자적으로 취소(시작 스냅숏 복원 후 정리) |
+| M10 같은 방향 일직선 포트 역주행 | **FIXED** | 마주보는 방향만 직선 허용, 같은 방향 일직선은 수직 우회(dogleg). 4방향 테이블 테스트 (`schema-validation.test.ts`) |
+| M11 PLC 매핑 부품의 유체 포트 검사 면제 | **FIXED** | 면제를 전기 포트로 한정 — 압력 스위치 유체 포트는 계속 배관 검사 |
+
+## LOW
+
+| 항목 | 상태 | 조치 |
+|---|---|---|
+| L1 README 수치 불일치 | **FIXED** | 공압 20종·예제 18종·테스트 82개로 갱신, 유압 라인에 릴리프(동작)·오픈 센터·모터 반영 |
+| L2 파일 선택 취소 시 Promise 미완료 | **FIXED** | `cancel` 이벤트 + 포커스 복귀 폴백으로 항상 완료. `cancelled` 플래그로 오류와 구분 |
+| L3 언어 전환 시 문서 lang 미갱신 | **FIXED** | 초기화·토글 시 `document.documentElement.lang` 동기화 |
+
+## 요소별 감사 지적 (HIGH/MEDIUM 외)
+
+| 항목 | 상태 | 조치 |
+|---|---|---|
+| 셔틀밸브 역급기 | **FIXED** | 가압된 입력만 출력과 연결. 양측 무압 시 출력→입력 일방향 배기만 허용. 테스트: 비활성 입력 비가압 확인 |
+| 2압밸브 출력 레벨이 높은 쪽 | **FIXED** | 두 입력 모두 켜지면 직전 레벨 기준 낮은 입력과 연결 (min 의미). 테스트: 6bar+2bar→출력 2bar |
+| 탠덤 센터 탱크 라인 pressurized 표시 | **FIXED** | 배기 터미널을 포함한 넷은 공급이 닿아도 언로딩(exhausted, 레벨 0)으로 분류. 테스트 포함. 펌프측 넷은 상태 모델 한계로 가압 유지 (ARCHITECTURE에 기록) |
+| 감압밸브 역방향 cap | **FIXED** | cap을 정방향(P→A)에만 적용. 역방향 테스트 포함 |
+| 유압 압력 스위치 초기 스냅숏 오류 | **FIXED** | 엔진 생성 시 유체→전기→유체 순 초기 솔브 |
+| 타이머/카운터 출력 1틱 지연 | **FIXED** | 디바이스 출력 변경 시 전기 고정점 재실행 |
+| P 디바이스 입력/출력 겹침 | **FIXED** | 출력 이미지를 출력 요소가 실제 기록한 디바이스로 제한. 테스트: 입력 P0이 출력으로 새지 않음 |
+| 출력 코일 셀 통전 강조 안 됨 | **FIXED** | 통전된 출력 셀의 오른쪽 레일 노드를 켜서 모니터 강조 조건 충족. 테스트 포함 |
+| vlink 마지막 행 무효 링크 | **FIXED** | 아랫줄 없는 행에서 vlink 생성 차단 + 안내 |
+| T/C 경과·계수 미노출 | **FIXED** | `PlcMonitor.values`로 노출, 패널 디바이스 상태에 `T0=1.2 · C0=3` 형식 표시 |
+| label/디바이스/실린더 오타 조용한 실패 | **FIXED** | `validateForSimulation()`에 교차 참조 경고 추가: 실린더 이름표, 디바이스 코일, 솔레노이드 대응 부품, ioMap 부품 미지정 |
+| 3/2 솔레노이드 장비 뷰 5/2 오바인딩 | **FIXED** | 전용 3포트 스프라이트 신설 후 매핑 교체 |
+| 압력계 바늘 100bar 포화 | **FIXED** | 풀스케일을 설정 가능 최대 300bar로 조정 (수치 텍스트가 1차 표시) |
+| XG5000 비제휴 고지 부재 (WATCH) | **FIXED** | README "고지" 절: LS ELECTRIC 무관 독립 구현, `.xgp` 비호환, 로고 미사용 명시 |
+| SW가 오리진 내 타 캐시 삭제 (WATCH) | **FIXED** | `hyd-` 접두사만 정리 |
+
+## 미조치·후속 (사유 명시)
+
+| 항목 | 분류 | 사유 |
+|---|---|---|
+| M6 브라우저 E2E·렌더링 프레임 테스트 | 후속 개발 | 테스트 러너 도입(Playwright/Storybook 등)이 필요한 인프라 작업. 현재는 세션 내 브라우저 수동 검증으로 보완 중 |
+| WATCH: propertySchema-behavior 적합성 검사 | 후속 개발 | 등록 시 behavior가 참조하는 속성 키 존재 검증 — 다음 반복에서 레지스트리 등록기에 추가 예정 |
+| WATCH: 엔진의 문서 참조 readonly화 | 후속 개발 | 코어 API 계약 강화 — 파괴적 변경이라 별도 반복에서 처리 |
+| WATCH: 긴 연결망/순환망 성능 벤치마크 | 후속 개발 | 벤치 fixture 추가 예정 |
+| 미터인·카운터밸런스 전용 예제, 3/2 롤러 중복 label 규칙 | 후속 개발 | ROADMAP 후순위 등재. 중복 실린더 label은 교차 참조 경고가 오타는 잡아주며, 중복 자체의 의미 규칙(첫 부품 선택)은 문서화된 현행 유지 |
+| **IP 게이트 6~9 (provenance 확정, 법률 검토, side-by-side 독립 검토, LICENSE 선택, V-AMT EULA 확보, chain-of-title)** | **사용자 결정 필요** | 라이선스 선택·법률 자문·기여자 사실확인은 프로젝트 소유자의 판단·행위가 필요한 항목. 개발 측 준비물로 `ASSET_PROVENANCE.md` 원장 골격(사실 기재 + 소유자 확인 필드)을 작성해 둠. 런타임 의존성 고지 초안(React/React DOM/Zustand — 모두 MIT)도 원장에 포함 |
+
+## 검증 스냅숏
+
+- `npx tsc -b`: 오류 없음
+- `npm test`: 14 files, **82 passed** (추가된 회귀: solver-fixes 8, plc-integration 4, plc-scanner 6, schema-validation 14)
+- `npm run build`: 성공
+- 브라우저 수동 확인: 아래 세션 기록 참조 (릴리프 20bar 제한 표시 등)

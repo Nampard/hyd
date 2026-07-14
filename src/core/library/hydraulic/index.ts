@@ -79,8 +79,7 @@ export const reliefValve: ComponentDefinition = {
   ],
   symbolId: "hyd.relief",
   bounds: { x: -25, y: -30, width: 56, height: 60 },
-  // 상태 기반 모델에서는 정상 상태에서 흐름 없음 (안전 요소로 작도만)
-  behavior: { role: "conduit", connections: [] },
+  behavior: { role: "pressure-relief", pressurePort: "P", tankPort: "T" },
 };
 
 // ---------- 방향제어밸브 ----------
@@ -171,6 +170,34 @@ export const valve43TandemSolenoid: ComponentDefinition = {
     positions: [
       { connections: [["P", "A"], ["B", "T"]] },
       { connections: [["P", "T"]] }, // 탠덤 센터: 펌프 무부하, 실린더 유지
+      { connections: [["P", "B"], ["A", "T"]] },
+    ],
+    initial: 1,
+    left: { kind: "solenoid", solenoidProp: "solenoidLeft" },
+    right: { kind: "solenoid", solenoidProp: "solenoidRight" },
+    exhaustPorts: [],
+    springCentered: true,
+  },
+};
+
+export const valve43OpenSolenoid: ComponentDefinition = {
+  type: "hyd.valve.4-3-open-solenoid",
+  domain: "hydraulic",
+  name: "4/3 밸브 (오픈 센터, 양측 솔레노이드)",
+  category: "유압 · 방향제어밸브",
+  ports: valve4Ports(-30),
+  propertySchema: [
+    { key: "solenoidLeft", label: "왼쪽 솔레노이드 (→P-A)", type: "text", default: "Y1" },
+    { key: "solenoidRight", label: "오른쪽 솔레노이드 (→P-B)", type: "text", default: "Y2" },
+  ],
+  symbolId: "hyd.valve.4-3-open-solenoid",
+  bounds: { x: -108, y: -30, width: 216, height: 60 },
+  behavior: {
+    role: "valve",
+    positions: [
+      { connections: [["P", "A"], ["B", "T"]] },
+      // 오픈 센터: 네 포트 모두 상통 — 펌프 무부하 + 실린더 자유 상태 (PRD 4.3)
+      { connections: [["P", "T"], ["A", "T"], ["B", "T"]] },
       { connections: [["P", "B"], ["A", "T"]] },
     ],
     initial: 1,
@@ -333,6 +360,7 @@ const allDefinitions = [
   valve42Lever,
   valve43ClosedSolenoid,
   valve43TandemSolenoid,
+  valve43OpenSolenoid,
   checkValve,
   pilotCheckValve,
   flowControl,

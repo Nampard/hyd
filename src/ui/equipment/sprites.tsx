@@ -127,6 +127,21 @@ function Valve32RollerSprite({ properties, runtime }: SymbolProps): ReactElement
   );
 }
 
+/** 3/2 솔레노이드 밸브: 3포트 블록 + 솔레노이드 인디케이터 (codex-review 스프라이트 오바인딩 수정) */
+function Valve32SolenoidSprite({ properties, runtime }: SymbolProps): ReactElement {
+  const current = runtime?.valvePosition ?? 1;
+  return (
+    <g>
+      <ValveBlock
+        width={70}
+        topPorts={[20]}
+        bottomPorts={[10, 30]}
+        indicators={[{ x: -25, on: current === 0, label: String(properties.solenoidLeft ?? "") }]}
+      />
+    </g>
+  );
+}
+
 function makeValve52Sprite(kind: "manual" | "pilot-double" | "pilot-single" | "sol-single" | "sol-double") {
   return function Valve52Sprite({ properties, runtime }: SymbolProps): ReactElement {
     const current = runtime?.valvePosition ?? 1;
@@ -233,7 +248,7 @@ const spriteRegistry: Record<string, SpriteComponent> = {
   "pneu.valve.5-2-manual": makeValve52Sprite("manual"),
   "pneu.valve.5-2-double-pilot": makeValve52Sprite("pilot-double"),
   "pneu.valve.5-2-single-pilot": makeValve52Sprite("pilot-single"),
-  "pneu.valve.3-2-solenoid": makeValve52Sprite("sol-single"),
+  "pneu.valve.3-2-solenoid": Valve32SolenoidSprite,
   "pneu.valve.5-2-solenoid": makeValve52Sprite("sol-single"),
   "pneu.valve.5-2-double-solenoid": makeValve52Sprite("sol-double"),
   "elec.pushbutton": PushbuttonSprite,

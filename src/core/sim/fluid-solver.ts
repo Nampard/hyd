@@ -94,6 +94,8 @@ export function solveFluid(
   const sourceLevels = new Map<number, number>();
   const exhaustNets = new Set<number>();
   const staticEdges: Edge[] = [];
+  /** 릴리프 밸브 목록 (활성 시 유로 레벨 상한) */
+  const reliefs: { compId: string; netP: number; netT: number; setpoint: number }[] = [];
 
   const net = (compId: string, pid: string) => netOfPort.get(portKey(compId, pid))!;
   const addSource = (n: number, level: number) => {
@@ -112,13 +114,22 @@ export function solveFluid(
         addSource(net(comp.id, behavior.port), Number(comp.properties.pressure ?? 6));
         break;
       case "reducer":
+        // 정방향만 감압 — 역방향 흐름에는 cap을 적용하지 않는다 (codex-review 감압 방향 결함)
         staticEdges.push({
           a: net(comp.id, behavior.portIn),
           b: net(comp.id, behavior.portOut),
           factorAB: 1,
           factorBA: 1,
           levelCapAB: Number(comp.properties.pressure ?? 20),
-          levelCapBA: Number(comp.properties.pressure ?? 20),
+        });
+        break;
+      case "pressure-relief":
+        // 릴리프는 내부 유로를 만들지 않는다 — 활성 시 레벨 상한만 부여 (아래 반복 해석에서)
+        reliefs.push({
+          compId: comp.id,
+          netP: net(comp.id, behavior.pressurePort),
+          netT: net(comp.id, behavior.tankPort),
+          setpoint: Number(comp.properties.pressure ?? 50),
         });
         break;
       case "exhaust":
@@ -182,12 +193,16 @@ export function solveFluid(
 
   // --- 3+4. 동적 연결 반복 해석 ---
   let portStatePrev = new Map<string, PressureState>();
-  // 초기 추정: 직전 틱 상태 (셔틀 등이 첫 반복에서 활용)
+  let portLevelPrev = new Map<string, number>();
+  // 초기 추정: 직전 틱 상태 (셔틀·2압 등이 첫 반복에서 활용)
   for (const comp of doc.components) {
     const runtime = runtimes.get(comp.id);
     if (!runtime) continue;
     for (const [pid, st] of Object.entries(runtime.portState)) {
       portStatePrev.set(portKey(comp.id, pid), st);
+    }
+    for (const [pid, lv] of Object.entries(runtime.portLevel ?? {})) {
+      portLevelPrev.set(portKey(comp.id, pid), lv);
     }
   }
 
@@ -203,20 +218,26 @@ export function solveFluid(
       const stateOf = (pid: string) => portStatePrev.get(portKey(comp.id, pid)) ?? "blocked";
 
       if (behavior.role === "shuttle") {
-        if (stateOf(behavior.inA) === "pressurized")
+        // 가압된 입력만 출력과 연결 — 비활성 입력은 볼이 막으므로 역급기 금지 (codex-review 셔틀 결함)
+        const aOn = stateOf(behavior.inA) === "pressurized";
+        const bOn = stateOf(behavior.inB) === "pressurized";
+        if (aOn)
           edges.push({ a: net(comp.id, behavior.inA), b: net(comp.id, behavior.out), factorAB: 1, factorBA: 1 });
-        if (stateOf(behavior.inB) === "pressurized")
+        if (bOn)
           edges.push({ a: net(comp.id, behavior.inB), b: net(comp.id, behavior.out), factorAB: 1, factorBA: 1 });
-        // 두 입력 모두 무압이면 출력은 입력측으로 배기 (열린 쪽으로) — 상태 기반 단순화: 아무 연결 없음
-        if (stateOf(behavior.inA) !== "pressurized" && stateOf(behavior.inB) !== "pressurized") {
-          // 배기 경로 제공: 출력이 갇히지 않도록 양쪽 입력과 연결
-          edges.push({ a: net(comp.id, behavior.inA), b: net(comp.id, behavior.out), factorAB: 1, factorBA: 1 });
-          edges.push({ a: net(comp.id, behavior.inB), b: net(comp.id, behavior.out), factorAB: 1, factorBA: 1 });
+        if (!aOn && !bOn) {
+          // 두 입력 모두 무압: 출력이 갇히지 않도록 출력→입력 방향으로만 배기 허용
+          edges.push({ a: net(comp.id, behavior.out), b: net(comp.id, behavior.inA), factorAB: 1, factorBA: 0 });
+          edges.push({ a: net(comp.id, behavior.out), b: net(comp.id, behavior.inB), factorAB: 1, factorBA: 0 });
         }
       } else if (behavior.role === "two-pressure") {
         const bothOn = stateOf(behavior.inA) === "pressurized" && stateOf(behavior.inB) === "pressurized";
         if (bothOn) {
-          edges.push({ a: net(comp.id, behavior.inA), b: net(comp.id, behavior.out), factorAB: 1, factorBA: 1 });
+          // 두 입력 중 낮은 압력이 출력을 지배 (codex-review 2압밸브 레벨 결함)
+          const levelA = portLevelPrev.get(portKey(comp.id, behavior.inA)) ?? 0;
+          const levelB = portLevelPrev.get(portKey(comp.id, behavior.inB)) ?? 0;
+          const lowIn = levelB < levelA ? behavior.inB : behavior.inA;
+          edges.push({ a: net(comp.id, lowIn), b: net(comp.id, behavior.out), factorAB: 1, factorBA: 1 });
         } else {
           // 한쪽 이상 무압 — 출력은 무압 입력측으로 연결 (배기 허용)
           const openIn = stateOf(behavior.inA) !== "pressurized" ? behavior.inA : behavior.inB;
@@ -246,28 +267,46 @@ export function solveFluid(
     for (const n of sourceNets) supply[n] = 1;
     relax(supply, edges);
 
+    // 배기 전파 — 터미널 넷은 공급이 닿아도 대기/탱크 개방(언로딩)이므로 항상 시드.
+    // 단, 가압 넷을 "통과"하는 확산은 여전히 금지된다 (relaxExhaust 가드).
+    const exhaust = new Array<number>(netCount).fill(0);
+    for (const n of dynExhaustNets) exhaust[n] = 1;
+    relaxExhaust(exhaust, edges, supply);
+
     // 압력 레벨 전파 (경로상 최소 캡, 준정량)
     const level = new Array<number>(netCount).fill(0);
     for (const [n, lv] of sourceLevels) level[n] = lv;
     relaxLevel(level, edges);
 
-    // 배기 전파 — 가압 넷은 통과하지 않음, 흐름 방향은 배기 쪽으로
-    const exhaust = new Array<number>(netCount).fill(0);
-    for (const n of dynExhaustNets) if (supply[n] === 0) exhaust[n] = 1;
-    relaxExhaust(exhaust, edges, supply);
+    // 릴리프 밸브: 탱크 경로가 살아 있고 라인이 설정압을 넘으면
+    // 압력 포트가 속한 유로(간선으로 이어진 영역) 전체의 레벨을 설정값으로 제한 (H6)
+    for (const relief of reliefs) {
+      const tankOk = exhaust[relief.netT] > 0;
+      if (!tankOk || level[relief.netP] <= relief.setpoint) continue;
+      for (const n of connectedRegion(relief.netP, netCount, edges)) {
+        level[n] = Math.min(level[n], relief.setpoint);
+      }
+    }
 
-    // 결과 조립
+    // 결과 조립 — 배기 터미널을 포함한 넷은 공급이 닿아도 언로딩 상태(탱크 귀환)로 본다
     const portState = new Map<string, PressureState>();
     const supplyFactor = new Map<string, number>();
     const exhaustFactor = new Map<string, number>();
     const supplyLevel = new Map<string, number>();
     for (const k of allPortKeys) {
       const n = netOfPort.get(k)!;
-      const st: PressureState = supply[n] > 0 ? "pressurized" : exhaust[n] > 0 ? "exhausted" : "blocked";
+      const unloaded = dynExhaustNets.has(n);
+      const st: PressureState = unloaded
+        ? "exhausted"
+        : supply[n] > 0
+          ? "pressurized"
+          : exhaust[n] > 0
+            ? "exhausted"
+            : "blocked";
       portState.set(k, st);
-      supplyFactor.set(k, supply[n]);
-      exhaustFactor.set(k, exhaust[n]);
-      supplyLevel.set(k, supply[n] > 0 ? level[n] : 0);
+      supplyFactor.set(k, unloaded ? 0 : supply[n]);
+      exhaustFactor.set(k, unloaded ? 1 : exhaust[n]);
+      supplyLevel.set(k, !unloaded && supply[n] > 0 ? level[n] : 0);
     }
     const wireState = new Map<string, PressureState>();
     for (const wire of doc.wires) {
@@ -276,19 +315,44 @@ export function solveFluid(
     }
     result = { portState, supplyFactor, exhaustFactor, supplyLevel, wireState };
 
-    // 고정점 검사
+    // 고정점 검사 (상태 + 레벨)
     let changed = false;
     for (const k of allPortKeys) {
-      if ((portStatePrev.get(k) ?? "blocked") !== portState.get(k)) {
+      if (
+        (portStatePrev.get(k) ?? "blocked") !== portState.get(k) ||
+        (portLevelPrev.get(k) ?? 0) !== supplyLevel.get(k)
+      ) {
         changed = true;
         break;
       }
     }
     portStatePrev = portState;
+    portLevelPrev = supplyLevel;
     if (!changed) break;
   }
 
   return result!;
+}
+
+/** 시작 넷에서 흐름 가능한 간선(계수>0)으로 이어진 유로 영역 (릴리프 상한 적용 범위) */
+function connectedRegion(start: number, netCount: number, edges: Edge[]): Set<number> {
+  const seen = new Set<number>([start]);
+  const queue = [start];
+  void netCount;
+  while (queue.length > 0) {
+    const n = queue.pop()!;
+    for (const e of edges) {
+      if (e.a === n && e.factorAB > 0 && !seen.has(e.b)) {
+        seen.add(e.b);
+        queue.push(e.b);
+      }
+      if (e.b === n && e.factorBA > 0 && !seen.has(e.a)) {
+        seen.add(e.a);
+        queue.push(e.a);
+      }
+    }
+  }
+  return seen;
 }
 
 function clamp01(v: number, min = 0): number {

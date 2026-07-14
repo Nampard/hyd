@@ -16,7 +16,8 @@ export interface StoredDocumentMeta {
 
 export interface DocumentStorage {
   list(): StoredDocumentMeta[];
-  save(name: string, doc: CircuitDocument): void;
+  /** 저장 성공 여부 — 용량 초과·사생활 보호 모드 등 실패를 호출자가 안내 (codex-review M7) */
+  save(name: string, doc: CircuitDocument): boolean;
   load(name: string): CircuitDocument | null;
   delete(name: string): void;
 }
@@ -36,12 +37,28 @@ export interface KeyValueStore {
 export class LocalDocumentStorage implements DocumentStorage {
   constructor(private kv: KeyValueStore) {}
 
+  /** 저장소 값도 외부 경계 — 항목 단위로 구조를 검증해 손상 항목은 격리한다 (codex-review M8) */
   private read(): StorageShape {
+    let raw: unknown;
     try {
-      return JSON.parse(this.kv.getItem(STORAGE_KEY) ?? "{}") as StorageShape;
+      raw = JSON.parse(this.kv.getItem(STORAGE_KEY) ?? "{}");
     } catch {
       return {};
     }
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+    const shape: StorageShape = {};
+    for (const [name, entry] of Object.entries(raw as Record<string, unknown>)) {
+      if (
+        typeof entry === "object" &&
+        entry !== null &&
+        typeof (entry as Record<string, unknown>).savedAt === "string" &&
+        typeof (entry as Record<string, unknown>).componentCount === "number" &&
+        typeof (entry as Record<string, unknown>).json === "string"
+      ) {
+        shape[name] = entry as StorageShape[string];
+      }
+    }
+    return shape;
   }
 
   private write(shape: StorageShape): void {
@@ -58,14 +75,19 @@ export class LocalDocumentStorage implements DocumentStorage {
       .sort((a, b) => b.savedAt.localeCompare(a.savedAt));
   }
 
-  save(name: string, doc: CircuitDocument): void {
-    const shape = this.read();
-    shape[name] = {
-      savedAt: new Date().toISOString(),
-      componentCount: doc.components.length,
-      json: serializeDocument(doc),
-    };
-    this.write(shape);
+  save(name: string, doc: CircuitDocument): boolean {
+    try {
+      const shape = this.read();
+      shape[name] = {
+        savedAt: new Date().toISOString(),
+        componentCount: doc.components.length,
+        json: serializeDocument(doc),
+      };
+      this.write(shape);
+      return true;
+    } catch {
+      return false; // 용량 초과, 저장소 권한 제한 등
+    }
   }
 
   load(name: string): CircuitDocument | null {
@@ -76,9 +98,13 @@ export class LocalDocumentStorage implements DocumentStorage {
   }
 
   delete(name: string): void {
-    const shape = this.read();
-    delete shape[name];
-    this.write(shape);
+    try {
+      const shape = this.read();
+      delete shape[name];
+      this.write(shape);
+    } catch {
+      /* 저장소 접근 실패 — 삭제는 조용히 무시 */
+    }
   }
 }
 

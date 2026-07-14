@@ -682,8 +682,8 @@ function HydTank(_: SymbolProps): ReactElement {
 function HydGauge({ runtime }: SymbolProps): ReactElement {
   const hot = runtime?.portState?.P === "pressurized";
   const level = runtime?.portLevel?.P ?? 0;
-  // 바늘: 0bar 좌측(-60도) ~ 100bar 우측(+60도)
-  const angle = -60 + Math.min(level / 100, 1) * 120;
+  // 바늘: 0bar 좌측(-60도) ~ 300bar(설정 가능 최대) 우측(+60도) — 수치 텍스트가 1차 표시 (codex-review 게이지 포화)
+  const angle = -60 + Math.min(level / 300, 1) * 120;
   const rad = ((angle - 90) * Math.PI) / 180;
   return (
     <g>
@@ -699,17 +699,22 @@ function HydGauge({ runtime }: SymbolProps): ReactElement {
   );
 }
 
-function HydRelief(_: SymbolProps): ReactElement {
+function HydRelief({ properties, runtime }: SymbolProps): ReactElement {
+  // 작동 판정: P 라인 레벨이 설정압에 도달 (릴리프가 상한을 잡고 있는 상태)
+  const setpoint = Number(properties.pressure ?? 50);
+  const levelP = runtime?.portLevel?.P ?? 0;
+  const relieving = runtime != null && levelP >= setpoint && levelP > 0;
   return (
     <g>
-      <rect x={-15} y={-20} width={30} height={40} {...S} />
-      {/* 정상 차단 + 압력 초과 시 열림 (화살표 오프셋) */}
-      <FlowArrow x1={-8} y1={14} x2={-8} y2={-14} />
+      <rect x={-15} y={-20} width={30} height={40} {...S} fill={relieving ? "var(--energized)" : "none"} />
+      {/* 정상 차단 + 압력 초과 시 열림 — 작동 시 유로 화살표가 중앙 정렬 */}
+      <FlowArrow x1={relieving ? 0 : -8} y1={14} x2={relieving ? 0 : -8} y2={-14} />
       <SpringH x={15} dir={1} />
       <line x1={0} y1={-30} x2={0} y2={-20} {...S} />
       <line x1={0} y1={20} x2={0} y2={30} {...S} />
       <text x={4} y={-33} fontSize={9} fill="currentColor" stroke="none">P</text>
       <text x={4} y={39} fontSize={9} fill="currentColor" stroke="none">T</text>
+      <text x={-24} y={-24} fontSize={8} fill="currentColor" stroke="none">{setpoint} bar</text>
     </g>
   );
 }
@@ -767,7 +772,7 @@ function HydValve42Lever({ properties, runtime }: SymbolProps): ReactElement {
   );
 }
 
-function HydValve43({ properties, runtime, center }: SymbolProps & { center: "closed" | "tandem" }): ReactElement {
+function HydValve43({ properties, runtime, center }: SymbolProps & { center: "closed" | "tandem" | "open" }): ReactElement {
   const current = runtime?.valvePosition ?? 1;
   const boxes = [
     <g key="0">
@@ -781,13 +786,21 @@ function HydValve43({ properties, runtime, center }: SymbolProps & { center: "cl
         <BlockedT x={20} side="bottom" />
         <BlockedT x={40} side="bottom" />
       </g>
-    ) : (
+    ) : center === "tandem" ? (
       <g key="1">
         {/* 탠덤: P→T 우회, A/B 차단 */}
         <polyline points="20,20 20,6 40,6" {...S} />
         <FlowArrow x1={40} y1={6} x2={40} y2={20} />
         <BlockedT x={20} side="top" />
         <BlockedT x={40} side="top" />
+      </g>
+    ) : (
+      <g key="1">
+        {/* 오픈: 네 포트 상통 (십자 연결) */}
+        <line x1={20} y1={-20} x2={20} y2={20} {...Sthin} />
+        <line x1={40} y1={-20} x2={40} y2={20} {...Sthin} />
+        <line x1={20} y1={0} x2={40} y2={0} {...Sthin} />
+        <FlowArrow x1={30} y1={0} x2={40} y2={16} />
       </g>
     ),
     <g key="2">
@@ -1110,6 +1123,7 @@ const symbolRegistry: Record<string, SymbolComponent> = {
   "hyd.valve.4-2-lever": HydValve42Lever,
   "hyd.valve.4-3-closed-solenoid": (p) => <HydValve43 {...p} center="closed" />,
   "hyd.valve.4-3-tandem-solenoid": (p) => <HydValve43 {...p} center="tandem" />,
+  "hyd.valve.4-3-open-solenoid": (p) => <HydValve43 {...p} center="open" />,
   "hyd.check": () => <HydCheck />,
   "hyd.pilot-check": () => <HydCheck pilot />,
   "hyd.flow-control": SpeedController,
