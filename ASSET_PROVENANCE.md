@@ -47,6 +47,9 @@ codex-review IP 게이트 대응 문서. 이 원장은 법적 판단이 아니�
 - [ ] 프로젝트 LICENSE 선택 (예: MIT/Apache-2.0/비공개) — 제3자 재사용 조건 확정
 - [ ] 기여자별 경쟁 제품 자료 접근 이력 사실확인서 (본 원장 [B] 항목의 인간 기여자 서명본)
 - [ ] 상용 제품 공개 화면과의 side-by-side 독립 검토 수행·기록
-- [ ] V-AMT 구매계약/EULA, Automation Studio EUSLMA 수락 이력 확인
+- [x] V-AMT 구매계약/EULA, Automation Studio EUSLMA 수락 이력 확인 — **소유자 확인 완료
+  (2026-07-15): 소유자 및 개발 관여자는 V-AMT·Automation Studio를 설치·사용한 이력이
+  없으며, 따라서 두 제품의 EULA/구매계약에 동의한 사실도 없다.** 향후 다른 기여자가
+  합류하면 그 시점에 동일 확인을 반복한다
 - [ ] 코드·문서·자산 권리 귀속(chain of title) 문서화 — AI 생성물의 권리 귀속 정책 포함
 - [ ] 공개 배포(GitHub Pages) 유지에 대한 책임자 인수 기록
