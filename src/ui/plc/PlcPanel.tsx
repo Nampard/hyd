@@ -13,12 +13,15 @@ import {
   type LadderProgram,
   type LadderRung,
 } from "../../core/plc/model";
+import type { PlcMonitor } from "../../core/plc/scanner";
 import { getComponentDefinition } from "../../core/library/registry";
 
 /**
- * PLC 래더 편집·모니터링 패널 (XG5000 스타일 단순화).
+ * PLC 래더 편집·모니터링 패널 (XG5000 스타일 단순화, Phase 13 연속 선도 렌더링).
+ * 렁 전체를 SVG 하나로 그려 좌·우 모선이 렁 경계에서 끊기지 않고,
+ * 접점·코일이 셀 경계에 맞닿는 연속 선으로 이어지도록 한다.
  * 도구를 고른 뒤 셀을 클릭해 배치하고, 선택 셀의 디바이스/설정값을 입력한다.
- * 시뮬레이션 중에는 통전 셀이 강조된다 (모니터 모드).
+ * 시뮬레이션 중에는 통전 경로가 선 색으로 강조된다 (모니터 모드).
  */
 
 type Tool = LadderCellKind | "erase" | "vlink";
@@ -55,29 +58,366 @@ function defaultDevice(kind: LadderCellKind): string {
   }
 }
 
-function cellLabel(cell: LadderCell): string {
+// ---------- 래더 SVG 기하 상수 ----------
+const CW = 86; // 셀 너비
+const RH = 34; // 행 높이
+const GUTTER = 30; // 좌측 모선 앞 여백 (렁 번호·버튼)
+const PAD_Y = 6; // 상하 여백
+const RUNG_GAP = 10; // 렁 사이 간격 (모선은 이 구간도 관통)
+const LEFT_RAIL_X = GUTTER;
+const RIGHT_RAIL_X = LEFT_RAIL_X + LADDER_COLS * CW;
+const SVG_WIDTH = RIGHT_RAIL_X + 4;
+
+interface RungLayout {
+  rung: LadderRung;
+  top: number;
+  rows: number;
+}
+
+function layoutRungs(rungs: LadderRung[]): { layouts: RungLayout[]; totalHeight: number } {
+  let y = PAD_Y;
+  const layouts: RungLayout[] = rungs.map((rung) => {
+    const rows = rung.cells.length;
+    const top = y;
+    y += rows * RH + RUNG_GAP;
+    return { rung, top, rows };
+  });
+  const totalHeight = layouts.length > 0 ? y - RUNG_GAP + PAD_Y : PAD_Y * 2;
+  return { layouts, totalHeight };
+}
+
+/** 셀 좌표 → x (노드 열 nc: 0..LADDER_COLS) */
+function nodeX(nc: number): number {
+  return LEFT_RAIL_X + nc * CW;
+}
+
+function cellCenterY(rungTop: number, r: number): number {
+  return rungTop + r * RH + RH / 2;
+}
+
+// ---------- 심벌 (셀 경계에 닿는 연속선 위에 작도) ----------
+
+function segColor(hot: boolean): string {
+  return hot ? "var(--run)" : "var(--text)";
+}
+
+function HLine({ x1, x2, y, hot }: { x1: number; x2: number; y: number; hot: boolean }): ReactElement {
+  return <line x1={x1} y1={y} x2={x2} y2={y} stroke={segColor(hot)} strokeWidth={hot ? 2 : 1.5} />;
+}
+
+function ContactSymbol({
+  cx,
+  cy,
+  nc,
+  device,
+  enterHot,
+  conductHot,
+}: {
+  cx: number;
+  cy: number;
+  nc: boolean;
+  device: string;
+  enterHot: boolean;
+  conductHot: boolean;
+}): ReactElement {
+  const half = CW / 2;
+  const gap = 9;
+  const barH = 11;
+  return (
+    <g>
+      <text x={cx} y={cy - 12} textAnchor="middle" fontSize={9} fill="var(--text-dim)">
+        {device}
+      </text>
+      <HLine x1={cx - half} x2={cx - gap} y={cy} hot={enterHot} />
+      <line x1={cx - gap} y1={cy - barH / 2} x2={cx - gap} y2={cy + barH / 2} stroke={segColor(conductHot)} strokeWidth={2} />
+      <line x1={cx + gap} y1={cy - barH / 2} x2={cx + gap} y2={cy + barH / 2} stroke={segColor(conductHot)} strokeWidth={2} />
+      {nc && (
+        <line
+          x1={cx - gap + 2.5}
+          y1={cy + barH / 2}
+          x2={cx + gap - 2.5}
+          y2={cy - barH / 2}
+          stroke={segColor(conductHot)}
+          strokeWidth={2}
+        />
+      )}
+      <HLine x1={cx + gap} x2={cx + half} y={cy} hot={conductHot} />
+    </g>
+  );
+}
+
+function CoilSymbol({
+  cx,
+  cy,
+  device,
+  glyph,
+  enterHot,
+}: {
+  cx: number;
+  cy: number;
+  device: string;
+  glyph?: string;
+  enterHot: boolean;
+}): ReactElement {
+  const half = CW / 2;
+  const r = 9;
+  return (
+    <g>
+      <text x={cx} y={cy - 14} textAnchor="middle" fontSize={9} fill="var(--text-dim)">
+        {device}
+      </text>
+      <HLine x1={cx - half} x2={cx - r} y={cy} hot={enterHot} />
+      <circle cx={cx} cy={cy} r={r} stroke={segColor(enterHot)} strokeWidth={2} fill="none" />
+      {glyph && (
+        <text x={cx} y={cy + 3} textAnchor="middle" fontSize={9} fontWeight={700} fill={segColor(enterHot)}>
+          {glyph}
+        </text>
+      )}
+      <HLine x1={cx + r} x2={cx + half} y={cy} hot={enterHot} />
+    </g>
+  );
+}
+
+function FunctionBlockSymbol({
+  cx,
+  cy,
+  kindLabel,
+  device,
+  presetText,
+  enterHot,
+}: {
+  cx: number;
+  cy: number;
+  kindLabel: string;
+  device: string;
+  presetText: string;
+  enterHot: boolean;
+}): ReactElement {
+  const half = CW / 2;
+  const boxW = 62;
+  const boxH = 20;
+  return (
+    <g>
+      <text x={cx} y={cy - 14} textAnchor="middle" fontSize={9} fill="var(--text-dim)">
+        {device}
+      </text>
+      <HLine x1={cx - half} x2={cx - boxW / 2} y={cy} hot={enterHot} />
+      <rect
+        x={cx - boxW / 2}
+        y={cy - boxH / 2}
+        width={boxW}
+        height={boxH}
+        stroke={segColor(enterHot)}
+        strokeWidth={1.5}
+        fill="none"
+      />
+      <text x={cx} y={cy + 3.5} textAnchor="middle" fontSize={9} fontWeight={700} fill={segColor(enterHot)}>
+        {kindLabel} {presetText}
+      </text>
+      <HLine x1={cx + boxW / 2} x2={cx + half} y={cy} hot={enterHot} />
+    </g>
+  );
+}
+
+function cellFunctionLabel(kind: LadderCellKind): string {
+  switch (kind) {
+    case "ton":
+      return "TON";
+    case "toff":
+      return "TOFF";
+    case "ctu":
+      return "CTU";
+    case "ctd":
+      return "CTD";
+    default:
+      return "";
+  }
+}
+
+function CellSymbol({
+  cell,
+  cx,
+  cy,
+  enterHot,
+  conductHot,
+}: {
+  cell: LadderCell;
+  cx: number;
+  cy: number;
+  enterHot: boolean;
+  conductHot: boolean;
+}): ReactElement | null {
   switch (cell.kind) {
     case "no":
-      return `┤ ├ ${cell.device ?? ""}`;
+      return <ContactSymbol cx={cx} cy={cy} nc={false} device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} />;
     case "nc":
-      return `┤/├ ${cell.device ?? ""}`;
+      return <ContactSymbol cx={cx} cy={cy} nc={true} device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} />;
     case "hline":
-      return "─────";
+      return <HLine x1={cx - CW / 2} x2={cx + CW / 2} y={cy} hot={enterHot && conductHot} />;
     case "coil":
-      return `( ) ${cell.device ?? ""}`;
+      return <CoilSymbol cx={cx} cy={cy} device={cell.device ?? ""} enterHot={enterHot} />;
     case "set":
-      return `(S) ${cell.device ?? ""}`;
+      return <CoilSymbol cx={cx} cy={cy} device={cell.device ?? ""} glyph="S" enterHot={enterHot} />;
     case "rst":
-      return `(R) ${cell.device ?? ""}`;
+      return <CoilSymbol cx={cx} cy={cy} device={cell.device ?? ""} glyph="R" enterHot={enterHot} />;
     case "ton":
-      return `TON ${cell.device ?? ""} ${cell.preset ?? 0}s`;
     case "toff":
-      return `TOFF ${cell.device ?? ""} ${cell.preset ?? 0}s`;
+      return (
+        <FunctionBlockSymbol
+          cx={cx}
+          cy={cy}
+          kindLabel={cellFunctionLabel(cell.kind)}
+          device={cell.device ?? ""}
+          presetText={`${cell.preset ?? 0}s`}
+          enterHot={enterHot}
+        />
+      );
     case "ctu":
-      return `CTU ${cell.device ?? ""} ×${cell.preset ?? 0}`;
     case "ctd":
-      return `CTD ${cell.device ?? ""} ×${cell.preset ?? 0}`;
+      return (
+        <FunctionBlockSymbol
+          cx={cx}
+          cy={cy}
+          kindLabel={cellFunctionLabel(cell.kind)}
+          device={cell.device ?? ""}
+          presetText={`×${cell.preset ?? 0}`}
+          enterHot={enterHot}
+        />
+      );
   }
+}
+
+// ---------- 렁 하나의 SVG 그룹 ----------
+
+function RungGroup({
+  rung,
+  top,
+  rows,
+  power,
+  running,
+  selected,
+  onCellClick,
+}: {
+  rung: LadderRung;
+  top: number;
+  rows: number;
+  power: boolean[][] | undefined;
+  running: boolean;
+  selected: { rungId: string; r: number; c: number } | null;
+  onCellClick: (r: number, c: number) => void;
+}): ReactElement {
+  return (
+    <g>
+      {Array.from({ length: rows }, (_, r) => {
+        const cy = cellCenterY(top, r);
+        return (
+          <g key={r}>
+            {Array.from({ length: LADDER_COLS }, (_, c) => {
+              const cell = rung.cells[r][c];
+              const cx = nodeX(c) + CW / 2;
+              const enterHot = power?.[r]?.[c] ?? false;
+              const exitHot = power?.[r]?.[c + 1] ?? false;
+              const isSelected = selected?.rungId === rung.id && selected.r === r && selected.c === c;
+              return (
+                <g key={c}>
+                  {cell && (
+                    <CellSymbol cell={cell} cx={cx} cy={cy} enterHot={enterHot} conductHot={exitHot} />
+                  )}
+                  {!running && (
+                    <rect
+                      x={nodeX(c)}
+                      y={top + r * RH}
+                      width={CW}
+                      height={RH}
+                      fill="none"
+                      stroke="var(--panel-border)"
+                      strokeDasharray="2 2"
+                      strokeWidth={1}
+                    />
+                  )}
+                  <rect
+                    className={`plc-cell-hit${cell ? "" : " plc-cell-hit-empty"}`}
+                    x={nodeX(c)}
+                    y={top + r * RH}
+                    width={CW}
+                    height={RH}
+                    fill="transparent"
+                    onClick={() => onCellClick(r, c)}
+                  />
+                  {isSelected && (
+                    <rect
+                      x={nodeX(c) + 1}
+                      y={top + r * RH + 1}
+                      width={CW - 2}
+                      height={RH - 2}
+                      fill="none"
+                      stroke="var(--accent)"
+                      strokeWidth={2}
+                      pointerEvents="none"
+                    />
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        );
+      })}
+      {rung.vlinks.map((link, i) => {
+        if (link.r + 1 >= rows) return null;
+        const x = nodeX(link.c);
+        const hot = (power?.[link.r]?.[link.c] ?? false) && (power?.[link.r + 1]?.[link.c] ?? false);
+        return (
+          <line
+            key={i}
+            x1={x}
+            y1={cellCenterY(top, link.r)}
+            x2={x}
+            y2={cellCenterY(top, link.r + 1)}
+            stroke={segColor(hot)}
+            strokeWidth={hot ? 2 : 1.5}
+          />
+        );
+      })}
+    </g>
+  );
+}
+
+// ---------- 좌·우 모선 (전체 관통 + 행별 통전 오버레이) ----------
+
+function Rails({
+  layouts,
+  totalHeight,
+  monitor,
+  running,
+}: {
+  layouts: RungLayout[];
+  totalHeight: number;
+  monitor: PlcMonitor | null;
+  running: boolean;
+}): ReactElement {
+  return (
+    <g>
+      <line x1={LEFT_RAIL_X} y1={0} x2={LEFT_RAIL_X} y2={totalHeight} stroke="var(--text-dim)" strokeWidth={3} />
+      <line x1={RIGHT_RAIL_X} y1={0} x2={RIGHT_RAIL_X} y2={totalHeight} stroke="var(--text-dim)" strokeWidth={3} />
+      {running &&
+        layouts.map(({ rung, top, rows }) => {
+          const power = monitor?.nodePower[rung.id];
+          return Array.from({ length: rows }, (_, r) => {
+            const leftHot = power?.[r]?.[0] ?? false;
+            const rightHot = power?.[r]?.[LADDER_COLS] ?? false;
+            if (!leftHot && !rightHot) return null;
+            const y1 = top + r * RH;
+            const y2 = y1 + RH;
+            return (
+              <g key={`${rung.id}-${r}`}>
+                {leftHot && <line x1={LEFT_RAIL_X} y1={y1} x2={LEFT_RAIL_X} y2={y2} stroke="var(--run)" strokeWidth={3} />}
+                {rightHot && <line x1={RIGHT_RAIL_X} y1={y1} x2={RIGHT_RAIL_X} y2={y2} stroke="var(--run)" strokeWidth={3} />}
+              </g>
+            );
+          });
+        })}
+    </g>
+  );
 }
 
 export function PlcPanel(): ReactElement | null {
@@ -151,9 +491,19 @@ export function PlcPanel(): ReactElement | null {
     };
     updateRung(rung.id, (rg) => ({
       ...rg,
-      cells: rg.cells.map((row, ri) =>
-        ri === r ? row.map((cell, ci) => (ci === c ? newCell : cell)) : row,
-      ),
+      cells: rg.cells.map((row, ri) => {
+        if (ri !== r) return row;
+        const newRow = [...row];
+        newRow[c] = newCell;
+        // 출력 요소를 놓을 때 바로 앞의 빈 셀을 hline으로 자동 연결한다 (기존 요소는 보존, XG5000 관례)
+        if (isOutputKind(kind)) {
+          for (let cc = c - 1; cc >= 0; cc--) {
+            if (newRow[cc] !== null) break;
+            newRow[cc] = { kind: "hline" };
+          }
+        }
+        return newRow;
+      }),
     }));
   };
 
@@ -189,6 +539,8 @@ export function PlcPanel(): ReactElement | null {
     const name = comp.properties.name ?? comp.properties.label ?? "";
     return `${name} — ${def.name}`;
   };
+
+  const { layouts, totalHeight } = layoutRungs(program.rungs);
 
   return (
     <div className="plc-panel">
@@ -239,67 +591,55 @@ export function PlcPanel(): ReactElement | null {
         </div>
 
         <div className="plc-rungs">
-          {program.rungs.map((rung, rungIndex) => {
-            const power = plcMonitor?.nodePower[rung.id];
-            return (
-              <div key={rung.id} className="plc-rung">
-                <div className="plc-rung-head">
-                  <span>렁 {rungIndex}</span>
-                  {!running && (
-                    <span className="plc-rung-buttons">
-                      <button
-                        title="행 추가 (병렬 분기)"
-                        onClick={() =>
-                          updateRung(rung.id, (rg) => ({
-                            ...rg,
-                            cells: [...rg.cells, new Array(LADDER_COLS).fill(null)],
-                          }))
-                        }
-                      >
-                        +행
-                      </button>
-                      <button
-                        title="렁 삭제"
-                        onClick={() =>
-                          commitProgram({ rungs: program.rungs.filter((r) => r.id !== rung.id) })
-                        }
-                      >
-                        ×
-                      </button>
-                    </span>
-                  )}
-                </div>
-                {rung.cells.map((row, r) => (
-                  <div key={r} className="plc-row">
-                    <span className={`plc-rail${power?.[r]?.[0] ? " hot" : ""}`} />
-                    {row.map((cell, c) => {
-                      const hotLeft = power?.[r]?.[c] ?? false;
-                      const hotRight = power?.[r]?.[c + 1] ?? false;
-                      const vlink = rung.vlinks.some((v) => v.r === r && v.c === c + 1);
-                      return (
-                        <span
-                          key={c}
-                          className={[
-                            "plc-cell",
-                            cell ? `kind-${cell.kind}` : "empty",
-                            running && hotLeft && (cell ? hotRight : false) ? "hot" : "",
-                            running && hotLeft && !cell ? "" : "",
-                            selected?.rungId === rung.id && selected.r === r && selected.c === c
-                              ? "selected"
-                              : "",
-                            vlink ? "vlink" : "",
-                          ].join(" ")}
-                          onClick={() => handleCellClick(rung, r, c)}
-                        >
-                          {cell ? cellLabel(cell) : ""}
-                        </span>
-                      );
-                    })}
-                  </div>
-                ))}
+          <div className="plc-ladder-wrap" style={{ width: SVG_WIDTH }}>
+            <svg width={SVG_WIDTH} height={totalHeight} className="plc-ladder-svg">
+              <Rails layouts={layouts} totalHeight={totalHeight} monitor={plcMonitor} running={running} />
+              {layouts.map(({ rung, top, rows }) => (
+                <RungGroup
+                  key={rung.id}
+                  rung={rung}
+                  top={top}
+                  rows={rows}
+                  power={plcMonitor?.nodePower[rung.id]}
+                  running={running}
+                  selected={selected}
+                  onCellClick={(r, c) => handleCellClick(rung, r, c)}
+                />
+              ))}
+            </svg>
+            {layouts.map(({ rung, top, rows }, idx) => (
+              <div
+                key={rung.id}
+                className="plc-rung-gutter"
+                style={{ top, height: rows * RH, width: GUTTER }}
+              >
+                <span className="plc-rung-index">{idx}</span>
+                {!running && (
+                  <span className="plc-rung-buttons">
+                    <button
+                      title="행 추가 (병렬 분기)"
+                      onClick={() =>
+                        updateRung(rung.id, (rg) => ({
+                          ...rg,
+                          cells: [...rg.cells, new Array(LADDER_COLS).fill(null)],
+                        }))
+                      }
+                    >
+                      +행
+                    </button>
+                    <button
+                      title="렁 삭제"
+                      onClick={() =>
+                        commitProgram({ rungs: program.rungs.filter((r) => r.id !== rung.id) })
+                      }
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
               </div>
-            );
-          })}
+            ))}
+          </div>
           {!running && (
             <button
               className="plc-add-rung"
