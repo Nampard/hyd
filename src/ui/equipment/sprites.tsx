@@ -167,8 +167,16 @@ function makeValve52Sprite(kind: "manual" | "pilot-double" | "pilot-single" | "s
         </ValveBlock>
         {(kind === "pilot-double" || kind === "pilot-single") && (
           <>
-            <rect x={-58} y={-8} width={8} height={16} fill="#3c5164" />
-            {kind === "pilot-double" && <rect x={50} y={-8} width={8} height={16} fill="#3c5164" />}
+            {/* 파일럿 조작부: 현재 위치를 만든 쪽을 강조해 전환을 시각화 (솔레노이드 인디케이터와 동일 규약).
+                왼쪽 파일럿(X)=위치 0, 오른쪽 파일럿(Y)=위치 1(마지막). 스프링 복귀형은 왼쪽만 존재 */}
+            <rect x={-58} y={-8} width={8} height={16} fill={current === 0 ? "#fbbf24" : "#3c5164"} />
+            <text x={-58} y={-11} fontSize={7} fill="#1f2937" stroke="none">X</text>
+            {kind === "pilot-double" && (
+              <>
+                <rect x={50} y={-8} width={8} height={16} fill={current === 1 ? "#fbbf24" : "#3c5164"} />
+                <text x={50} y={-11} fontSize={7} fill="#1f2937" stroke="none">Y</text>
+              </>
+            )}
           </>
         )}
       </g>
