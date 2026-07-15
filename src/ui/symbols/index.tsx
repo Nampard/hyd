@@ -123,13 +123,18 @@ function Roller({ x, active }: { x: number; active?: boolean }) {
   );
 }
 
-/** 공압 파일럿 조작부 (측면 사각형 + 점선) */
-function PilotGlyph({ x, dir }: { x: number; dir: 1 | -1 }) {
+/**
+ * 공압 파일럿 조작부 (측면 사각형 + 점선).
+ * 조작부는 외부 파일럿 배관이 붙는 포트라 위치가 고정돼 본체처럼 슬라이드할 수 없다.
+ * 대신 파일럿 신호가 들어오면(active) 사각형을 가압색으로 채워 동작을 시각화한다
+ * — 포트 원이 가압 시 색이 바뀌는 규약과 동일.
+ */
+function PilotGlyph({ x, dir, active }: { x: number; dir: 1 | -1; active?: boolean }) {
   const w = 10;
   const x0 = dir === -1 ? x - w : x;
   return (
     <g>
-      <rect x={x0} y={-7} width={w} height={14} {...Sthin} />
+      <rect x={x0} y={-7} width={w} height={14} {...Sthin} fill={active ? "var(--pneumatic)" : "none"} />
       <line x1={x0 + (dir === -1 ? 0 : w)} y1={0} x2={x0 + (dir === -1 ? -6 : w + 6)} y2={0} {...Sthin} />
     </g>
   );
@@ -337,14 +342,16 @@ function Valve52Manual({ properties, runtime }: SymbolProps): ReactElement {
 function Valve52DoublePilot({ properties, runtime }: SymbolProps): ReactElement {
   const rest = properties.initialPosition === "left" ? 0 : 1;
   const current = runtime?.valvePosition ?? rest;
+  const xActive = runtime?.portState?.X === "pressurized";
+  const yActive = runtime?.portState?.Y === "pressurized";
   // 포트는 항상 오른쪽 박스 자리 기준 (라이브러리 정의와 일치: restIndex=1)
   return (
     <g>
       <ValveBody boxW={60} boxes={valve52Boxes} restIndex={1} current={current}>
         <Valve52Stubs />
       </ValveBody>
-      <PilotGlyph x={-60} dir={-1} />
-      <PilotGlyph x={60} dir={1} />
+      <PilotGlyph x={-60} dir={-1} active={xActive} />
+      <PilotGlyph x={60} dir={1} active={yActive} />
       <text x={-69} y={-11} fontSize={9} fill="currentColor" stroke="none">X</text>
       <text x={63} y={-11} fontSize={9} fill="currentColor" stroke="none">Y</text>
     </g>
@@ -353,6 +360,7 @@ function Valve52DoublePilot({ properties, runtime }: SymbolProps): ReactElement 
 
 function Valve52SinglePilot({ runtime }: SymbolProps): ReactElement {
   const current = runtime?.valvePosition ?? 1;
+  const xActive = runtime?.portState?.X === "pressurized";
   return (
     <g>
       <ValveBody
@@ -364,7 +372,7 @@ function Valve52SinglePilot({ runtime }: SymbolProps): ReactElement {
       >
         <Valve52Stubs />
       </ValveBody>
-      <PilotGlyph x={-60} dir={-1} />
+      <PilotGlyph x={-60} dir={-1} active={xActive} />
       <text x={-69} y={-11} fontSize={9} fill="currentColor" stroke="none">X</text>
     </g>
   );
