@@ -323,6 +323,49 @@ body,
   border-top: 1px solid var(--panel-border);
 }
 
+/* --- 문서 메타 필드 (학습 활동 설명, Phase 12) --- */
+.doc-meta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  margin-top: 12px;
+  border-top: 1px solid var(--panel-border);
+  padding-top: 12px;
+}
+
+.learning-activity-input {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.learning-activity-autofill {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.learning-activity-autofill:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.doc-meta-hint {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  margin: 2px 0 0;
+}
+
 /* --- 장비 뷰 --- */
 .equipment-view {
   flex: 1;

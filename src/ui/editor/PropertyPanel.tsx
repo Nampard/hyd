@@ -4,6 +4,7 @@ import { useSimStore } from "../sim/simStore";
 import { getComponent } from "../../core/model/operations";
 import { getComponentDefinition } from "../../core/library/registry";
 import type { PropertyField } from "../../core/library/types";
+import { summarizeLearningActivity } from "../../core/model/learning-activity";
 import { useT } from "../i18n";
 
 function FieldInput({
@@ -77,6 +78,26 @@ export function PropertyPanel(): ReactElement {
         <p className="panel-empty">
           {selection?.type === "wire" ? t("wireSelected") : t("selectHint")}
         </p>
+        <div className="doc-meta-field">
+          <span className="field-label">{t("learningActivityLabel")}</span>
+          <textarea
+            className="learning-activity-input"
+            rows={3}
+            value={doc.meta.learningActivity ?? ""}
+            disabled={running}
+            placeholder={t("learningActivityPlaceholder")}
+            onChange={(e) => useEditorStore.getState().setLearningActivity(e.target.value)}
+          />
+          <button
+            type="button"
+            className="learning-activity-autofill"
+            disabled={running || doc.components.length === 0}
+            onClick={() => useEditorStore.getState().setLearningActivity(summarizeLearningActivity(doc))}
+          >
+            {t("learningActivityAutoFill")}
+          </button>
+          <p className="doc-meta-hint">{t("learningActivityHint")}</p>
+        </div>
       </div>
     );
   }

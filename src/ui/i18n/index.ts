@@ -51,6 +51,10 @@ const ko = {
   equipmentReset: "배치 초기화",
   diagramHead: "변위단계선도",
   diagramEmpty: " — 실린더가 있는 회로를 실행하면 기록됩니다.",
+  learningActivityLabel: "학습 활동 설명",
+  learningActivityPlaceholder: "예: 제어밸브 및 복동실린더를 활용한 시퀀스 제어",
+  learningActivityAutoFill: "자동 작성",
+  learningActivityHint: "저장 시 비워두면 회로 구성을 바탕으로 자동 작성됩니다. 이름·학번 등 개인정보는 적지 마세요.",
 };
 
 const en: Record<keyof typeof ko, string> = {
@@ -97,6 +101,10 @@ const en: Record<keyof typeof ko, string> = {
   equipmentReset: "Reset layout",
   diagramHead: "Displacement-step diagram",
   diagramEmpty: " — run a circuit with cylinders to record.",
+  learningActivityLabel: "Learning activity description",
+  learningActivityPlaceholder: "e.g. Sequence control using a control valve and a double-acting cylinder",
+  learningActivityAutoFill: "Auto-fill",
+  learningActivityHint: "Leave blank to auto-fill from the circuit on save. Do not enter names, student IDs, or other personal info.",
 };
 
 export type I18nKey = keyof typeof ko;

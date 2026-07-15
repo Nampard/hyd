@@ -98,6 +98,32 @@ describe("부품 속성: propertySchema 기반 검증", () => {
   });
 });
 
+describe("문서 메타: learningActivity (Phase 12)", () => {
+  it("문자열이 아닌 learningActivity를 거부한다", () => {
+    const doc = docWithCylinder();
+    const broken = { ...doc, meta: { ...doc.meta, learningActivity: 12345 } };
+    const result = reparse(broken);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("learningActivity");
+  });
+
+  it("500자를 넘는 learningActivity를 거부한다", () => {
+    const doc = docWithCylinder();
+    const broken = {
+      ...doc,
+      meta: { ...doc.meta, learningActivity: "가".repeat(501) },
+    };
+    const result = reparse(broken);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("학습 활동");
+  });
+
+  it("필드가 없는 v2 이전 문서도 통과한다 (선택 필드)", () => {
+    const doc = docWithCylinder();
+    expect(reparse(doc).ok).toBe(true);
+  });
+});
+
 describe("PLC 프로그램: 렁/vlink/디바이스 문법", () => {
   const withPlc = (rungs: unknown[]) => ({ ...docWithCylinder(), plcProgram: { rungs } });
 
@@ -212,6 +238,8 @@ describe("회귀: 파싱을 통과한 문서는 엔진 첫 틱까지 안전하�
       expect(result.ok, `${ex.id} 파싱`).toBe(true);
       const engine = new SimulationEngine(result.document!);
       expect(() => engine.tick(0.02), `${ex.id} 첫 틱`).not.toThrow();
+      // Phase 12: 내장 예제는 교사가 그대로 배포·활용하므로 학습 활동 설명이 채워져 있어야 한다
+      expect(result.document!.meta.learningActivity, `${ex.id} 학습 활동 설명`).toBeTruthy();
     }
   });
 

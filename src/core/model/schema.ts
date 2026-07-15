@@ -24,6 +24,8 @@ export const MAX_JSON_BYTES = 5 * 1024 * 1024;
 const LIMITS = { components: 2000, wires: 4000, waypoints: 128, rungs: 200, rows: 32, ioMap: 512 };
 /** 이름표·디바이스 등 문자열 필드 길이 상한 */
 const MAX_STRING = 200;
+/** 학습 활동 설명 길이 상한 (Phase 12) — 제목보다 긴 문장을 허용 */
+const MAX_LEARNING_ACTIVITY = 500;
 
 export function parseDocument(json: string): ParseResult {
   // UTF-16 code unit 수는 UTF-8 byte 수의 하한이므로 빠른 선별에 쓰고,
@@ -71,6 +73,14 @@ function validateShape(doc: Record<string, unknown>): string | null {
   }
   if (typeof meta.title === "string" && meta.title.length > MAX_STRING) {
     return "문서 제목이 너무 깁니다.";
+  }
+  if (meta.learningActivity !== undefined) {
+    if (typeof meta.learningActivity !== "string") {
+      return "meta.learningActivity가 문자열이 아닙니다.";
+    }
+    if (meta.learningActivity.length > MAX_LEARNING_ACTIVITY) {
+      return "학습 활동 설명이 너무 깁니다.";
+    }
   }
   if (!Array.isArray(doc.components) || !Array.isArray(doc.wires)) {
     return "components/wires 목록이 없습니다.";
@@ -320,6 +330,7 @@ function migrate(obj: Record<string, unknown>): Record<string, unknown> {
   const version = obj.schemaVersion as number;
   let doc = obj;
   if (version < 2) doc = migrateV1toV2(doc);
+  if (version < 3) doc = migrateV2toV3(doc);
   doc.schemaVersion = CURRENT_SCHEMA_VERSION;
   return doc;
 }
@@ -327,5 +338,15 @@ function migrate(obj: Record<string, unknown>): Record<string, unknown> {
 /** v2: equipmentLayout(장비 뷰 자유 배치) 선택 필드 도입 — v1 문서는 빈 배치로 시작 */
 function migrateV1toV2(doc: Record<string, unknown>): Record<string, unknown> {
   if (doc.equipmentLayout === undefined) doc.equipmentLayout = {};
+  return doc;
+}
+
+/**
+ * v3: meta.learningActivity(학습 활동 설명) 선택 필드 도입 (Phase 12).
+ * 값을 채우는 마이그레이션 로직은 없다 — 필드가 optional이라 v2 문서는
+ * 빈 값으로 그대로 로드되고, 다음 저장 시 에디터가 자동 초안(summarizeLearningActivity)을
+ * 채워 넣는다. 여기서는 버전 표기만 올린다.
+ */
+function migrateV2toV3(doc: Record<string, unknown>): Record<string, unknown> {
   return doc;
 }

@@ -38,6 +38,13 @@ export interface DocumentMeta {
   title: string;
   description?: string;
   createdAt: string;
+  /**
+   * 학습 활동 설명 (Phase 12) — 이 과제물이 어떤 학습 활동인지 나타내는 문장.
+   * 예: "제어밸브 및 복동실린더를 활용한 시퀀스 제어". 저장 시 비어 있으면
+   * summarizeLearningActivity()의 자동 초안으로 채워지고, 언제든 수정 가능하다.
+   * 학습자 식별 정보(이름·학번 등)는 의도적으로 포함하지 않는다.
+   */
+  learningActivity?: string;
 }
 
 import type { IoEntry, LadderProgram } from "../plc/model";
@@ -55,7 +62,7 @@ export interface CircuitDocument {
   equipmentLayout?: Record<string, Point>;
 }
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export function createEmptyDocument(title = "새 회로"): CircuitDocument {
   return {

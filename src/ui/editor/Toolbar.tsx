@@ -4,6 +4,7 @@ import { clearSimHistory, useSimStore } from "../sim/simStore";
 import { downloadDocument, exportCircuitSvg, openDocumentFile } from "../../app/file";
 import { examples, getExample } from "../../core/examples";
 import { createBrowserStorage } from "../../core/storage";
+import { summarizeLearningActivity } from "../../core/model/learning-activity";
 import { useI18nStore, useT } from "../i18n";
 
 const browserStorage = createBrowserStorage();
@@ -27,6 +28,14 @@ export function Toolbar(): ReactElement {
     const s = useEditorStore.getState();
     if (!s.isDirty()) return true;
     return window.confirm("현재 회로를 버릴까요? 저장하지 않은 변경은 사라집니다.");
+  };
+
+  /** 학습 활동 설명이 비어 있으면 저장 직전 자동 초안으로 채운다 (Phase 12) */
+  const ensureLearningActivity = () => {
+    const s = useEditorStore.getState();
+    if (!s.document.meta.learningActivity) {
+      s.setLearningActivity(summarizeLearningActivity(s.document));
+    }
   };
 
   const handleNew = () => {
@@ -73,6 +82,7 @@ export function Toolbar(): ReactElement {
 
   const handleBrowserSave = () => {
     if (!browserStorage) return;
+    ensureLearningActivity();
     const s = useEditorStore.getState();
     const name = s.document.meta.title || "제목 없음";
     if (browserStorage.save(name, s.document)) {
@@ -186,6 +196,7 @@ export function Toolbar(): ReactElement {
         <button
           disabled={running}
           onClick={() => {
+            ensureLearningActivity();
             const s = useEditorStore.getState();
             downloadDocument(s.document);
             s.markSaved();

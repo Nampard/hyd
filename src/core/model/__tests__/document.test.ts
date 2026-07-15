@@ -66,6 +66,25 @@ describe("문서 직렬화", () => {
     expect(result.document?.equipmentLayout).toEqual({});
   });
 
+  it("v2 문서는 v3으로 마이그레이션된다 (learningActivity 없이 로드)", () => {
+    const doc = createEmptyDocument();
+    const v2 = { ...doc, schemaVersion: 2 } as Record<string, unknown>;
+    const result = parseDocument(JSON.stringify(v2));
+    expect(result.ok).toBe(true);
+    expect(result.document?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(result.document?.meta.learningActivity).toBeUndefined();
+  });
+
+  it("learningActivity가 저장 왕복을 보존한다 (v3)", () => {
+    let doc = createEmptyDocument("학습 활동 테스트");
+    doc = { ...doc, meta: { ...doc.meta, learningActivity: "제어밸브 및 복동실린더를 활용한 시퀀스 제어" } };
+    const result = parseDocument(serializeDocument(doc));
+    expect(result.ok).toBe(true);
+    expect(result.document?.meta.learningActivity).toBe(
+      "제어밸브 및 복동실린더를 활용한 시퀀스 제어",
+    );
+  });
+
   it("더 새로운 스키마 버전은 거부한다", () => {
     const doc = createEmptyDocument();
     const json = serializeDocument({ ...doc, schemaVersion: CURRENT_SCHEMA_VERSION + 1 });

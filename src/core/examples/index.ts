@@ -1,6 +1,7 @@
 import type { CircuitDocument, Rotation } from "../model/types";
 import { createEmptyDocument } from "../model/types";
 import { addComponent, autoWire, canConnect, moveComponent, rerouteAttachedWires } from "../model/operations";
+import { summarizeLearningActivity } from "../model/learning-activity";
 import type { IoEntry, LadderCell, LadderProgram, VLink } from "../plc/model";
 import { LADDER_COLS, isOutputKind } from "../plc/model";
 
@@ -87,7 +88,12 @@ function buildCircuit(title: string, description: string, build: (b: Builder) =>
   };
 
   build(builder);
-  return builder.doc();
+  const finalDoc = builder.doc();
+  // 내장 예제는 교사가 그대로 배포·활용하므로 학습 활동 설명을 자동 채움 (Phase 12)
+  return {
+    ...finalDoc,
+    meta: { ...finalDoc.meta, learningActivity: summarizeLearningActivity(finalDoc) },
+  };
 }
 
 export type ExampleCategory = "공압 기초" | "전기공압" | "유압" | "PLC" | "자격증 유형";

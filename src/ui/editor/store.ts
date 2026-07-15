@@ -48,6 +48,8 @@ interface EditorState {
   newDocument(): void;
   loadDocument(doc: CircuitDocument): void;
   setTitle(title: string): void;
+  /** 학습 활동 설명 수정 (Phase 12) */
+  setLearningActivity(text: string): void;
   /** 저장 성공 시 호출 — 현재 문서를 저장 기준점으로 표시 */
   markSaved(): void;
   /** 저장 기준점 이후 변경 여부 (제목·PLC·속성 등 모든 변경 포함) */
@@ -152,6 +154,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const state = get();
     set({
       document: { ...state.document, meta: { ...state.document.meta, title } },
+    });
+  },
+
+  setLearningActivity(text) {
+    const state = get();
+    set({
+      document: {
+        ...state.document,
+        meta: { ...state.document.meta, learningActivity: text },
+      },
     });
   },
 
