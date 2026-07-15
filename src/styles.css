@@ -575,6 +575,21 @@ body,
   cursor: pointer;
 }
 
+.plc-hint {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.plc-hint strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .plc-add-rung {
   padding: 4px 10px;
   margin-top: 8px;

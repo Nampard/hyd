@@ -30,7 +30,7 @@ const TOOLS: { id: Tool; label: string; title: string }[] = [
   { id: "no", label: "─┤ ├─", title: "a접점 (NO)" },
   { id: "nc", label: "─┤/├─", title: "b접점 (NC)" },
   { id: "hline", label: "───", title: "가로 연결선" },
-  { id: "vlink", label: "│", title: "수직 연결 (OR 분기) — 셀 왼쪽 절반=왼쪽 노드, 오른쪽 절반=오른쪽 노드. 첫 열 왼쪽=좌측 모선 분기" },
+  { id: "vlink", label: "│", title: "세로 연결 (OR 분기) — 같은 렁 안의 위/아래 행끼리만 이어집니다. 셀 왼쪽 절반=왼쪽 노드, 오른쪽 절반=오른쪽 노드, 첫 열 왼쪽=좌측 모선 분기" },
   { id: "coil", label: "─( )─", title: "출력 코일 (OUT)" },
   { id: "set", label: "(S)", title: "SET 코일" },
   { id: "rst", label: "(R)", title: "RST 코일" },
@@ -468,7 +468,11 @@ export function PlcPanel(): ReactElement | null {
       // 어느 쪽 행을 클릭해도 같은 링크를 만들 수 있어야 한다 (review: "클릭해도 안 그려짐" 버그 수정)
       const linkR = r + 1 < rung.cells.length ? r : r > 0 ? r - 1 : null;
       if (linkR === null) {
-        useEditorStore.getState().setStatus("수직 연결은 위나 아래에 다른 행이 있어야 만들 수 있습니다.");
+        // 흔한 오해: 자기유지 하려고 '+ 렁 추가'로 새 렁을 만들면 서로 다른 렁이라 세로선이 이어지지 않는다.
+        // 세로선은 같은 렁 안의 위/아래 행끼리만 연결되므로, '+ 병렬 분기'로 이 렁에 행을 먼저 추가해야 한다.
+        useEditorStore
+          .getState()
+          .setStatus("세로선은 같은 렁 안의 위/아래 행끼리만 연결됩니다. 자기유지는 이 렁에서 '+ 병렬 분기'로 행을 추가한 뒤 세로선을 그으세요.");
         return;
       }
       // 셀의 좌/우 절반에 따라 왼쪽 노드(c) 또는 오른쪽 노드(c+1)에 연결 토글.
@@ -611,6 +615,12 @@ export function PlcPanel(): ReactElement | null {
           )}
         </div>
 
+        <p className="plc-hint">
+          렁 = 좌·우 모선을 잇는 독립 회로줄. 자기유지처럼 세로선(OR)으로 잇는 병렬 회로는
+          같은 렁 안의 <strong>‘+ 병렬 분기’</strong>로 행을 추가해 만듭니다 —
+          <strong>‘+ 새 렁’</strong>은 위 렁과 세로선으로 이어지지 않습니다.
+        </p>
+
         <div className="plc-rungs">
           <div className="plc-ladder-wrap" style={{ width: SVG_WIDTH }}>
             <svg width={SVG_WIDTH} height={totalHeight} className="plc-ladder-svg">
@@ -638,7 +648,7 @@ export function PlcPanel(): ReactElement | null {
                 {!running && (
                   <span className="plc-rung-buttons">
                     <button
-                      title="행 추가 (병렬 분기)"
+                      title="병렬 분기 추가 — 이 렁 안에 아래 행을 넣습니다. 세로선(OR)으로 위 행과 이어 자기유지 회로를 만들 때 사용합니다."
                       onClick={() =>
                         updateRung(rung.id, (rg) => ({
                           ...rg,
@@ -646,7 +656,7 @@ export function PlcPanel(): ReactElement | null {
                         }))
                       }
                     >
-                      +행
+                      + 병렬 분기
                     </button>
                     <button
                       title="렁 삭제"
@@ -664,9 +674,10 @@ export function PlcPanel(): ReactElement | null {
           {!running && (
             <button
               className="plc-add-rung"
+              title="새 렁 추가 — 위 렁과 독립된 새 회로줄입니다. 세로선으로 위 렁과 이어지지 않습니다(자기유지에는 '+ 병렬 분기'를 쓰세요)."
               onClick={() => commitProgram({ rungs: [...program.rungs, createRung()] })}
             >
-              + 렁 추가
+              + 새 렁 (독립 회로줄)
             </button>
           )}
         </div>
