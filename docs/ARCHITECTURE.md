@@ -44,7 +44,7 @@ src/
     editor/              # 스키매틱 에디터 (캔버스, 팔레트, 속성 패널, 툴바, 상태바)
     symbols/             # 교육용 단순화 기호 SVG (ISO 1219/KS 관례 참고, 적합성 미인증)
     equipment/           # 일러스트 장비 뷰 (스프라이트 + 자유 배치)
-    plc/PlcPanel.tsx     # XG5000 스타일 래더 에디터 + 모니터링
+    plc/PlcPanel.tsx     # 교육용 래더(LD) 에디터 + 모니터링 (XG5000 표기 관례 참고)
     diagram/             # 변위단계선도 패널
     sim/simStore.ts      # 실행 루프(연속/구분 모드), 스냅숏 구독
     i18n/                # ko/en 문자열

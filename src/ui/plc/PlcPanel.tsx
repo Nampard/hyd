@@ -17,7 +17,7 @@ import type { PlcMonitor } from "../../core/plc/scanner";
 import { getComponentDefinition } from "../../core/library/registry";
 
 /**
- * PLC 래더 편집·모니터링 패널 (XG5000 스타일 단순화, Phase 13 연속 선도 렌더링).
+ * PLC 래더 편집·모니터링 패널 (교육용 단순화, XG5000 표기 관례 참고, Phase 13 연속 선도 렌더링).
  * 렁 전체를 SVG 하나로 그려 좌·우 모선이 렁 경계에서 끊기지 않고,
  * 접점·코일이 셀 경계에 맞닿는 연속 선으로 이어지도록 한다.
  * 도구를 고른 뒤 셀을 클릭해 배치하고, 선택 셀의 디바이스/설정값을 입력한다.
@@ -463,20 +463,24 @@ export function PlcPanel(): ReactElement | null {
     if (running) return;
     setSelected({ rungId: rung.id, r, c });
     if (tool === "vlink") {
-      if (r + 1 >= rung.cells.length) {
-        useEditorStore.getState().setStatus("수직 연결은 아랫줄이 있는 행에서만 만들 수 있습니다.");
+      // 자기유지 회로처럼 "새로 추가한 아래 행"을 클릭해 위 행과 연결하려는 시도가 자연스럽다.
+      // 클릭한 행에 아래 행이 있으면 아래로(r↔r+1), 없고 위 행이 있으면 위로(r-1↔r) 연결한다 —
+      // 어느 쪽 행을 클릭해도 같은 링크를 만들 수 있어야 한다 (review: "클릭해도 안 그려짐" 버그 수정)
+      const linkR = r + 1 < rung.cells.length ? r : r > 0 ? r - 1 : null;
+      if (linkR === null) {
+        useEditorStore.getState().setStatus("수직 연결은 위나 아래에 다른 행이 있어야 만들 수 있습니다.");
         return;
       }
-      // 셀의 좌/우 절반에 따라 왼쪽 노드(c) 또는 오른쪽 노드(c+1)에 아랫줄 연결 토글.
+      // 셀의 좌/우 절반에 따라 왼쪽 노드(c) 또는 오른쪽 노드(c+1)에 연결 토글.
       // 첫 열 셀의 왼쪽 절반을 클릭하면 c=0(좌측 모선) 분기 — 자기유지 회로를 처음부터 작도 가능 (review P0)
       const node = half === "left" ? c : c + 1;
       updateRung(rung.id, (rg) => {
-        const exists = rg.vlinks.some((v) => v.r === r && v.c === node);
+        const exists = rg.vlinks.some((v) => v.r === linkR && v.c === node);
         return {
           ...rg,
           vlinks: exists
-            ? rg.vlinks.filter((v) => !(v.r === r && v.c === node))
-            : [...rg.vlinks, { r, c: node }],
+            ? rg.vlinks.filter((v) => !(v.r === linkR && v.c === node))
+            : [...rg.vlinks, { r: linkR, c: node }],
         };
       });
       return;
