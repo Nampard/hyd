@@ -30,7 +30,7 @@ const TOOLS: { id: Tool; label: string; title: string }[] = [
   { id: "no", label: "─┤ ├─", title: "a접점 (NO)" },
   { id: "nc", label: "─┤/├─", title: "b접점 (NC)" },
   { id: "hline", label: "───", title: "가로 연결선" },
-  { id: "vlink", label: "│", title: "수직 연결 (OR 분기) — 셀 오른쪽 경계 토글" },
+  { id: "vlink", label: "│", title: "수직 연결 (OR 분기) — 셀 왼쪽 절반=왼쪽 노드, 오른쪽 절반=오른쪽 노드. 첫 열 왼쪽=좌측 모선 분기" },
   { id: "coil", label: "─( )─", title: "출력 코일 (OUT)" },
   { id: "set", label: "(S)", title: "SET 코일" },
   { id: "rst", label: "(R)", title: "RST 코일" },
@@ -304,7 +304,8 @@ function RungGroup({
   power: boolean[][] | undefined;
   running: boolean;
   selected: { rungId: string; r: number; c: number } | null;
-  onCellClick: (r: number, c: number) => void;
+  /** half: 클릭한 셀의 좌/우 절반 — vlink 도구가 좌측 노드(c)/우측 노드(c+1)를 구분하는 데 사용 */
+  onCellClick: (r: number, c: number, half: "left" | "right") => void;
 }): ReactElement {
   return (
     <g>
@@ -317,7 +318,9 @@ function RungGroup({
               const cx = nodeX(c) + CW / 2;
               const enterHot = power?.[r]?.[c] ?? false;
               const exitHot = power?.[r]?.[c + 1] ?? false;
-              const isSelected = selected?.rungId === rung.id && selected.r === r && selected.c === c;
+              const isSelected =
+                !running && selected?.rungId === rung.id && selected.r === r && selected.c === c;
+              const rowY = top + r * RH;
               return (
                 <g key={c}>
                   {cell && (
@@ -326,7 +329,7 @@ function RungGroup({
                   {!running && (
                     <rect
                       x={nodeX(c)}
-                      y={top + r * RH}
+                      y={rowY}
                       width={CW}
                       height={RH}
                       fill="none"
@@ -335,19 +338,29 @@ function RungGroup({
                       strokeWidth={1}
                     />
                   )}
+                  {/* 히트 영역을 좌/우 절반으로 분리 — vlink 도구가 좌측 모선(c=0) 분기도 만들 수 있게 (review P0) */}
                   <rect
                     className={`plc-cell-hit${cell ? "" : " plc-cell-hit-empty"}`}
                     x={nodeX(c)}
-                    y={top + r * RH}
-                    width={CW}
+                    y={rowY}
+                    width={CW / 2}
                     height={RH}
                     fill="transparent"
-                    onClick={() => onCellClick(r, c)}
+                    onClick={() => onCellClick(r, c, "left")}
+                  />
+                  <rect
+                    className={`plc-cell-hit${cell ? "" : " plc-cell-hit-empty"}`}
+                    x={nodeX(c) + CW / 2}
+                    y={rowY}
+                    width={CW / 2}
+                    height={RH}
+                    fill="transparent"
+                    onClick={() => onCellClick(r, c, "right")}
                   />
                   {isSelected && (
                     <rect
                       x={nodeX(c) + 1}
-                      y={top + r * RH + 1}
+                      y={rowY + 1}
                       width={CW - 2}
                       height={RH - 2}
                       fill="none"
@@ -446,7 +459,7 @@ export function PlcPanel(): ReactElement | null {
     });
   };
 
-  const handleCellClick = (rung: LadderRung, r: number, c: number) => {
+  const handleCellClick = (rung: LadderRung, r: number, c: number, half: "left" | "right") => {
     if (running) return;
     setSelected({ rungId: rung.id, r, c });
     if (tool === "vlink") {
@@ -454,14 +467,16 @@ export function PlcPanel(): ReactElement | null {
         useEditorStore.getState().setStatus("수직 연결은 아랫줄이 있는 행에서만 만들 수 있습니다.");
         return;
       }
-      // 셀 오른쪽 경계 (노드 열 c+1)에서 아랫줄 연결 토글
+      // 셀의 좌/우 절반에 따라 왼쪽 노드(c) 또는 오른쪽 노드(c+1)에 아랫줄 연결 토글.
+      // 첫 열 셀의 왼쪽 절반을 클릭하면 c=0(좌측 모선) 분기 — 자기유지 회로를 처음부터 작도 가능 (review P0)
+      const node = half === "left" ? c : c + 1;
       updateRung(rung.id, (rg) => {
-        const exists = rg.vlinks.some((v) => v.r === r && v.c === c + 1);
+        const exists = rg.vlinks.some((v) => v.r === r && v.c === node);
         return {
           ...rg,
           vlinks: exists
-            ? rg.vlinks.filter((v) => !(v.r === r && v.c === c + 1))
-            : [...rg.vlinks, { r, c: c + 1 }],
+            ? rg.vlinks.filter((v) => !(v.r === r && v.c === node))
+            : [...rg.vlinks, { r, c: node }],
         };
       });
       return;
@@ -552,6 +567,8 @@ export function PlcPanel(): ReactElement | null {
               key={t.id}
               className={`plc-tool${tool === t.id ? " active" : ""}`}
               title={t.title}
+              aria-label={t.title}
+              aria-pressed={tool === t.id}
               disabled={running}
               onClick={() => setTool(t.id)}
             >
@@ -603,7 +620,7 @@ export function PlcPanel(): ReactElement | null {
                   power={plcMonitor?.nodePower[rung.id]}
                   running={running}
                   selected={selected}
-                  onCellClick={(r, c) => handleCellClick(rung, r, c)}
+                  onCellClick={(r, c, half) => handleCellClick(rung, r, c, half)}
                 />
               ))}
             </svg>

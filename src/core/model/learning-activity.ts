@@ -49,6 +49,12 @@ interface Analysis {
   hasRelayLogic: boolean;
   hasLogicValve: boolean;
   domains: Set<Domain>;
+  /**
+   * 솔레노이드 밸브가 속한 도메인 집합 — "전기공압/전기유압" 판정은 문서 전체 도메인이 아니라
+   * 실제 솔레노이드 밸브의 도메인으로 해야 한다 (review P1: 무관한 유압 실린더가 있어도
+   * 공압 솔레노이드면 "전기공압"으로 판정)
+   */
+  solenoidValveDomains: Set<Domain>;
   /** 우선순위별로 분류된, 등장 순서를 보존한 부품 이름 목록 (역할 제외 대상은 미포함) */
   featuredNames: string[];
   secondaryNames: string[];
@@ -64,6 +70,7 @@ function analyze(doc: CircuitDocument): Analysis {
     hasRelayLogic: false,
     hasLogicValve: false,
     domains: new Set(),
+    solenoidValveDomains: new Set(),
     featuredNames: [],
     secondaryNames: [],
     counts: new Map(),
@@ -79,6 +86,7 @@ function analyze(doc: CircuitDocument): Analysis {
     if (behavior.role === "valve") {
       if (behavior.left.kind === "solenoid" || behavior.right.kind === "solenoid") {
         a.hasSolenoidValve = true;
+        a.solenoidValveDomains.add(def.domain);
       }
       if (behavior.left.kind === "roller" || behavior.right.kind === "roller") {
         a.hasRollerOrLimit = true;
@@ -121,8 +129,11 @@ function controlTypeOf(a: Analysis): string {
 
   if (a.hasPLC) return "PLC 제어";
   if (a.hasSolenoidValve) {
-    if (has("hydraulic")) return "전기유압 시퀀스 제어";
-    if (has("pneumatic")) return "전기공압 시퀀스 제어";
+    // 솔레노이드 밸브의 실제 도메인으로 판정 — 문서에 무관한 타 도메인 부품이 있어도 오분류하지 않는다
+    const solD = a.solenoidValveDomains;
+    if (solD.has("hydraulic") && solD.has("pneumatic")) return "전기공유압 시퀀스 제어";
+    if (solD.has("hydraulic")) return "전기유압 시퀀스 제어";
+    if (solD.has("pneumatic")) return "전기공압 시퀀스 제어";
     return "전기 시퀀스 제어";
   }
   if (a.hasRollerOrLimit) return "시퀀스 제어(자동 왕복)";

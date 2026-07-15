@@ -52,6 +52,34 @@ describe("PLC 스캐너 단위 테스트", () => {
     expect(runner.getBit("M0")).toBe(false);
   });
 
+  it("c=0 vlink(좌측 모선 분기)가 하단 행에 전원을 공급한다 (review P0 편집 계약)", () => {
+    // 하단 행(유지 접점 M0)이 오직 c=0 vlink로만 좌측 모선에 연결된다.
+    // 사용자가 편집기에서 셀 왼쪽 절반 클릭으로 만드는 바로 그 분기.
+    const rungWith = (vlinks: { r: number; c: number }[]) => ({
+      rungs: [
+        rungOf(
+          [
+            [lc("no", "P0"), lc("nc", "P1"), lc("coil", "M0")],
+            [lc("no", "M0"), null],
+          ],
+          vlinks,
+        ),
+      ],
+    });
+
+    // c=0 vlink가 있으면 자기유지 성립
+    const withC0 = new PlcRunner(rungWith([{ r: 0, c: 0 }, { r: 0, c: 1 }]));
+    withC0.scan(DT, new Map([["P0", true], ["P1", false]]));
+    withC0.scan(DT, new Map([["P0", false], ["P1", false]]));
+    expect(withC0.getBit("M0")).toBe(true);
+
+    // c=0 vlink가 없으면(c=1만) 하단 행이 좌측 모선과 끊겨 자기유지 실패
+    const withoutC0 = new PlcRunner(rungWith([{ r: 0, c: 1 }]));
+    withoutC0.scan(DT, new Map([["P0", true], ["P1", false]]));
+    withoutC0.scan(DT, new Map([["P0", false], ["P1", false]]));
+    expect(withoutC0.getBit("M0")).toBe(false);
+  });
+
   it("TON: 설정 시간 후 출력", () => {
     const program = { rungs: [rungOf([[lc("no", "P0"), lc("ton", "T0", 0.1)]])] };
     const runner = new PlcRunner(program);

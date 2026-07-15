@@ -344,8 +344,14 @@ body,
   resize: vertical;
 }
 
+.learning-activity-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
 .learning-activity-autofill {
-  align-self: flex-start;
   padding: 3px 8px;
   border: 1px solid var(--panel-border);
   border-radius: 4px;
@@ -357,6 +363,19 @@ body,
 .learning-activity-autofill:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.learning-activity-count {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-meta-warn {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--err);
+  margin: 4px 0 0;
 }
 
 .doc-meta-hint {

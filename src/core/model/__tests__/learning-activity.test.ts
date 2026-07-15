@@ -103,17 +103,57 @@ describe("summarizeLearningActivity: 제어 유형 판정", () => {
 });
 
 describe("summarizeLearningActivity: 조사(을/를) 처리", () => {
-  it("받침 있는 이름 뒤에는 '을'을 붙인다 (예: 릴레이 접점)", () => {
-    const doc = build({ pb: "elec.pushbutton", contact: "elec.relay-contact" });
-    // 부품 1개(secondary) 뿐이면 목록이 "릴레이 접점"만 남을 수 있어 을/를 검증에 적합
+  it("받침 있는 이름 뒤에는 정확히 '을'을 붙인다 (릴레이 접점 — '점'에 받침)", () => {
+    const doc = build({ pb: "elec.pushbutton", coil: "elec.relay-coil" });
+    // 마지막 노출 부품이 "릴레이 코일"(받침 ㄹ)이면 "을", 아니면 목록 마지막 기준
     const text = summarizeLearningActivity(doc);
-    expect(text.includes("을 활용한") || text.includes("를 활용한")).toBe(true);
+    // '점'/'일' 등 받침 있는 음절로 끝나면 반드시 "을 활용한", 아니면 "를 활용한"
+    const m = text.match(/(.)(을|를) 활용한/);
+    expect(m).not.toBeNull();
+    const lastChar = m![1];
+    const code = lastChar.charCodeAt(0) - 0xac00;
+    const hasJong = code >= 0 && code <= 11171 && code % 28 !== 0;
+    expect(m![2]).toBe(hasJong ? "을" : "를");
   });
 
   it("괄호로 끝나는 이름도 마지막 한글 음절 기준으로 조사를 정확히 붙인다", () => {
     // "속도제어밸브 (스로틀+체크)" — 마지막 한글 음절 "크"는 받침 없음 → "를"
     const doc = build({ cyl: "pneu.cylinder.double", sc: "pneu.speed-controller" });
     expect(summarizeLearningActivity(doc)).toMatch(/체크\)를 활용한/);
+  });
+});
+
+describe("summarizeLearningActivity: 혼합 도메인 (review P1)", () => {
+  it("공압 솔레노이드 밸브 + 무관한 유압 실린더 → '전기공압'(유압 아님)", () => {
+    const doc = build(
+      { pv: "pneu.valve.5-2-double-solenoid", pc: "pneu.cylinder.double", hc: "hyd.cylinder.double" },
+      [
+        ["pv", "A", "pc", "HEAD"],
+        ["pv", "B", "pc", "ROD"],
+      ],
+    );
+    const text = summarizeLearningActivity(doc);
+    expect(text).toContain("전기공압 시퀀스 제어");
+    expect(text).not.toContain("전기유압");
+  });
+
+  it("유압 솔레노이드 밸브만 있으면 '전기유압'", () => {
+    const doc = build(
+      { hv: "hyd.valve.4-3-closed-solenoid", hc: "hyd.cylinder.double" },
+      [
+        ["hv", "A", "hc", "HEAD"],
+        ["hv", "B", "hc", "ROD"],
+      ],
+    );
+    expect(summarizeLearningActivity(doc)).toContain("전기유압 시퀀스 제어");
+  });
+
+  it("공압·유압 솔레노이드 밸브가 둘 다 있으면 '전기공유압'", () => {
+    const doc = build({
+      pv: "pneu.valve.5-2-double-solenoid",
+      hv: "hyd.valve.4-3-closed-solenoid",
+    });
+    expect(summarizeLearningActivity(doc)).toContain("전기공유압 시퀀스 제어");
   });
 });
 

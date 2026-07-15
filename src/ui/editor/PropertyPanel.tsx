@@ -5,6 +5,7 @@ import { getComponent } from "../../core/model/operations";
 import { getComponentDefinition } from "../../core/library/registry";
 import type { PropertyField } from "../../core/library/types";
 import { summarizeLearningActivity } from "../../core/model/learning-activity";
+import { MAX_LEARNING_ACTIVITY } from "../../core/model/schema";
 import { useT } from "../i18n";
 
 function FieldInput({
@@ -72,6 +73,10 @@ export function PropertyPanel(): ReactElement {
   const t = useT();
 
   if (selection?.type !== "component") {
+    const activity = doc.meta.learningActivity ?? "";
+    // 회로가 바뀌어 저장된 설명이 현재 자동 초안과 다르면 안내 (수동 수정분은 존중, 재작성은 선택)
+    const autoDraft = doc.components.length > 0 ? summarizeLearningActivity(doc) : "";
+    const stale = activity.trim() !== "" && autoDraft !== "" && activity.trim() !== autoDraft;
     return (
       <div className="property-panel">
         <h2 className="panel-title">{t("properties")}</h2>
@@ -79,24 +84,37 @@ export function PropertyPanel(): ReactElement {
           {selection?.type === "wire" ? t("wireSelected") : t("selectHint")}
         </p>
         <div className="doc-meta-field">
-          <span className="field-label">{t("learningActivityLabel")}</span>
+          <label className="field-label" htmlFor="learning-activity-input">
+            {t("learningActivityLabel")}
+          </label>
           <textarea
+            id="learning-activity-input"
             className="learning-activity-input"
             rows={3}
-            value={doc.meta.learningActivity ?? ""}
+            maxLength={MAX_LEARNING_ACTIVITY}
+            value={activity}
             disabled={running}
             placeholder={t("learningActivityPlaceholder")}
+            aria-describedby="learning-activity-hint"
             onChange={(e) => useEditorStore.getState().setLearningActivity(e.target.value)}
           />
-          <button
-            type="button"
-            className="learning-activity-autofill"
-            disabled={running || doc.components.length === 0}
-            onClick={() => useEditorStore.getState().setLearningActivity(summarizeLearningActivity(doc))}
-          >
-            {t("learningActivityAutoFill")}
-          </button>
-          <p className="doc-meta-hint">{t("learningActivityHint")}</p>
+          <div className="learning-activity-meta">
+            <button
+              type="button"
+              className="learning-activity-autofill"
+              disabled={running || doc.components.length === 0}
+              onClick={() => useEditorStore.getState().setLearningActivity(summarizeLearningActivity(doc))}
+            >
+              {t("learningActivityAutoFill")}
+            </button>
+            <span className="learning-activity-count">
+              {activity.length}/{MAX_LEARNING_ACTIVITY}
+            </span>
+          </div>
+          {stale && <p className="doc-meta-warn">{t("learningActivityStale")}</p>}
+          <p id="learning-activity-hint" className="doc-meta-hint">
+            {t("learningActivityHint")}
+          </p>
         </div>
       </div>
     );

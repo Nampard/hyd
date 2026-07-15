@@ -159,6 +159,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setLearningActivity(text) {
     const state = get();
+    // 값이 그대로면 새 참조를 만들지 않는다 — 같은 자동 문구 재작성이 dirty를 유발하지 않도록 (review 품질)
+    if ((state.document.meta.learningActivity ?? "") === text) return;
     set({
       document: {
         ...state.document,

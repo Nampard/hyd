@@ -1,6 +1,7 @@
 import type { CircuitDocument, Point, Rotation } from "./types";
 import { CURRENT_SCHEMA_VERSION } from "./types";
 import { hasComponentDefinition, getComponentDefinition } from "../library/registry";
+import { summarizeLearningActivity } from "./learning-activity";
 import { LADDER_COLS, isOutputKind, type LadderCellKind } from "../plc/model";
 
 export interface ParseResult {
@@ -11,6 +12,19 @@ export interface ParseResult {
 
 export function serializeDocument(doc: CircuitDocument): string {
   return JSON.stringify(doc, null, 2);
+}
+
+/**
+ * 저장 직전 문서 정규화 — 모든 저장 경로(파일 다운로드·브라우저 저장)의 단일 관문 (review P1).
+ * 학습 활동 설명: 공백 trim → 비어 있으면 자동 초안 생성 → 500자 상한으로 방어적 절단.
+ * 이로써 "저장 성공 = 재열기 성공"을 보장한다 (parseDocument가 >500자를 거부하므로).
+ * 부품이 없는 빈 문서는 요약이 빈 문자열이라 설명도 비운다(설명할 회로가 없음).
+ */
+export function prepareDocumentForPersistence(doc: CircuitDocument): CircuitDocument {
+  const trimmed = (doc.meta.learningActivity ?? "").trim();
+  const activity = (trimmed || summarizeLearningActivity(doc)).slice(0, MAX_LEARNING_ACTIVITY);
+  if (activity === (doc.meta.learningActivity ?? "")) return doc; // 변경 없음 — 동일 참조 유지
+  return { ...doc, meta: { ...doc.meta, learningActivity: activity } };
 }
 
 /**
@@ -25,7 +39,7 @@ const LIMITS = { components: 2000, wires: 4000, waypoints: 128, rungs: 200, rows
 /** 이름표·디바이스 등 문자열 필드 길이 상한 */
 const MAX_STRING = 200;
 /** 학습 활동 설명 길이 상한 (Phase 12) — 제목보다 긴 문장을 허용 */
-const MAX_LEARNING_ACTIVITY = 500;
+export const MAX_LEARNING_ACTIVITY = 500;
 
 export function parseDocument(json: string): ParseResult {
   // UTF-16 code unit 수는 UTF-8 byte 수의 하한이므로 빠른 선별에 쓰고,
@@ -62,7 +76,33 @@ export function parseDocument(json: string): ParseResult {
   const error = validateShape(migrated);
   if (error) return { ok: false, error };
 
-  return { ok: true, document: migrated as unknown as CircuitDocument };
+  // 허용된 키만으로 문서·메타를 재구성한다 — 조작된 JSON의 숨은 필드
+  // (meta.studentName 같은 미등록 개인정보 키, 최상위 임의 키)를 제거한다 (review P1)
+  return { ok: true, document: reconstructDocument(migrated) };
+}
+
+/** 검증을 통과한 객체에서 알려진 키만 추려 CircuitDocument를 재구성 (미등록 키 제거) */
+function reconstructDocument(doc: Record<string, unknown>): CircuitDocument {
+  const meta = doc.meta as Record<string, unknown>;
+  const cleanMeta: CircuitDocument["meta"] = {
+    title: meta.title as string,
+    createdAt: (meta.createdAt as string) ?? new Date().toISOString(),
+  };
+  if (typeof meta.description === "string") cleanMeta.description = meta.description;
+  if (typeof meta.learningActivity === "string") cleanMeta.learningActivity = meta.learningActivity;
+
+  const result: CircuitDocument = {
+    schemaVersion: doc.schemaVersion as number,
+    meta: cleanMeta,
+    components: doc.components as CircuitDocument["components"],
+    wires: doc.wires as CircuitDocument["wires"],
+  };
+  if (doc.plcProgram !== undefined) result.plcProgram = doc.plcProgram as CircuitDocument["plcProgram"];
+  if (doc.ioMap !== undefined) result.ioMap = doc.ioMap as CircuitDocument["ioMap"];
+  if (doc.equipmentLayout !== undefined) {
+    result.equipmentLayout = doc.equipmentLayout as CircuitDocument["equipmentLayout"];
+  }
+  return result;
 }
 
 /** 문서 전체 구조 검증. 문제가 있으면 한국어 오류 메시지, 없으면 null */

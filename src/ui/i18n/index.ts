@@ -55,6 +55,7 @@ const ko = {
   learningActivityPlaceholder: "예: 제어밸브 및 복동실린더를 활용한 시퀀스 제어",
   learningActivityAutoFill: "자동 작성",
   learningActivityHint: "저장 시 비워두면 회로 구성을 바탕으로 자동 작성됩니다. 이름·학번 등 개인정보는 적지 마세요.",
+  learningActivityStale: "⚠ 회로가 바뀌어 설명이 현재 구성과 다를 수 있습니다. [자동 작성]으로 갱신할 수 있어요.",
 };
 
 const en: Record<keyof typeof ko, string> = {
@@ -105,6 +106,7 @@ const en: Record<keyof typeof ko, string> = {
   learningActivityPlaceholder: "e.g. Sequence control using a control valve and a double-acting cylinder",
   learningActivityAutoFill: "Auto-fill",
   learningActivityHint: "Leave blank to auto-fill from the circuit on save. Do not enter names, student IDs, or other personal info.",
+  learningActivityStale: "⚠ The circuit changed, so this description may not match. Use [Auto-fill] to refresh it.",
 };
 
 export type I18nKey = keyof typeof ko;

@@ -1,9 +1,15 @@
 import type { CircuitDocument } from "../core/model/types";
-import { MAX_JSON_BYTES, parseDocument, serializeDocument } from "../core/model/schema";
+import {
+  MAX_JSON_BYTES,
+  parseDocument,
+  prepareDocumentForPersistence,
+  serializeDocument,
+} from "../core/model/schema";
 
-/** 문서를 .json 파일로 다운로드 */
+/** 문서를 .json 파일로 다운로드 (저장 경계를 거쳐 항상 재열기 가능한 형태로 직렬화) */
 export function downloadDocument(doc: CircuitDocument): void {
-  const blob = new Blob([serializeDocument(doc)], { type: "application/json" });
+  const prepared = prepareDocumentForPersistence(doc);
+  const blob = new Blob([serializeDocument(prepared)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

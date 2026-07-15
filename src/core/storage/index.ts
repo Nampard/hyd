@@ -1,5 +1,5 @@
 import type { CircuitDocument } from "../model/types";
-import { parseDocument, serializeDocument } from "../model/schema";
+import { parseDocument, prepareDocumentForPersistence, serializeDocument } from "../model/schema";
 
 /**
  * 문서 저장소 어댑터 (Phase 9).
@@ -83,11 +83,12 @@ export class LocalDocumentStorage implements DocumentStorage {
     // "저장 성공인데 목록에 없음" 모순을 막는다 (review-3 P1)
     if (name === "__proto__" || name === "constructor" || name === "prototype") return false;
     try {
+      const prepared = prepareDocumentForPersistence(doc);
       const shape = this.read();
       shape[name] = {
         savedAt: new Date().toISOString(),
-        componentCount: doc.components.length,
-        json: serializeDocument(doc),
+        componentCount: prepared.components.length,
+        json: serializeDocument(prepared),
       };
       this.write(shape);
       return true;

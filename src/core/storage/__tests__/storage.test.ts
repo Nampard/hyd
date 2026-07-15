@@ -3,6 +3,7 @@ import { registerLibraries } from "../../library";
 import { createEmptyDocument } from "../../model/types";
 import { addComponent } from "../../model/operations";
 import { LocalDocumentStorage, type KeyValueStore } from "../index";
+import { prepareDocumentForPersistence } from "../../model/schema";
 
 beforeAll(() => {
   registerLibraries();
@@ -28,8 +29,10 @@ describe("로컬 문서 저장소 (Phase 9)", () => {
     expect(list[0].name).toBe("내 회로");
     expect(list[0].componentCount).toBe(1);
 
+    // 저장 시 저장 경계를 거쳐 학습 활동 설명이 자동으로 채워진다 (Phase 12 / review P1)
     const loaded = storage.load("내 회로");
-    expect(loaded).toEqual(doc);
+    expect(loaded).toEqual(prepareDocumentForPersistence(doc));
+    expect(loaded?.meta.learningActivity).toBeTruthy();
 
     storage.delete("내 회로");
     expect(storage.list()).toHaveLength(0);

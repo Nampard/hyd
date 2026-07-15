@@ -1,7 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerLibraries } from "../../library";
 import { examples } from "../../examples";
-import { parseDocument, serializeDocument } from "../schema";
+import {
+  MAX_LEARNING_ACTIVITY,
+  parseDocument,
+  prepareDocumentForPersistence,
+  serializeDocument,
+} from "../schema";
 import { addComponent, autoWire, updateComponentProperty } from "../operations";
 import { createEmptyDocument, type CircuitDocument } from "../types";
 import { SimulationEngine } from "../../sim/engine";
@@ -121,6 +126,77 @@ describe("문서 메타: learningActivity (Phase 12)", () => {
   it("필드가 없는 v2 이전 문서도 통과한다 (선택 필드)", () => {
     const doc = docWithCylinder();
     expect(reparse(doc).ok).toBe(true);
+  });
+});
+
+describe("저장 경계: prepareDocumentForPersistence (review P1)", () => {
+  it("빈 학습 활동 설명은 자동 초안으로 채운다", () => {
+    const doc = docWithCylinder();
+    const prepared = prepareDocumentForPersistence(doc);
+    expect(prepared.meta.learningActivity).toBeTruthy();
+  });
+
+  it("공백만 있는 설명도 자동 초안으로 대체한다 (trim 기준)", () => {
+    const doc = { ...docWithCylinder() };
+    doc.meta = { ...doc.meta, learningActivity: "   \n\t " };
+    const prepared = prepareDocumentForPersistence(doc);
+    expect(prepared.meta.learningActivity?.trim()).toBeTruthy();
+    expect(prepared.meta.learningActivity).not.toBe("   \n\t ");
+  });
+
+  it("사용자 설명은 보존한다", () => {
+    const doc = { ...docWithCylinder() };
+    doc.meta = { ...doc.meta, learningActivity: "내가 직접 적은 설명" };
+    expect(prepareDocumentForPersistence(doc).meta.learningActivity).toBe("내가 직접 적은 설명");
+  });
+
+  it("500자를 넘는 설명은 상한으로 잘라 재열기 가능하게 만든다 (저장=재열기 보장)", () => {
+    const doc = { ...docWithCylinder() };
+    doc.meta = { ...doc.meta, learningActivity: "가".repeat(600) };
+    const prepared = prepareDocumentForPersistence(doc);
+    expect(prepared.meta.learningActivity!.length).toBe(MAX_LEARNING_ACTIVITY);
+    // 저장 경계를 거친 문서는 반드시 다시 파싱된다
+    expect(parseDocument(serializeDocument(prepared)).ok).toBe(true);
+  });
+
+  it("빈 문서(부품 없음)는 설명을 비운 채 둔다 (설명할 회로 없음)", () => {
+    const empty = createEmptyDocument("빈 문서");
+    const prepared = prepareDocumentForPersistence(empty);
+    expect(prepared.meta.learningActivity ?? "").toBe("");
+  });
+});
+
+describe("미등록 meta 키 제거 (개인정보 방어, review P1)", () => {
+  it("조작된 meta.studentName·meta.studentId 등 미등록 키를 제거한다", () => {
+    const doc = docWithCylinder();
+    const broken = {
+      ...doc,
+      meta: { ...doc.meta, studentName: "홍길동", studentId: "20301", 반: "3-2" },
+    };
+    const result = reparse(broken);
+    expect(result.ok).toBe(true);
+    expect(result.document!.meta).not.toHaveProperty("studentName");
+    expect(result.document!.meta).not.toHaveProperty("studentId");
+    expect(result.document!.meta).not.toHaveProperty("반");
+    // 허용된 키는 보존
+    expect(result.document!.meta.title).toBe(doc.meta.title);
+  });
+
+  it("최상위 임의 키도 제거한다 (허용 키만 재구성)", () => {
+    const doc = docWithCylinder();
+    const broken = { ...doc, secretPayload: { x: 1 }, __owner: "leak" };
+    const result = reparse(broken);
+    expect(result.ok).toBe(true);
+    expect(result.document!).not.toHaveProperty("secretPayload");
+    expect(result.document!).not.toHaveProperty("__owner");
+  });
+
+  it("허용된 description·learningActivity는 보존한다", () => {
+    const doc = { ...docWithCylinder() };
+    doc.meta = { ...doc.meta, description: "설명", learningActivity: "학습 활동" };
+    const result = reparse(doc);
+    expect(result.document!.meta.description).toBe("설명");
+    expect(result.document!.meta.learningActivity).toBe("학습 활동");
   });
 });
 

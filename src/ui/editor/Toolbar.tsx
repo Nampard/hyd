@@ -4,7 +4,7 @@ import { clearSimHistory, useSimStore } from "../sim/simStore";
 import { downloadDocument, exportCircuitSvg, openDocumentFile } from "../../app/file";
 import { examples, getExample } from "../../core/examples";
 import { createBrowserStorage } from "../../core/storage";
-import { summarizeLearningActivity } from "../../core/model/learning-activity";
+import { prepareDocumentForPersistence } from "../../core/model/schema";
 import { useI18nStore, useT } from "../i18n";
 
 const browserStorage = createBrowserStorage();
@@ -30,12 +30,15 @@ export function Toolbar(): ReactElement {
     return window.confirm("현재 회로를 버릴까요? 저장하지 않은 변경은 사라집니다.");
   };
 
-  /** 학습 활동 설명이 비어 있으면 저장 직전 자동 초안으로 채운다 (Phase 12) */
-  const ensureLearningActivity = () => {
+  /**
+   * 저장 직전 문서를 저장 경계로 정규화하고 스토어에 반영한다 (review P1).
+   * 학습 활동 설명 자동 채움·trim·500자 상한이 core 단일 경계에서 처리되며,
+   * 스토어를 저장본과 일치시켜 이후 markSaved()의 dirty 판정이 정확해진다.
+   */
+  const syncForSave = () => {
     const s = useEditorStore.getState();
-    if (!s.document.meta.learningActivity) {
-      s.setLearningActivity(summarizeLearningActivity(s.document));
-    }
+    const prepared = prepareDocumentForPersistence(s.document);
+    s.setLearningActivity(prepared.meta.learningActivity ?? "");
   };
 
   const handleNew = () => {
@@ -82,7 +85,7 @@ export function Toolbar(): ReactElement {
 
   const handleBrowserSave = () => {
     if (!browserStorage) return;
-    ensureLearningActivity();
+    syncForSave();
     const s = useEditorStore.getState();
     const name = s.document.meta.title || "제목 없음";
     if (browserStorage.save(name, s.document)) {
@@ -196,7 +199,7 @@ export function Toolbar(): ReactElement {
         <button
           disabled={running}
           onClick={() => {
-            ensureLearningActivity();
+            syncForSave();
             const s = useEditorStore.getState();
             downloadDocument(s.document);
             s.markSaved();
