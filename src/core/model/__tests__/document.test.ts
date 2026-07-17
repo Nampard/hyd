@@ -211,4 +211,30 @@ describe("직교 라우팅", () => {
       expect(dx === 0 || dy === 0).toBe(true);
     }
   });
+
+  // 적응형 스텁: 부품이 가깝게 배치돼도 스텁이 상대를 지나쳐 반대편으로
+  // 삐져나오지 않아야 한다 (overshoot 방지)
+  it("가까운 마주보는 포트: 경로가 두 포트 사이 대역을 벗어나지 않는다", () => {
+    // 세로 간격 20 — 고정 스텁(20)이면 서로를 지나쳐 역방향 수염이 생기던 케이스
+    const route = computeOrthogonalRoute({ x: 0, y: 0 }, "down", { x: 60, y: 20 }, "up");
+    for (const p of route) {
+      expect(p.y).toBeGreaterThanOrEqual(0);
+      expect(p.y).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it("근접 포트: 스텁이 상대 좌표를 지나치지 않는다 (0V 접지 수염 케이스)", () => {
+    // 위를 향한 포트가 목표보다 10 아래 — 고정 스텁이면 목표 위 10px 수염
+    const route = computeOrthogonalRoute({ x: 0, y: 10 }, "up", { x: 100, y: 0 }, "down");
+    for (const p of route) {
+      expect(p.y).toBeGreaterThanOrEqual(0);
+      expect(p.y).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it("충분히 먼 포트는 기본 스텁 길이(20)를 유지한다", () => {
+    const route = computeOrthogonalRoute({ x: 0, y: 0 }, "down", { x: 100, y: 200 }, "up");
+    expect(route[0]).toEqual({ x: 0, y: 20 });
+    expect(route[route.length - 1]).toEqual({ x: 100, y: 180 });
+  });
 });

@@ -1,19 +1,39 @@
 import type { Point } from "./model/types";
 import { pointsEqual, type Direction } from "./geometry";
 
-/** 포트에서 배선이 빠져나오는 최소 직선 길이 */
+/** 포트에서 배선이 빠져나오는 기본 직선 길이 */
 const STUB = 20;
 
-function stubEnd(pos: Point, dir: Direction): Point {
+/**
+ * 이 포트의 스텁 길이. 기본은 STUB이지만, 상대 포트가 스텁 진행 방향 앞에
+ * 있으면 두 포트 사이 축 거리의 절반까지로 줄인다 — 부품이 가깝게 배치됐을 때
+ * 스텁이 상대를 지나쳐 접속점 반대편으로 삐져나오는 것(overshoot)을 막는다.
+ * 양쪽 모두 절반씩 줄어들므로 마주보는 스텁은 정확히 중간에서 만난다.
+ * 상대가 스텁 뒤쪽·옆이면 기존 길이를 유지한다 (우회 경로의 이격 확보).
+ */
+function stubLength(pos: Point, dir: Direction, other: Point): number {
+  const ahead =
+    dir === "up"
+      ? pos.y - other.y
+      : dir === "down"
+        ? other.y - pos.y
+        : dir === "left"
+          ? pos.x - other.x
+          : other.x - pos.x;
+  if (ahead <= 0) return STUB;
+  return Math.min(STUB, ahead / 2);
+}
+
+function stubEnd(pos: Point, dir: Direction, len: number): Point {
   switch (dir) {
     case "up":
-      return { x: pos.x, y: pos.y - STUB };
+      return { x: pos.x, y: pos.y - len };
     case "down":
-      return { x: pos.x, y: pos.y + STUB };
+      return { x: pos.x, y: pos.y + len };
     case "left":
-      return { x: pos.x - STUB, y: pos.y };
+      return { x: pos.x - len, y: pos.y };
     case "right":
-      return { x: pos.x + STUB, y: pos.y };
+      return { x: pos.x + len, y: pos.y };
   }
 }
 
@@ -32,8 +52,8 @@ export function computeOrthogonalRoute(
   toPos: Point,
   toDir: Direction,
 ): Point[] {
-  const a = stubEnd(fromPos, fromDir);
-  const b = stubEnd(toPos, toDir);
+  const a = stubEnd(fromPos, fromDir, stubLength(fromPos, fromDir, toPos));
+  const b = stubEnd(toPos, toDir, stubLength(toPos, toDir, fromPos));
 
   const opposite =
     (fromDir === "left" && toDir === "right") ||
