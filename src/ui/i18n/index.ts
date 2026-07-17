@@ -35,7 +35,7 @@ const ko = {
   editHint: "R 키: 회전 · Delete 키: 삭제",
   simEditLock: "시뮬레이션 중에는 속성을 변경할 수 없습니다.",
   statusDefault: "포트(○)를 클릭하면 배선을 시작합니다. 빈 곳 드래그: 화면 이동 · 휠: 확대/축소",
-  appTagline: "교육용 논리 시뮬레이션 — 실설비 검증 사용 금지",
+  appTagline: "교육용 논리 시뮬레이터",
   statusPlacing: "캔버스를 클릭해 부품을 배치하세요. (우클릭/Esc 취소)",
   statusWiring: "연결할 포트를 클릭하세요. (우클릭/Esc 취소)",
   statusRunning: "시뮬레이션 실행 중 — 초록 점선 부품을 클릭해 조작하세요. (Shift+클릭: 누름 고정)",
@@ -59,6 +59,12 @@ const ko = {
   emptyHint1: "왼쪽 [부품]에서 기호를 골라 도면을 클릭하면 배치됩니다.",
   emptyHint2: "포트(○)끼리 클릭해 이으면 배선이 되고, [▶ 실행]으로 동작을 확인합니다.",
   emptyHint3: "처음이라면 상단 [예제 열기…]에서 18가지 예제를 불러와 참고하세요.",
+  emptyNotice1:
+    "교육용 논리/상태 시뮬레이션입니다 — 수치를 정밀 계산하지 않으므로 실제 설비 선정·압력 설정·안전 검증에 사용하지 마세요.",
+  emptyNotice2:
+    "기호는 ISO 1219 · KS B 0054 · IEC 60617의 표기 관례를 참고한 교육용 단순화이며, 표준 적합성이 인증된 것은 아닙니다.",
+  emptyNotice3:
+    "© 2026 Nampard · 웹앱 열람과 수업 활용은 자유롭게 · 소스·자산의 무단 복제·수정·재배포는 금지됩니다.",
 };
 
 const en: Record<keyof typeof ko, string> = {
@@ -89,7 +95,7 @@ const en: Record<keyof typeof ko, string> = {
   editHint: "R: rotate · Delete: remove",
   simEditLock: "Properties are locked while the simulation runs.",
   statusDefault: "Click a port (○) to start wiring. Drag empty space: pan · Wheel: zoom",
-  appTagline: "Educational logic simulation — not for real equipment validation",
+  appTagline: "Educational logic simulator",
   statusPlacing: "Click the canvas to place the component. (Right-click/Esc to cancel)",
   statusWiring: "Click a target port. (Right-click/Esc to cancel)",
   statusRunning: "Simulation running — click green-dashed parts to operate. (Shift+click: latch)",
@@ -113,6 +119,12 @@ const en: Record<keyof typeof ko, string> = {
   emptyHint1: "Pick a symbol from [Parts] on the left, then click the canvas to place it.",
   emptyHint2: "Click port to port (○) to wire them up, then press [▶ Run] to see it work.",
   emptyHint3: "New here? Load one of the 18 examples from [Open example…] above.",
+  emptyNotice1:
+    "Educational logic/state simulation — values are not precisely computed, so never use it to select real equipment, set pressures, or validate safety.",
+  emptyNotice2:
+    "Symbols are educational simplifications referencing ISO 1219 · KS B 0054 · IEC 60617 conventions; they are not certified as standard-compliant.",
+  emptyNotice3:
+    "© 2026 Nampard · Viewing and classroom use are free · Copying, modifying, or redistributing the source and assets is prohibited.",
 };
 
 export type I18nKey = keyof typeof ko;

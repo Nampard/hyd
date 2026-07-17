@@ -29,6 +29,9 @@ export function exportCircuitSvg(title = "circuit"): void {
 
   const clone = svg.cloneNode(true) as SVGSVGElement;
   clone.querySelectorAll('rect[fill="url(#grid)"]').forEach((el) => el.remove());
+  // 빈 도면 안내는 화면 전용 — 독립 SVG에는 styles.css가 없어 숨김(opacity:0)이
+  // 적용되지 않으므로 명시적으로 제거한다
+  clone.querySelectorAll(".canvas-empty-hint").forEach((el) => el.remove());
   clone.querySelector("g")?.removeAttribute("transform");
   const pad = 24;
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
