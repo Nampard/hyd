@@ -2,8 +2,26 @@
  * HYD 서비스 워커 — 오프라인 실행 (Phase 9, codex-review M1 개선).
  * install 단계에서 앱 셸(index.html + 참조 자산)을 프리캐시해
  * "첫 방문 직후 오프라인"이 보장되도록 한다. 이후에는 네트워크 우선 + 캐시 폴백.
+ *
+ * v4: 간헐적 흰 화면 2건 해소 —
+ * 1) 네트워크가 매달리는 환경(프록시 등)에서 캐시 사본이 있으면 타임아웃 후 캐시 반환
+ * 2) 배포 직후 새 해시 자산이 아직 404일 때 캐시 사본으로 대체
  */
-const CACHE = "hyd-v3";
+const CACHE = "hyd-v4";
+
+/** 캐시 사본이 있을 때 네트워크를 기다려 주는 한계 시간 */
+const NETWORK_TIMEOUT_MS = 4000;
+
+/** 타임아웃 있는 fetch — 캐시 폴백이 존재할 때만 사용한다 */
+async function fetchWithTimeout(request) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), NETWORK_TIMEOUT_MS);
+  try {
+    return await fetch(request, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -55,12 +73,25 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
+      const cached = await cache.match(event.request);
       try {
-        const fresh = await fetch(event.request);
-        if (fresh.ok) cache.put(event.request, fresh.clone());
+        // 캐시 사본이 있으면 타임아웃을 걸어 매달리는 네트워크에서 캐시로 넘어간다.
+        // 사본이 없으면(첫 방문) 타임아웃 없이 기다린다 — 느린 정상 로드를 끊지 않기 위해
+        const fresh = cached
+          ? await fetchWithTimeout(event.request)
+          : await fetch(event.request);
+        if (fresh.ok) {
+          cache.put(event.request, fresh.clone());
+          return fresh;
+        }
+        // 404/5xx: 배포 직후 새 해시 자산이 CDN에 아직 없는 창 등 — 캐시 사본이 낫다
+        if (cached) return cached;
+        if (event.request.mode === "navigate") {
+          const index = await cache.match("./index.html");
+          if (index) return index;
+        }
         return fresh;
       } catch {
-        const cached = await cache.match(event.request);
         if (cached) return cached;
         // SPA 네비게이션 폴백
         if (event.request.mode === "navigate") {
