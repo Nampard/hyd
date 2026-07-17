@@ -237,4 +237,50 @@ describe("직교 라우팅", () => {
     expect(route[0]).toEqual({ x: 0, y: 20 });
     expect(route[route.length - 1]).toEqual({ x: 100, y: 180 });
   });
+
+  // 상대가 포트 방향 반대쪽일 때(뒤쪽): 스텁을 되밟아 반대편으로 삐져나오지 않아야 한다
+  const hasRetrace = (pts: { x: number; y: number }[]): boolean => {
+    for (let i = 2; i < pts.length; i++) {
+      const [p0, p1, p2] = [pts[i - 2], pts[i - 1], pts[i]];
+      if (p0.x === p1.x && p1.x === p2.x && Math.sign(p1.y - p0.y) * Math.sign(p2.y - p1.y) === -1)
+        return true;
+      if (p0.y === p1.y && p1.y === p2.y && Math.sign(p1.x - p0.x) * Math.sign(p2.x - p1.x) === -1)
+        return true;
+    }
+    return false;
+  };
+
+  it("상대가 뒤쪽인 직교 포트: 스텁을 되밟지 않는다 (T분기 우측 포트 → 좌상단 게이지)", () => {
+    // hyd-basic에서 실측된 역주행 케이스: 오른쪽을 향한 포트에서 왼쪽 위의 부품으로
+    const from = { x: 460, y: 340 };
+    const to = { x: 440, y: 260 };
+    const route = computeOrthogonalRoute(from, "right", to, "down");
+    const pts = [from, ...route, to];
+    expect(hasRetrace(pts)).toBe(false);
+    for (let i = 1; i < pts.length; i++) {
+      expect(pts[i].x === pts[i - 1].x || pts[i].y === pts[i - 1].y).toBe(true);
+    }
+  });
+
+  it("상대가 뒤쪽인 세로 포트도 되밟지 않는다", () => {
+    const from = { x: 0, y: 0 };
+    const to = { x: 100, y: 50 };
+    const route = computeOrthogonalRoute(from, "up", to, "left");
+    expect(hasRetrace([from, ...route, to])).toBe(false);
+  });
+
+  it("같은 방향 일직선(M10) 우회: 뒤쪽 포트의 삐져나옴이 8px 이하로 준다", () => {
+    // T분기 아래 다리(아래 방향 포트) 위에 게이지를 놓은 배치 — 이전에는 20px 돌출
+    const route = computeOrthogonalRoute({ x: 0, y: 0 }, "down", { x: 0, y: 100 }, "down");
+    expect(Math.max(...route.map((p) => p.y))).toBeLessThanOrEqual(108);
+  });
+
+  it("옵션 1(근접 스텁 축소) 경로는 옵션 2 이후에도 그대로다", () => {
+    // 근접 마주보는 포트 — 두 스텁이 중간에서 만나는 경로가 변하지 않아야 함
+    const route = computeOrthogonalRoute({ x: 0, y: 0 }, "down", { x: 60, y: 20 }, "up");
+    expect(route).toEqual([
+      { x: 0, y: 10 },
+      { x: 60, y: 10 },
+    ]);
+  });
 });
