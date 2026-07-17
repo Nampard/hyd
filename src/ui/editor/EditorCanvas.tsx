@@ -14,6 +14,7 @@ import { WireView } from "./WireView";
 import { getSymbol } from "../symbols";
 import { PORT_COLORS } from "./colors";
 import { useSimStore } from "../sim/simStore";
+import { useT } from "../i18n";
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
@@ -36,6 +37,8 @@ export function EditorCanvas(): ReactElement {
   const pendingWireFrom = useEditorStore((s) => s.pendingWireFrom);
   const simRunning = useSimStore((s) => s.running);
   const simSnapshot = useSimStore((s) => s.snapshot);
+  const t = useT();
+  const isEmpty = doc.components.length === 0 && doc.wires.length === 0;
 
   const screenToWorld = useCallback(
     (clientX: number, clientY: number): Point => {
@@ -272,6 +275,28 @@ export function EditorCanvas(): ReactElement {
         ))}
 
         {placingGhost}
+      </g>
+
+      {/* 빈 도면 안내. 변환 <g> 밖에 화면 좌표(50%)로 두어 팬/줌과 무관하게 중앙 고정.
+          부품·배선이 하나라도 생기면 페이드 아웃 — 언마운트하면 전환이 안 보이므로
+          항상 렌더하고 opacity만 바꾼다 */}
+      <g
+        className={`canvas-empty-hint${isEmpty ? "" : " is-hidden"}`}
+        pointerEvents="none"
+        aria-hidden={!isEmpty}
+      >
+        <text x="50%" y="50%" textAnchor="middle" className="canvas-empty-title" dy={-34}>
+          HYD
+        </text>
+        <text x="50%" y="50%" textAnchor="middle" className="canvas-empty-line" dy={6}>
+          {t("emptyHint1")}
+        </text>
+        <text x="50%" y="50%" textAnchor="middle" className="canvas-empty-line" dy={30}>
+          {t("emptyHint2")}
+        </text>
+        <text x="50%" y="50%" textAnchor="middle" className="canvas-empty-line is-accent" dy={58}>
+          {t("emptyHint3")}
+        </text>
       </g>
     </svg>
   );
