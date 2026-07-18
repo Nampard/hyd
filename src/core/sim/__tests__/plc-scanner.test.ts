@@ -90,3 +90,38 @@ describe("모니터 값 (T 경과·C 계수)", () => {
     expect(monitor.values.C0).toBe(5);
   });
 });
+
+describe("Phase 14-6: 음변환(N) 접점 + 점멸 특수릴레이", () => {
+  it("ne 접점은 디바이스가 꺼지는 스캔에만 1회 통전한다", () => {
+    const runner = new PlcRunner({ rungs: [rungOf([[lc("ne", "P0"), lc("set", "M0")]])] });
+
+    runner.scan(DT, new Map([["P0", false]]));
+    expect(runner.getBit("M0")).toBe(false); // 초기: 에지 없음
+    runner.scan(DT, new Map([["P0", true]]));
+    expect(runner.getBit("M0")).toBe(false); // 상승 에지에는 반응 없음
+    runner.scan(DT, new Map([["P0", false]]));
+    expect(runner.getBit("M0")).toBe(true); // 하강 에지 — 1스캔 통전 (SET으로 래치 확인)
+
+    // 통전이 1스캔뿐인지: coil로 재검증
+    const pulse = new PlcRunner({ rungs: [rungOf([[lc("ne", "P0"), lc("coil", "M1")]])] });
+    pulse.scan(DT, new Map([["P0", true]]));
+    pulse.scan(DT, new Map([["P0", false]]));
+    expect(pulse.getBit("M1")).toBe(true); // 에지 스캔
+    pulse.scan(DT, new Map([["P0", false]]));
+    expect(pulse.getBit("M1")).toBe(false); // 다음 스캔부터 소자
+  });
+
+  it("_T1S는 1초 주기(0.5s ON/0.5s OFF)로 점멸한다", () => {
+    const runner = new PlcRunner({ rungs: [rungOf([[lc("no", "_T1S"), lc("coil", "M0")]])] });
+    const on = new Map<string, boolean>();
+    let changes = 0;
+    let prev: boolean | null = null;
+    for (let i = 0; i < Math.round(2 / DT); i++) {
+      runner.scan(DT, on);
+      const bit = runner.getBit("M0");
+      if (prev !== null && bit !== prev) changes += 1;
+      prev = bit;
+    }
+    expect(changes).toBe(4); // 2초 동안 4회 전환 (0.5, 1.0, 1.5, 2.0)
+  });
+});

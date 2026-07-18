@@ -16,6 +16,7 @@ export const OUTPUT_COL = LADDER_COLS - 1;
 export type LadderCellKind =
   | "no" // a접점
   | "nc" // b접점
+  | "ne" // 음변환(N) 접점 — 디바이스가 1→0으로 내려가는 스캔에 1회 통전 (Phase 14 수업자료 pb4 초기화)
   | "hline" // 가로 연결선
   | "coil" // OUT
   | "set"
@@ -83,6 +84,6 @@ export function isOutputKind(kind: LadderCellKind): boolean {
 }
 
 /** 접점(도통 판정) 요소인지 */
-export function isContactKind(kind: LadderCellKind): kind is "no" | "nc" {
-  return kind === "no" || kind === "nc";
+export function isContactKind(kind: LadderCellKind): kind is "no" | "nc" | "ne" {
+  return kind === "no" || kind === "nc" || kind === "ne";
 }

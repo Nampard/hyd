@@ -227,33 +227,83 @@ describe("Phase 14-3: 엔진 ioMap 채널 연동 (PLC ↔ 스테이션)", () => 
   });
 });
 
-describe("골든 시나리오: MPS 기본동작 (예제 19)", () => {
-  async function runExample(workpieces: string) {
+describe("골든 시나리오: MPS 자동운전 (예제 19 — 수업자료 슬라이드 9 LD)", () => {
+  /** PB2로 기동 후 지정 시간 실행. pb3At 초에 PB3 펄스(라인변경) 옵션 */
+  async function runExample(workpieces: string, seconds: number, pb3At?: number) {
     const { getExample } = await import("../../examples");
     const { SimulationEngine } = await import("../engine");
     const doc = getExample("mps-basic")!.build();
     const station = doc.components.find((c) => c.type === "auto.mps-station")!;
     station.properties.workpieces = workpieces;
     const engine = new SimulationEngine(doc);
-    // PB2 눌러 기동 (0.1s 유지 — M11 자기유지)
-    engine.setMpsButton(station.id, 1, true);
+    engine.setMpsButton(station.id, 1, true); // PB2 기동
     for (let i = 0; i < 5; i++) engine.tick(0.02);
     engine.setMpsButton(station.id, 1, false);
-    for (let i = 0; i < Math.round(12 / 0.02); i++) engine.tick(0.02);
-    return engine.snapshot().components[station.id].mps!;
+    const steps = Math.round(seconds / 0.02);
+    for (let i = 0; i < steps; i++) {
+      if (pb3At !== undefined) {
+        const t = i * 0.02;
+        if (t >= pb3At && t < pb3At + 0.2) engine.setMpsButton(station.id, 2, true);
+        else engine.setMpsButton(station.id, 2, false);
+      }
+      engine.tick(0.02);
+    }
+    return { mps: engine.snapshot().components[station.id].mps!, engine, stationId: station.id };
   }
 
   it("금속: A공급 → 판별 → 가공 → 이송 → D실린더가 배출박스로 분류한다", async () => {
-    const mps = await runExample("금");
+    const { mps } = await runExample("금", 12);
     expect(mps.eject).toEqual(["metal"]);
     expect(mps.store).toHaveLength(0);
     expect(mps.belt).toHaveLength(0);
   });
 
   it("비금속: D 미작동 — 컨베이어 끝 저장박스로 분류한다", async () => {
-    const mps = await runExample("비");
+    const { mps } = await runExample("비", 13);
     expect(mps.store).toEqual(["nonmetal"]);
     expect(mps.eject).toHaveLength(0);
     expect(mps.belt).toHaveLength(0);
+  });
+
+  it("금,비: 사이클 후 매거진에 물품이 있으면 자동 재시작(M22), 금1·비1 처리로 종료한다", async () => {
+    const { mps } = await runExample("금,비", 22);
+    expect(mps.eject).toEqual(["metal"]); // 1사이클: 금속 → 배출박스
+    expect(mps.store).toEqual(["nonmetal"]); // 자동 재시작 2사이클: 비금속 → 저장박스
+    expect(mps.magazine).toHaveLength(0);
+    expect(mps.belt).toHaveLength(0);
+  });
+
+  it("PB3 라인변경(M24): 금속이 저장박스로 반전 분류된다", async () => {
+    const { mps } = await runExample("금", 14, 0.8); // 판별 직후 PB3
+    expect(mps.store).toEqual(["metal"]); // D 미작동 → 컨베이어 끝
+    expect(mps.eject).toHaveLength(0);
+  });
+
+  it("PB4 일시정지: 누르면 출력 차단·적램 점멸, 떼면(음변환) 초기화된다", async () => {
+    const { getExample } = await import("../../examples");
+    const { SimulationEngine } = await import("../engine");
+    const doc = getExample("mps-basic")!.build();
+    const station = doc.components.find((c) => c.type === "auto.mps-station")!;
+    const engine = new SimulationEngine(doc);
+    engine.setMpsButton(station.id, 1, true);
+    for (let i = 0; i < 5; i++) engine.tick(0.02);
+    engine.setMpsButton(station.id, 1, false);
+    for (let i = 0; i < 50; i++) engine.tick(0.02); // 1.1s — 드릴 구간 진입
+
+    engine.setMpsButton(station.id, 3, true); // PB4 누름 = 일시정지
+    for (let i = 0; i < 10; i++) engine.tick(0.02);
+    let snap = engine.snapshot().components[station.id];
+    expect(snap.mps?.lamps.red).toBe(true); // 적램 (점멸 위상 초반 ON)
+    const pausedB = snap.mps!.cyl.B;
+
+    for (let i = 0; i < 25; i++) engine.tick(0.02); // 0.5s 더 정지 유지
+    snap = engine.snapshot().components[station.id];
+    expect(snap.mps!.cyl.B).toBeLessThanOrEqual(pausedB); // 전진 차단 (스프링 복귀만)
+
+    engine.setMpsButton(station.id, 3, false); // 뗌 → 음변환 → M26 초기화
+    for (let i = 0; i < 25; i++) engine.tick(0.02);
+    const bits = engine.snapshot().plc?.bits ?? {};
+    expect(bits.M00010 ?? false).toBe(false); // 기동 자기유지 해제
+    expect(bits.M00011 ?? false).toBe(false); // 스텝 체인 리셋
   });
 });

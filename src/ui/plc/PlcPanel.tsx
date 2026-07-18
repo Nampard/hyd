@@ -30,6 +30,7 @@ type Tool = LadderCellKind | "erase" | "vlink";
 const TOOLS: { id: Tool; label: string; title: string }[] = [
   { id: "no", label: "─┤ ├─", title: "a접점 (NO)" },
   { id: "nc", label: "─┤/├─", title: "b접점 (NC)" },
+  { id: "ne", label: "─┤N├─", title: "음변환 접점 (N) — 디바이스가 꺼지는 순간 1스캔 통전" },
   { id: "hline", label: "───", title: "가로 연결선" },
   { id: "vlink", label: "│", title: "세로 연결 (OR 분기) — 같은 렁 안의 위/아래 행끼리만 이어집니다. 셀 왼쪽 절반=왼쪽 노드, 오른쪽 절반=오른쪽 노드, 첫 열 왼쪽=좌측 모선 분기" },
   { id: "coil", label: "─( )─", title: "출력 코일 (OUT)" },
@@ -110,6 +111,7 @@ function ContactSymbol({
   cx,
   cy,
   nc,
+  edge,
   device,
   enterHot,
   conductHot,
@@ -117,6 +119,8 @@ function ContactSymbol({
   cx: number;
   cy: number;
   nc: boolean;
+  /** 음변환(N) 접점 — 막대 사이에 N 표기 (XG5000 관례) */
+  edge?: "N";
   device: string;
   enterHot: boolean;
   conductHot: boolean;
@@ -132,6 +136,11 @@ function ContactSymbol({
       <HLine x1={cx - half} x2={cx - gap} y={cy} hot={enterHot} />
       <line x1={cx - gap} y1={cy - barH / 2} x2={cx - gap} y2={cy + barH / 2} stroke={segColor(conductHot)} strokeWidth={2} />
       <line x1={cx + gap} y1={cy - barH / 2} x2={cx + gap} y2={cy + barH / 2} stroke={segColor(conductHot)} strokeWidth={2} />
+      {edge && (
+        <text x={cx} y={cy + 3.5} textAnchor="middle" fontSize={9} fontWeight={700} fill={segColor(conductHot)} stroke="none">
+          {edge}
+        </text>
+      )}
       {nc && (
         <line
           x1={cx - gap + 2.5}
@@ -253,6 +262,8 @@ function CellSymbol({
       return <ContactSymbol cx={cx} cy={cy} nc={false} device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} />;
     case "nc":
       return <ContactSymbol cx={cx} cy={cy} nc={true} device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} />;
+    case "ne":
+      return <ContactSymbol cx={cx} cy={cy} nc={false} edge="N" device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} />;
     case "hline":
       return <HLine x1={cx - CW / 2} x2={cx + CW / 2} y={cy} hot={enterHot && conductHot} />;
     case "coil":
@@ -601,9 +612,10 @@ export function PlcPanel(): ReactElement | null {
                 onChange={(e) => {
                   const v = e.target.value.toUpperCase();
                   // bit 디바이스(P/M/T/C)만 허용 — D는 word 디바이스라 범위 밖 (review-3 P0).
-                  // P/M은 비트 어드레스라 마지막 자리 16진(A~F) 허용 (P0000A 등, Phase 14-3)
-                  if (v !== "" && !/^([PM][0-9]{0,4}[0-9A-F]?|[TC][0-9]{0,5})$/.test(v)) {
-                    useEditorStore.getState().setStatus("디바이스는 P/M/T/C + 숫자만 사용할 수 있습니다 (P/M은 마지막 자리 A~F 허용, D는 워드 디바이스 — 미지원).");
+                  // P/M은 비트 어드레스라 마지막 자리 16진(A~F) 허용 (P0000A 등, Phase 14-3).
+                  // _T1S/_T2S: 점멸 특수릴레이 (입력 중간 상태 _ / _T / _T1 허용)
+                  if (v !== "" && !/^([PM][0-9]{0,4}[0-9A-F]?|[TC][0-9]{0,5}|_|_T|_T[12]|_T[12]S)$/.test(v)) {
+                    useEditorStore.getState().setStatus("디바이스는 P/M/T/C + 숫자 또는 _T1S/_T2S(점멸)만 사용할 수 있습니다 (P/M은 마지막 자리 A~F 허용, D는 워드 디바이스 — 미지원).");
                     return;
                   }
                   updateSelectedCell({ device: v });

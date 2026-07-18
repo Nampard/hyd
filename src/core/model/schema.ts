@@ -206,7 +206,7 @@ function validateShape(doc: Record<string, unknown>): string | null {
       return "plcProgram 형식이 잘못되었습니다.";
     }
     if (program.rungs.length > LIMITS.rungs) return "PLC 렁 수가 상한(200개)을 넘습니다.";
-    const validKinds: LadderCellKind[] = ["no", "nc", "hline", "coil", "set", "rst", "ton", "ctu", "toff", "ctd"];
+    const validKinds: LadderCellKind[] = ["no", "nc", "ne", "hline", "coil", "set", "rst", "ton", "ctu", "toff", "ctd"];
     const timerCounterKinds = new Set<string>(["ton", "toff", "ctu", "ctd"]);
     const rungIds = new Set<string>();
     for (const rung of program.rungs) {
@@ -234,10 +234,11 @@ function validateShape(doc: Record<string, unknown>): string | null {
             // 디바이스 문법: P/M/T/C + 숫자 (XG5000 스타일 bit 디바이스).
             // D는 word 디바이스라 bit 논리 범위 밖 — 허용하면 교육 개념 오류 (codex-review-3 P0)
             // P/M은 비트 어드레스라 마지막 자리 16진(A~F) 허용 — XG5000 규칙·수업자료와
-            // 일치 (P0000A 등, Phase 14-3). T/C는 10진 번호만
+            // 일치 (P0000A 등, Phase 14-3). T/C는 10진 번호만.
+            // _T1S/_T2S: 점멸 특수릴레이 (1초/2초 클록 — 스캐너 내장, Phase 14-6)
             if (
               typeof cell.device !== "string" ||
-              !/^([PM][0-9]{0,4}[0-9A-F]|[TC][0-9]{1,5})$/.test(cell.device)
+              !/^([PM][0-9]{0,4}[0-9A-F]|[TC][0-9]{1,5}|_T[12]S)$/.test(cell.device)
             ) {
               return `PLC 셀 디바이스 표기가 잘못되었습니다: ${rung.id} (${String(cell.device)})`;
             }

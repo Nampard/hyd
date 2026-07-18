@@ -35,6 +35,10 @@ export class PlcRunner {
   private counters = new Map<string, CounterState>();
   /** 이번 스캔에서 출력 요소가 실제로 기록한 디바이스 */
   private writtenDevices = new Set<string>();
+  /** 직전 스캔 종료 시점의 비트 사본 — 음변환(N) 접점의 에지 판정용 (Phase 14) */
+  private prevBits = new Map<string, boolean>();
+  /** 누적 스캔 시간 — 점멸 특수릴레이(_T1S/_T2S) 위상 계산 */
+  private elapsed = 0;
   private monitor: PlcMonitor = { nodePower: {}, bits: {}, values: {} };
 
   constructor(program: LadderProgram) {
@@ -48,6 +52,11 @@ export class PlcRunner {
   /** 한 스캔 사이클. inputs: P 디바이스 입력 이미지 */
   scan(dt: number, inputs: Map<string, boolean>): Map<string, boolean> {
     for (const [device, value] of inputs) this.bits.set(device, value);
+    // 점멸 특수릴레이: _T1S(1초 주기), _T2S(2초 주기) — XG5000 관례의 클록 접점.
+    // 스캔 시작 시 위상으로 갱신하며 사용자 코일 기록은 다음 스캔에서 덮인다
+    this.elapsed += dt;
+    this.bits.set("_T1S", this.elapsed % 1 < 0.5);
+    this.bits.set("_T2S", this.elapsed % 2 < 1);
     this.writtenDevices = new Set();
 
     const nodePower: Record<string, boolean[][]> = {};
@@ -68,6 +77,9 @@ export class PlcRunner {
     for (const [device, t] of this.timers) values[device] = Math.round(t.elapsed * 10) / 10;
     for (const [device, c] of this.counters) values[device] = c.count;
     this.monitor = { nodePower, bits: bitsSnapshot, values };
+
+    // 음변환(N) 접점의 다음 스캔 에지 판정을 위해 이번 스캔 결과를 보존
+    this.prevBits = new Map(this.bits);
 
     return outputs;
   }
@@ -196,8 +208,13 @@ export class PlcRunner {
     return power;
   }
 
-  private contactConducts(kind: "no" | "nc", device?: string): boolean {
+  private contactConducts(kind: "no" | "nc" | "ne", device?: string): boolean {
     const bit = device ? (this.bits.get(device) ?? false) : false;
+    if (kind === "ne") {
+      // 음변환: 직전 스캔 1 → 이번 스캔 0인 동안(해당 스캔 1회)만 통전
+      const prev = device ? (this.prevBits.get(device) ?? false) : false;
+      return prev && !bit;
+    }
     return kind === "no" ? bit : !bit;
   }
 }
