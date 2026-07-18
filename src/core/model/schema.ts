@@ -3,6 +3,7 @@ import { CURRENT_SCHEMA_VERSION } from "./types";
 import { hasComponentDefinition, getComponentDefinition } from "../library/registry";
 import { summarizeLearningActivity } from "./learning-activity";
 import { LADDER_COLS, isOutputKind, type LadderCellKind } from "../plc/model";
+import { MPS_INPUT_CHANNELS, MPS_OUTPUT_CHANNELS } from "../sim/mps-station";
 
 export interface ParseResult {
   ok: boolean;
@@ -232,7 +233,12 @@ function validateShape(doc: Record<string, unknown>): string | null {
           if (cell.kind !== "hline") {
             // 디바이스 문법: P/M/T/C + 숫자 (XG5000 스타일 bit 디바이스).
             // D는 word 디바이스라 bit 논리 범위 밖 — 허용하면 교육 개념 오류 (codex-review-3 P0)
-            if (typeof cell.device !== "string" || !/^[PMTC][0-9]{1,5}$/.test(cell.device)) {
+            // P/M은 비트 어드레스라 마지막 자리 16진(A~F) 허용 — XG5000 규칙·수업자료와
+            // 일치 (P0000A 등, Phase 14-3). T/C는 10진 번호만
+            if (
+              typeof cell.device !== "string" ||
+              !/^([PM][0-9]{0,4}[0-9A-F]|[TC][0-9]{1,5})$/.test(cell.device)
+            ) {
               return `PLC 셀 디바이스 표기가 잘못되었습니다: ${rung.id} (${String(cell.device)})`;
             }
           }
@@ -277,7 +283,8 @@ function validateShape(doc: Record<string, unknown>): string | null {
       if (
         !isRecord(entry) ||
         typeof entry.device !== "string" ||
-        !/^P[0-9]{1,5}$/.test(entry.device) ||
+        // 마지막 자리 16진 허용 (P0000A 등 — 셀 디바이스 규칙과 동일, Phase 14-3)
+        !/^P[0-9]{0,4}[0-9A-F]$/.test(entry.device) ||
         (entry.direction !== "input" && entry.direction !== "output") ||
         typeof entry.componentId !== "string"
       ) {
@@ -297,14 +304,23 @@ function validateShape(doc: Record<string, unknown>): string | null {
       if (entry.componentId !== "" && !componentIds.has(entry.componentId)) {
         return `ioMap이 존재하지 않는 부품을 참조합니다: ${entry.device}`;
       }
-      // 방향↔부품 역할 적합성: 입력=접점, 출력=부하 (review-2 P0)
+      // 방향↔부품 역할 적합성: 입력=접점, 출력=부하 (review-2 P0).
+      // 다채널 부품(mps-station)은 channel 필수 + 채널 이름이 방향별 목록에 있어야
+      // 하고, 단채널 부품에는 channel을 허용하지 않는다 (v4/Phase 14-3)
       if (entry.componentId !== "") {
         const comp = compById.get(entry.componentId)!;
         const role = getComponentDefinition(comp.type as string).behavior?.role;
-        if (entry.direction === "input" && role !== "elec-contact") {
+        if (role === "mps-station") {
+          const allowed: readonly string[] =
+            entry.direction === "input" ? MPS_INPUT_CHANNELS : MPS_OUTPUT_CHANNELS;
+          if (typeof entry.channel !== "string" || !allowed.includes(entry.channel)) {
+            return `ioMap ${entry.device}: MPS 스테이션에는 유효한 채널 이름이 필요합니다.`;
+          }
+        } else if (entry.channel !== undefined) {
+          return `ioMap ${entry.device}: 채널은 다채널 부품(MPS 스테이션)에만 쓸 수 있습니다.`;
+        } else if (entry.direction === "input" && role !== "elec-contact") {
           return `ioMap 입력 ${entry.device}에 접점이 아닌 부품이 연결되었습니다.`;
-        }
-        if (entry.direction === "output" && role !== "elec-load") {
+        } else if (entry.direction === "output" && role !== "elec-load") {
           return `ioMap 출력 ${entry.device}에 부하가 아닌 부품이 연결되었습니다.`;
         }
       }

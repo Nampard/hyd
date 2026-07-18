@@ -1,7 +1,7 @@
 /** 포트가 흘려보내는 매체 종류. 배선은 같은 kind끼리만 연결할 수 있다. */
 export type PortKind = "pneumatic" | "hydraulic" | "electric";
 
-export type Domain = "pneumatic" | "hydraulic" | "electric";
+export type Domain = "pneumatic" | "hydraulic" | "electric" | "automation";
 
 export type Rotation = 0 | 90 | 180 | 270;
 

@@ -1,4 +1,4 @@
-import type { CircuitDocument } from "./types";
+import type { CircuitDocument, Domain } from "./types";
 import { getComponentDefinition } from "../library/registry";
 
 /**
@@ -38,8 +38,6 @@ const FEATURED_ROLES = new Set<string>([
 
 /** elec-load 중 "능동 제어 요소"로 우선 노출되는 디바이스 (표시용 램프/부저/리셋 코일은 후순위) */
 const FEATURED_ELEC_DEVICES = new Set<string>(["solenoid", "relay", "timer-on", "timer-off", "counter"]);
-
-type Domain = "pneumatic" | "hydraulic" | "electric";
 
 interface Analysis {
   hasPLC: boolean;

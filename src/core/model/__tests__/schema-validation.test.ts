@@ -205,10 +205,15 @@ describe("스키마 v4: ioMap channel (Phase 14)", () => {
   });
 
   it("channel이 있는 ioMap 항목이 저장·재열기에서 보존된다", () => {
-    const { doc, btnId } = docWithButton();
+    // channel은 다채널 부품(MPS 스테이션)에서만 유효 (14-3 의미 검증)
+    let doc = createEmptyDocument("v4 채널 보존");
+    const st = addComponent(doc, "auto.mps-station", { x: 300, y: 300 });
+    doc = st.doc;
     const withChannel = {
       ...doc,
-      ioMap: [{ device: "P0", direction: "input" as const, componentId: btnId, channel: "PB1" }],
+      ioMap: [
+        { device: "P0", direction: "input" as const, componentId: st.component.id, channel: "PB1" },
+      ],
     };
     const result = parseDocument(serializeDocument(withChannel));
     expect(result.ok).toBe(true);
@@ -231,11 +236,19 @@ describe("스키마 v4: ioMap channel (Phase 14)", () => {
   });
 
   it("ioMap 항목의 미등록 키는 재조립에서 제거된다", () => {
-    const { doc, btnId } = docWithButton();
+    let doc0 = createEmptyDocument("v4 키 재조립");
+    const st = addComponent(doc0, "auto.mps-station", { x: 300, y: 300 });
+    doc0 = st.doc;
     const withExtra = {
-      ...doc,
+      ...doc0,
       ioMap: [
-        { device: "P0", direction: "input", componentId: btnId, hack: "주입", channel: "PB1" },
+        {
+          device: "P0",
+          direction: "input",
+          componentId: st.component.id,
+          hack: "주입",
+          channel: "PB1",
+        },
       ],
     };
     const result = parseDocument(JSON.stringify(withExtra));
@@ -245,5 +258,101 @@ describe("스키마 v4: ioMap channel (Phase 14)", () => {
     expect("hack" in entry).toBe(false);
     // 직렬화에도 새어 나가지 않는다
     expect(serializeDocument(result.document!)).not.toContain("주입");
+  });
+});
+
+describe("Phase 14-3: 16진 어드레스 + MPS 채널 의미 검증", () => {
+  function docWithStation() {
+    let doc = createEmptyDocument("MPS 테스트");
+    const st = addComponent(doc, "auto.mps-station", { x: 300, y: 300 });
+    doc = st.doc;
+    const lamp = addComponent(doc, "elec.lamp", { x: 100, y: 100 });
+    doc = lamp.doc;
+    return { doc, stationId: st.component.id, lampId: lamp.component.id };
+  }
+
+  it("P/M 디바이스의 마지막 자리 16진(A~F)을 허용한다 (래더 셀·ioMap)", () => {
+    const { doc, stationId } = docWithStation();
+    const withHex = {
+      ...doc,
+      plcProgram: {
+        rungs: [
+          {
+            id: "r1",
+            cells: [[{ kind: "no", device: "P0000A" }, null, null, null, null, null, null,
+              { kind: "coil", device: "M0010F" }]],
+            vlinks: [],
+          },
+        ],
+      },
+      ioMap: [
+        { device: "P0000A", direction: "input" as const, componentId: stationId, channel: "D후센" },
+      ],
+    };
+    const result = parseDocument(JSON.stringify(withHex));
+    expect(result.ok).toBe(true);
+  });
+
+  it("중간 자리 16진은 거부한다 (P00A00)", () => {
+    const { doc } = docWithStation();
+    const broken = {
+      ...doc,
+      plcProgram: {
+        rungs: [
+          {
+            id: "r1",
+            cells: [[{ kind: "no", device: "P00A00" }, null, null, null, null, null, null, null]],
+            vlinks: [],
+          },
+        ],
+      },
+    };
+    const result = parseDocument(JSON.stringify(broken));
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("디바이스");
+  });
+
+  it("MPS 스테이션 항목에는 유효한 채널이 필수다", () => {
+    const { doc, stationId } = docWithStation();
+    // 채널 없음
+    let result = parseDocument(
+      JSON.stringify({
+        ...doc,
+        ioMap: [{ device: "P0", direction: "input", componentId: stationId }],
+      }),
+    );
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("채널");
+    // 방향에 안 맞는 채널 (출력 채널을 입력에)
+    result = parseDocument(
+      JSON.stringify({
+        ...doc,
+        ioMap: [{ device: "P0", direction: "input", componentId: stationId, channel: "녹램" }],
+      }),
+    );
+    expect(result.ok).toBe(false);
+    // 올바른 조합
+    result = parseDocument(
+      JSON.stringify({
+        ...doc,
+        ioMap: [
+          { device: "P0", direction: "input", componentId: stationId, channel: "PB1" },
+          { device: "P19", direction: "output", componentId: stationId, channel: "녹램" },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("단채널 부품에는 채널을 허용하지 않는다", () => {
+    const { doc, lampId } = docWithStation();
+    const result = parseDocument(
+      JSON.stringify({
+        ...doc,
+        ioMap: [{ device: "P19", direction: "output", componentId: lampId, channel: "녹램" }],
+      }),
+    );
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("다채널");
   });
 });

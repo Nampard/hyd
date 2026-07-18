@@ -170,3 +170,56 @@ describe("램프·드릴 (시각 상태)", () => {
     expect(state.drillAngle).toBeGreaterThan(0);
   });
 });
+
+describe("Phase 14-3: 엔진 ioMap 채널 연동 (PLC ↔ 스테이션)", () => {
+  it("PB1 입력 채널 → 래더 → 녹램 출력 채널이 한 틱 안에 연결된다", async () => {
+    const { registerLibraries } = await import("../../library");
+    const { createEmptyDocument } = await import("../../model/types");
+    const { addComponent } = await import("../../model/operations");
+    const { rungOf, lc } = await import("../../examples");
+    const { SimulationEngine } = await import("../engine");
+    registerLibraries();
+
+    let doc = createEmptyDocument("MPS 채널 연동");
+    const st = addComponent(doc, "auto.mps-station", { x: 300, y: 300 });
+    doc = st.doc;
+    const stationId = st.component.id;
+    doc = {
+      ...doc,
+      // 매거진(P0000C)이 있으면 컨베이어(P00016), PB1(P00000)이면 녹램(P00019)
+      plcProgram: {
+        rungs: [
+          rungOf([[lc("no", "P00000"), lc("coil", "P00019")]]),
+          rungOf([[lc("no", "P0000C"), lc("coil", "P00016")]]),
+        ],
+      },
+      ioMap: [
+        { device: "P00000", direction: "input", componentId: stationId, channel: "PB1" },
+        { device: "P0000C", direction: "input", componentId: stationId, channel: "매거진" },
+        { device: "P00019", direction: "output", componentId: stationId, channel: "녹램" },
+        { device: "P00016", direction: "output", componentId: stationId, channel: "컨베이어" },
+      ],
+    };
+    const engine = new SimulationEngine(doc);
+
+    // PB 안 누름: 녹램 꺼짐. 매거진(기본 금,비,금)은 차 있으므로 컨베이어 가동
+    let snap = engine.tick(0.02);
+    engine.tick(0.02); // 출력 반영 후 스테이션 물리 1틱 더
+    snap = engine.snapshot();
+    expect(snap.components[stationId].mps?.lamps.green).toBe(false);
+    const offset1 = snap.components[stationId].mps?.beltOffset ?? 0;
+    expect(offset1).toBeGreaterThan(0); // 매거진 → 컨베이어 출력 → 벨트 진행
+
+    engine.setMpsButton(stationId, 0, true); // PB1 누름
+    engine.tick(0.02);
+    engine.tick(0.02);
+    snap = engine.snapshot();
+    expect(snap.components[stationId].mps?.lamps.green).toBe(true);
+
+    engine.setMpsButton(stationId, 0, false);
+    engine.tick(0.02);
+    engine.tick(0.02);
+    snap = engine.snapshot();
+    expect(snap.components[stationId].mps?.lamps.green).toBe(false);
+  });
+});

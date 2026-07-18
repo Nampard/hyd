@@ -5,7 +5,7 @@ import type { ComponentRuntime, PressureState, SimulationSnapshot } from "./type
 import { solveFluid } from "./fluid-solver";
 import { solveElectric } from "./electric-solver";
 import { PlcRunner, type PlcMonitor } from "../plc/scanner";
-import { createMpsState, stepMpsStation, type MpsOutputChannel } from "./mps-station";
+import { createMpsState, mpsInputs, stepMpsStation, type MpsOutputChannel } from "./mps-station";
 
 /** 릴레이·타이머·카운터 디바이스 상태 (이름표로 접점과 연결) */
 interface DeviceState {
@@ -122,6 +122,12 @@ export class SimulationEngine {
 
   getManual(componentId: string): boolean {
     return this.runtimes.get(componentId)?.manualActive ?? false;
+  }
+
+  /** MPS 스테이션 조작 패널 푸시버튼 (PB1~PB4 = 0~3) 누름/뗌 (Phase 14) */
+  setMpsButton(componentId: string, button: 0 | 1 | 2 | 3, active: boolean): void {
+    const mps = this.runtimes.get(componentId)?.mps;
+    if (mps) mps.pb[button] = active;
   }
 
   tick(dt: number): SimulationSnapshot {
@@ -358,9 +364,21 @@ export class SimulationEngine {
     const ioMap = this.doc.ioMap ?? [];
 
     const inputs = new Map<string, boolean>();
+    // 다채널 부품(MPS 스테이션)의 센서 이미지는 부품당 1회만 계산
+    const mpsImageCache = new Map<string, Record<string, boolean>>();
     for (const entry of ioMap) {
       if (entry.direction !== "input") continue;
-      inputs.set(entry.device, this.runtimes.get(entry.componentId)?.contactClosed ?? false);
+      const runtime = this.runtimes.get(entry.componentId);
+      if (entry.channel !== undefined && runtime?.mps) {
+        let image = mpsImageCache.get(entry.componentId);
+        if (!image) {
+          image = mpsInputs(runtime.mps);
+          mpsImageCache.set(entry.componentId, image);
+        }
+        inputs.set(entry.device, image[entry.channel] ?? false);
+      } else {
+        inputs.set(entry.device, runtime?.contactClosed ?? false);
+      }
     }
 
     const outputs = this.plcRunner.scan(dt, inputs);
@@ -373,6 +391,16 @@ export class SimulationEngine {
       if (entry.direction !== "output") continue;
       if (!this.runtimes.has(entry.componentId)) continue;
       const on = outputs.get(entry.device) ?? false;
+      if (entry.channel !== undefined) {
+        // 다채널 부품: 채널 상태만 기록 — 전기 통전과 무관하므로 고정점 재실행 불필요
+        let channels = this.plcForcedChannels.get(entry.componentId);
+        if (!channels) {
+          channels = new Map();
+          this.plcForcedChannels.set(entry.componentId, channels);
+        }
+        channels.set(entry.channel, on);
+        continue;
+      }
       if ((this.plcForced.get(entry.componentId) ?? false) !== on) changed = true;
       this.plcForced.set(entry.componentId, on);
     }

@@ -591,9 +591,10 @@ export function PlcPanel(): ReactElement | null {
                 value={selectedCell.device ?? ""}
                 onChange={(e) => {
                   const v = e.target.value.toUpperCase();
-                  // bit 디바이스(P/M/T/C)만 허용 — D는 word 디바이스라 범위 밖 (review-3 P0)
-                  if (v !== "" && !/^[PMTC][0-9]{0,5}$/.test(v)) {
-                    useEditorStore.getState().setStatus("디바이스는 P/M/T/C + 숫자만 사용할 수 있습니다 (D는 워드 디바이스 — 미지원).");
+                  // bit 디바이스(P/M/T/C)만 허용 — D는 word 디바이스라 범위 밖 (review-3 P0).
+                  // P/M은 비트 어드레스라 마지막 자리 16진(A~F) 허용 (P0000A 등, Phase 14-3)
+                  if (v !== "" && !/^([PM][0-9]{0,4}[0-9A-F]?|[TC][0-9]{0,5})$/.test(v)) {
+                    useEditorStore.getState().setStatus("디바이스는 P/M/T/C + 숫자만 사용할 수 있습니다 (P/M은 마지막 자리 A~F 허용, D는 워드 디바이스 — 미지원).");
                     return;
                   }
                   updateSelectedCell({ device: v });
