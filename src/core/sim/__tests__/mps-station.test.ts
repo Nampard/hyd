@@ -53,20 +53,38 @@ describe("매거진 큐 파싱", () => {
 });
 
 describe("A실린더 공급 + 판별 센서", () => {
-  it("A 전진 완료 시 매거진 → 공급 위치, 용량형/유도형이 재질을 반영한다", () => {
+  it("A 전진 완료 시 매거진 → 공급 위치 (판별 센서는 아직 반응 없음 — 벨트 초입 배치)", () => {
     const state = createMpsState({ workpieces: "금,비" });
     expect(mpsInputs(state).매거진).toBe(true);
-    expect(mpsInputs(state).용량형).toBe(false);
 
     run(state, ["A전솔"], 0.7); // 전 행정 0.5s + 여유
     expect(mpsInputs(state).A전센).toBe(true);
     expect(state.supply).toBe("metal");
     expect(state.magazine).toHaveLength(1);
-    expect(mpsInputs(state).용량형).toBe(true);
-    expect(mpsInputs(state).유도형).toBe(true); // 금속
+    // 배치도(S3/S4): 판별 센서는 컨베이어 초입에 있어 공급 위치에서는 감지하지 않는다
+    expect(mpsInputs(state).용량형).toBe(false);
+    expect(mpsInputs(state).유도형).toBe(false);
 
     run(state, ["A후솔"], 0.7); // 양솔 복귀
     expect(mpsInputs(state).A후센).toBe(true);
+  });
+
+  it("판별은 벨트 초입 구간에서: 금속이면 용량형+유도형, 비금속이면 용량형만", () => {
+    const metal = createMpsState({ workpieces: "금" });
+    run(metal, ["A전솔"], 0.7);
+    run(metal, ["A후솔"], 0.7);
+    run(metal, ["C전솔"], 0.7); // 벨트 초입 이송
+    run(metal, ["컨베이어"], 0.8); // 감지 구간(0.06~0.24) 진입
+    expect(mpsInputs(metal).용량형).toBe(true);
+    expect(mpsInputs(metal).유도형).toBe(true);
+
+    const nonmetal = createMpsState({ workpieces: "비" });
+    run(nonmetal, ["A전솔"], 0.7);
+    run(nonmetal, ["A후솔"], 0.7);
+    run(nonmetal, ["C전솔"], 0.7);
+    run(nonmetal, ["컨베이어"], 0.8);
+    expect(mpsInputs(nonmetal).용량형).toBe(true);
+    expect(mpsInputs(nonmetal).유도형).toBe(false); // 유도형은 금속만
   });
 
   it("양솔 무신호에서는 위치를 유지한다 (임펄스)", () => {

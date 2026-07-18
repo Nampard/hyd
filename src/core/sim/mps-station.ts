@@ -56,6 +56,12 @@ const STROKE_TIME = 0.5;
 const CONVEYOR_TRAVEL = 6;
 /** 포토센서 감지 구간 (컨베이어 진행률) — 초입 통과 감지 */
 const PHOTO_WINDOW: [number, number] = [0.02, 0.18];
+/**
+ * 용량형/유도형 판별 센서 감지 구간 — 실기 장비 배치도(S3/S4)처럼 컨베이어
+ * 초입부 위에 있다. 포토센서 바로 뒤 구간을 물품이 지나며 재질이 판별된다
+ * (공급 위치가 아님 — 2026-07-18 소유자 배치도 참고 정정)
+ */
+const DETECT_WINDOW: [number, number] = [0.06, 0.24];
 /** D실린더 분기 게이트 구간 (컨베이어 진행률) */
 const GATE_WINDOW: [number, number] = [0.45, 0.6];
 /** 매거진 최대 적재 수 */
@@ -201,6 +207,14 @@ export function mpsInputs(state: MpsStationState): Record<MpsInputChannel, boole
   const inPhoto = state.belt.some(
     (p) => p.progress >= PHOTO_WINDOW[0] && p.progress <= PHOTO_WINDOW[1],
   );
+  // 판별 센서는 벨트 초입 구간의 물품을 본다 (배치도 S3/S4)
+  const inDetect = (m: WorkpieceMaterial | null) =>
+    state.belt.some(
+      (p) =>
+        p.progress >= DETECT_WINDOW[0] &&
+        p.progress <= DETECT_WINDOW[1] &&
+        (m === null || p.material === m),
+    );
   return {
     PB1: state.pb[0],
     PB2: state.pb[1],
@@ -216,7 +230,7 @@ export function mpsInputs(state: MpsStationState): Record<MpsInputChannel, boole
     D전센: state.cyl.D >= 0.99,
     매거진: state.magazine.length > 0,
     포토: inPhoto,
-    용량형: state.supply !== null,
-    유도형: state.supply === "metal",
+    용량형: inDetect(null),
+    유도형: inDetect("metal"),
   };
 }

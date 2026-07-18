@@ -327,6 +327,11 @@ export function MpsStationSprite({
   const eject = mps?.eject ?? [];
   const drillDrop = cyl.B * 14;
   const photoOn = belt.some((p) => p.progress >= 0.02 && p.progress <= 0.18);
+  // 판별 센서 점등 (벨트 초입 감지 구간 — core DETECT_WINDOW와 동일 값)
+  const detectAny = belt.some((p) => p.progress >= 0.06 && p.progress <= 0.24);
+  const detectMetal = belt.some(
+    (p) => p.progress >= 0.06 && p.progress <= 0.24 && p.material === "metal",
+  );
   // 벨트 무늬 이동 (12px 주기)
   const dashShift = mps ? (mps.beltOffset * 26) % 12 : 0;
 
@@ -338,8 +343,8 @@ export function MpsStationSprite({
         MPS 스테이션
       </text>
 
-      {/* 조작 패널: PB1~4 + 램프 3 */}
-      <rect x={48} y={-80} width={88} height={36} rx={4} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
+      {/* 조작 패널: PB1~4 (램프는 우측 독립 타워 — 배치도 참고) */}
+      <rect x={44} y={-80} width={92} height={36} rx={4} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
       {([0, 1, 2, 3] as const).map((i) => {
         const px = 60 + i * 21;
         const pressed = mps?.pb[i] ?? false;
@@ -368,6 +373,9 @@ export function MpsStationSprite({
           </g>
         );
       })}
+      {/* 램프 타워: 우측 독립 기둥에 적(상)/황(중)/녹(하) — 배치도의 시그널 타워 */}
+      <line x1={133} y1={62} x2={133} y2={-14} stroke="#475569" strokeWidth={3} />
+      <rect x={126} y={62} width={14} height={5} rx={2} fill="#475569" />
       {(
         [
           ["red", "#dc2626"],
@@ -375,11 +383,13 @@ export function MpsStationSprite({
           ["green", "#16a34a"],
         ] as const
       ).map(([key, color], i) => (
-        <circle
+        <rect
           key={key}
-          cx={118}
-          cy={-74 + i * 10}
-          r={4}
+          x={127}
+          y={-60 + i * 16}
+          width={12}
+          height={15}
+          rx={3}
           fill={color}
           opacity={lamps[key] ? 1 : 0.25}
           stroke="#1f2937"
@@ -402,14 +412,9 @@ export function MpsStationSprite({
       <line x1={-110} y1={12} x2={-110 + cyl.A * 34} y2={12} stroke="#475569" strokeWidth={3} />
       <rect x={-112 + cyl.A * 34} y={5} width={3} height={14} fill="#475569" />
 
-      {/* 공급/판별/가공 위치 */}
+      {/* 공급/가공 위치 (판별 센서는 벨트 초입 — 배치도 S3/S4) */}
       <rect x={-84} y={14} width={32} height={6} fill="#64748b" />
       {supply && <Piece x={-79} y={4} material={supply} w={20} h={10} />}
-      {/* 판별 센서: 용량형(모든 재질)/유도형(금속) */}
-      <circle cx={-94} cy={-2} r={5.5} fill="#0284c7" opacity={supply ? 1 : 0.25} stroke="#1f2937" strokeWidth={0.8} />
-      <text x={-97} y={0.5} fontSize={7} fill="#fff" stroke="none">용</text>
-      <circle cx={-94} cy={11} r={5.5} fill="#f59e0b" opacity={supply === "metal" ? 1 : 0.25} stroke="#1f2937" strokeWidth={0.8} />
-      <text x={-97} y={13.5} fontSize={7} fill="#1f2937" stroke="none">유</text>
 
       {/* B실린더 + 드릴 (B 전진 시 하강) */}
       <rect x={-72} y={-78} width={12} height={16} rx={2} fill="#8aa3b8" stroke="#3c5164" strokeWidth={1.2} />
@@ -443,9 +448,15 @@ export function MpsStationSprite({
         <Piece key={i} x={-48 + p.progress * 158} y={36} material={p.material} />
       ))}
 
-      {/* 포토센서 (초입) */}
-      <line x1={-24} y1={44} x2={-24} y2={32} stroke="#334155" strokeWidth={2} />
-      <circle cx={-24} cy={29} r={3.5} fill="#a21caf" opacity={photoOn ? 1 : 0.25} stroke="#1f2937" strokeWidth={0.8} />
+      {/* 벨트 초입 센서 3종 (배치도): 포토(통과) → 용량형(모든 재질) → 유도형(금속) */}
+      <line x1={-34} y1={44} x2={-34} y2={32} stroke="#334155" strokeWidth={2} />
+      <circle cx={-34} cy={29} r={3.5} fill="#a21caf" opacity={photoOn ? 1 : 0.25} stroke="#1f2937" strokeWidth={0.8} />
+      <line x1={-18} y1={44} x2={-18} y2={28} stroke="#334155" strokeWidth={2} />
+      <circle cx={-18} cy={23} r={5.5} fill="#0284c7" opacity={detectAny ? 1 : 0.25} stroke="#1f2937" strokeWidth={0.8} />
+      <text x={-21} y={25.5} fontSize={7} fill="#fff" stroke="none">용</text>
+      <line x1={-4} y1={44} x2={-4} y2={28} stroke="#334155" strokeWidth={2} />
+      <circle cx={-4} cy={23} r={5.5} fill="#f59e0b" opacity={detectMetal ? 1 : 0.25} stroke="#1f2937" strokeWidth={0.8} />
+      <text x={-7} y={25.5} fontSize={7} fill="#1f2937" stroke="none">유</text>
 
       {/* D실린더 (편솔): 게이트에서 밀어 배출 */}
       <rect x={36} y={6} width={14} height={20} rx={2} fill="#8aa3b8" stroke="#3c5164" strokeWidth={1.2} />
@@ -461,12 +472,12 @@ export function MpsStationSprite({
       {eject.slice(-2).map((m, i) => (
         <Piece key={i} x={48 - i * 8} y={72} material={m} w={7} h={9} />
       ))}
-      <rect x={94} y={66} width={38} height={18} fill="#f1f5f9" stroke="#64748b" strokeWidth={1.2} />
-      <text x={97} y={78} fontSize={7} fill="#1f2937" stroke="none">
+      <rect x={86} y={66} width={38} height={18} fill="#f1f5f9" stroke="#64748b" strokeWidth={1.2} />
+      <text x={89} y={78} fontSize={7} fill="#1f2937" stroke="none">
         저장 {store.length}
       </text>
       {store.slice(-2).map((m, i) => (
-        <Piece key={i} x={116 - i * 8} y={72} material={m} w={7} h={9} />
+        <Piece key={i} x={108 - i * 8} y={72} material={m} w={7} h={9} />
       ))}
     </g>
   );

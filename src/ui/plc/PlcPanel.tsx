@@ -502,10 +502,17 @@ export function PlcPanel(): ReactElement | null {
       return;
     }
     if (tool === "erase") {
+      // 셀 내용과 함께, 클릭한 절반 쪽 노드에 붙은 세로선(vlink)도 지운다 —
+      // 세로선은 셀이 아니라 노드에 속하므로 셀만 비우면 남아 있었음 (사용자 보고)
+      const node = half === "left" ? c : c + 1;
       updateRung(rung.id, (rg) => ({
         ...rg,
         cells: rg.cells.map((row, ri) =>
           ri === r ? row.map((cell, ci) => (ci === c ? null : cell)) : row,
+        ),
+        vlinks: rg.vlinks.filter(
+          // 클릭한 노드(node)에서 이 행에 닿는 링크: 아래로(r↔r+1) 또는 위로(r-1↔r)
+          (v) => !(v.c === node && (v.r === r || v.r === r - 1)),
         ),
       }));
       return;
