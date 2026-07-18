@@ -136,7 +136,14 @@ export type Behavior =
       portA: string;
       portB: string;
       device: "relay" | "timer-on" | "timer-off" | "counter" | "counter-reset" | "solenoid" | "lamp" | "buzzer";
-    };
+    }
+  /**
+   * 자동화설비 기능사 MPS 스테이션 (Phase 14). 전기·유체 포트가 없는 장비 단위
+   * 부품 — PLC ioMap channel로 I/O 26점이 물리고, 워크피스(금속/비금속) 흐름을
+   * 내부 상태기계(core/sim/mps-station.ts)로 시뮬레이션한다. 설비는 물리만 제공:
+   * 액추에이터는 출력 채널에 반응, 센서는 입력 채널 상태 생성. 로직은 사용자 래더.
+   */
+  | { role: "mps-station" };
 
 export interface ComponentDefinition {
   type: string;

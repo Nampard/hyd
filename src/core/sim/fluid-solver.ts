@@ -191,6 +191,7 @@ export function solveFluid(
       case "elec-supply":
       case "elec-contact":
       case "elec-load":
+      case "mps-station": // 유체 포트 없음 — MPS 물리는 엔진의 stepMpsStation이 담당
         break;
     }
   }

@@ -5,6 +5,7 @@ import type { ComponentRuntime, PressureState, SimulationSnapshot } from "./type
 import { solveFluid } from "./fluid-solver";
 import { solveElectric } from "./electric-solver";
 import { PlcRunner, type PlcMonitor } from "../plc/scanner";
+import { createMpsState, stepMpsStation, type MpsOutputChannel } from "./mps-station";
 
 /** 릴레이·타이머·카운터 디바이스 상태 (이름표로 접점과 연결) */
 interface DeviceState {
@@ -40,6 +41,8 @@ export class SimulationEngine {
   private plcMonitor: PlcMonitor | null = null;
   /** PLC 출력이 강제한 부하 통전 (componentId → on). 전기 고정점에서 회로 통전과 OR 결합 */
   private plcForced = new Map<string, boolean>();
+  /** PLC 출력이 강제한 다채널 부품의 채널 상태 — compId → (channel → on) (Phase 14) */
+  private plcForcedChannels = new Map<string, Map<string, boolean>>();
   private time = 0;
   private listeners = new Set<(snap: SimulationSnapshot) => void>();
   /** 최근 솔브 수렴 여부 (발진 회로 진단, review-2 P0) */
@@ -57,6 +60,9 @@ export class SimulationEngine {
       }
       if (behavior?.role === "cylinder") {
         runtime.cylinderPos = comp.properties.initialPosition === "extended" ? 1 : 0;
+      }
+      if (behavior?.role === "mps-station") {
+        runtime.mps = createMpsState(comp.properties);
       }
       if (behavior?.role === "motor") {
         runtime.motorAngle = 0;
@@ -166,6 +172,17 @@ export class SimulationEngine {
       }
 
       runtime.cylinderPos = clamp01((runtime.cylinderPos ?? 0) + velocity * dt);
+    }
+
+    // 4.5 MPS 스테이션 물리 (Phase 14) — PLC가 강제한 출력 채널에 반응해
+    // 실린더·컨베이어·워크피스 흐름을 갱신. 유체·전기 솔브와 독립
+    for (const comp of this.doc.components) {
+      const behavior = getComponentDefinition(comp.type).behavior;
+      if (behavior?.role !== "mps-station") continue;
+      const mps = this.runtimes.get(comp.id)!.mps;
+      if (!mps) continue;
+      const forced = this.plcForcedChannels.get(comp.id);
+      stepMpsStation(mps, (ch: MpsOutputChannel) => forced?.get(ch) ?? false, dt);
     }
 
     // 5. 모터 적분 (A 가압·B 배출 → 정회전, 반대 → 역회전)
@@ -491,6 +508,18 @@ export class SimulationEngine {
         portLevel: runtime.portLevel ? { ...runtime.portLevel } : undefined,
         motorAngle: runtime.motorAngle,
         reliefActive: runtime.reliefActive,
+        mps: runtime.mps
+          ? {
+              ...runtime.mps,
+              magazine: [...runtime.mps.magazine],
+              belt: runtime.mps.belt.map((p) => ({ ...p })),
+              store: [...runtime.mps.store],
+              eject: [...runtime.mps.eject],
+              cyl: { ...runtime.mps.cyl },
+              pb: [...runtime.mps.pb] as [boolean, boolean, boolean, boolean],
+              lamps: { ...runtime.mps.lamps },
+            }
+          : undefined,
       };
     }
     const wires: Record<string, PressureState> = {};

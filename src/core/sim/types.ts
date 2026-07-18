@@ -21,6 +21,8 @@ export interface ComponentRuntime {
   motorAngle?: number;
   /** 릴리프 밸브가 릴리빙 중 (솔버가 판정, 기호 표시용) */
   reliefActive?: boolean;
+  /** MPS 스테이션 상태 (Phase 14 — 워크피스 흐름·실린더·램프) */
+  mps?: import("./mps-station").MpsStationState;
 }
 
 /** UI가 구독하는 스냅숏 (불변 평면 객체) */
@@ -37,8 +39,10 @@ export interface SimulationSnapshot {
       portState: Record<string, PressureState>;
       portLevel?: Record<string, number>;
       motorAngle?: number;
-  /** 릴리프 밸브가 릴리빙 중 (솔버가 판정, 기호 표시용) */
-  reliefActive?: boolean;
+      /** 릴리프 밸브가 릴리빙 중 (솔버가 판정, 기호 표시용) */
+      reliefActive?: boolean;
+      /** MPS 스테이션 상태 사본 (Phase 14 — 스프라이트 표시용) */
+      mps?: import("./mps-station").MpsStationState;
     }
   >;
   /**
