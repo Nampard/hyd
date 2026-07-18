@@ -23,7 +23,7 @@ export const mpsStation: ComponentDefinition = {
     },
   ],
   symbolId: "auto.mps-station",
-  bounds: { x: -90, y: -70, width: 180, height: 140 },
+  bounds: { x: -140, y: -85, width: 280, height: 170 },
   behavior: { role: "mps-station" },
 };
 

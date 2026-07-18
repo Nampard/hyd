@@ -29,6 +29,8 @@ interface SimStore {
   setManual(componentId: string, active: boolean): void;
   /** 레버(디텐트): 토글 */
   toggleManual(componentId: string): void;
+  /** MPS 스테이션 조작 패널 PB1~PB4 누름/뗌 (Phase 14) */
+  setMpsButton(componentId: string, button: 0 | 1 | 2 | 3, active: boolean): void;
 }
 
 let engine: SimulationEngine | null = null;
@@ -134,6 +136,10 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
   setManual(componentId, active) {
     engine?.setManual(componentId, active);
+  },
+
+  setMpsButton(componentId, button, active) {
+    engine?.setMpsButton(componentId, button, active);
   },
 
   toggleManual(componentId) {

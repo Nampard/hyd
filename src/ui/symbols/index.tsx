@@ -13,6 +13,8 @@ export interface SymbolRuntime {
   motorAngle?: number;
   /** 릴리프 밸브가 릴리빙 중 (솔버 판정) */
   reliefActive?: boolean;
+  /** MPS 스테이션 상태 (Phase 14 — 장비 뷰 스프라이트용) */
+  mps?: import("../../core/sim/mps-station").MpsStationState;
 }
 
 export interface SymbolProps {
@@ -1113,6 +1115,66 @@ function Supply0V(_: SymbolProps): ReactElement {
   );
 }
 
+/**
+ * MPS 스테이션 단자대 블록 (Phase 14). 회로도 뷰 표기 — 작동·애니메이션은
+ * 장비 뷰가 담당한다. 단자 번호는 실제 어드레스의 마지막 자리:
+ * 입력 P00000~F(16진), 출력 P00010~19.
+ */
+function MpsStationBlock(_: SymbolProps): ReactElement {
+  const inputs = "0123456789ABCDEF".split("");
+  const outputs = ["10", "11", "12", "13", "14", "15", "16", "17", "18", "19"];
+  const inW = 16;
+  const inX0 = -(inputs.length * inW) / 2;
+  const outW = 24;
+  const outX0 = -(outputs.length * outW) / 2;
+  return (
+    <g>
+      <rect x={-140} y={-85} width={280} height={170} rx={4} {...S} />
+      <text x={-132} y={-68} fontSize={13} fontWeight={700} fill="currentColor" stroke="none">
+        MPS 스테이션
+      </text>
+      <text x={-132} y={-53} fontSize={9} fill="currentColor" stroke="none" opacity={0.75}>
+        자동화설비 기능사 — 배선 대신 PLC I/O 매핑(채널)으로 연결
+      </text>
+
+      {/* 입력 단자대 P00000~F */}
+      <text x={-132} y={-30} fontSize={9} fontWeight={700} fill="currentColor" stroke="none">
+        입력 P00000~F
+      </text>
+      {inputs.map((label, i) => (
+        <g key={label} transform={`translate(${inX0 + i * inW}, -24)`}>
+          <rect x={1} y={0} width={inW - 2} height={14} {...Sthin} />
+          <text x={inW / 2} y={10} fontSize={8} textAnchor="middle" fill="currentColor" stroke="none">
+            {label}
+          </text>
+        </g>
+      ))}
+      <text x={-132} y={4} fontSize={8} fill="currentColor" stroke="none" opacity={0.75}>
+        PB1~4 · A후/전센 · B후/전센 · C후/전센 · D후/전센 · 매거진 · 포토 · 용량형 · 유도형
+      </text>
+
+      {/* 출력 단자대 P00010~19 */}
+      <text x={-132} y={24} fontSize={9} fontWeight={700} fill="currentColor" stroke="none">
+        출력 P00010~19
+      </text>
+      {outputs.map((label, i) => (
+        <g key={label} transform={`translate(${outX0 + i * outW}, 30)`}>
+          <rect x={1} y={0} width={outW - 2} height={14} {...Sthin} />
+          <text x={outW / 2} y={10} fontSize={8} textAnchor="middle" fill="currentColor" stroke="none">
+            {label}
+          </text>
+        </g>
+      ))}
+      <text x={-132} y={60} fontSize={8} fill="currentColor" stroke="none" opacity={0.75}>
+        A전솔 · A후솔 · B전솔 · C전솔 · D전솔 · 드릴모터 · 컨베이어 · 적램 · 황램 · 녹램
+      </text>
+      <text x={-132} y={76} fontSize={8} fill="currentColor" stroke="none" opacity={0.6}>
+        장비 뷰에서 동작 확인 · 매거진 물품은 속성에서 설정
+      </text>
+    </g>
+  );
+}
+
 const symbolRegistry: Record<string, SymbolComponent> = {
   "pneu.source": PneumaticSource,
   "pneu.service-unit": ServiceUnit,
@@ -1160,6 +1222,7 @@ const symbolRegistry: Record<string, SymbolComponent> = {
   "elec.solenoid": ElecSolenoid,
   "elec.lamp": ElecLamp,
   "elec.buzzer": ElecBuzzer,
+  "auto.mps-station": MpsStationBlock,
 };
 
 export function getSymbol(symbolId: string): SymbolComponent {
