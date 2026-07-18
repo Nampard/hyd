@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { registerLibraries } from "../../library";
 import {
   createMpsState,
   mpsInputs,
@@ -14,6 +15,10 @@ import {
  * PLC 없이 출력 채널을 스크립트로 구동해, 설비가 "물리만" 올바르게
  * 시뮬레이션하는지 검증한다 (래더 연동 골든 테스트는 Phase 14-5).
  */
+
+beforeAll(() => {
+  registerLibraries();
+});
 
 const DT = 0.02;
 
@@ -173,12 +178,10 @@ describe("램프·드릴 (시각 상태)", () => {
 
 describe("Phase 14-3: 엔진 ioMap 채널 연동 (PLC ↔ 스테이션)", () => {
   it("PB1 입력 채널 → 래더 → 녹램 출력 채널이 한 틱 안에 연결된다", async () => {
-    const { registerLibraries } = await import("../../library");
     const { createEmptyDocument } = await import("../../model/types");
     const { addComponent } = await import("../../model/operations");
     const { rungOf, lc } = await import("../../examples");
     const { SimulationEngine } = await import("../engine");
-    registerLibraries();
 
     let doc = createEmptyDocument("MPS 채널 연동");
     const st = addComponent(doc, "auto.mps-station", { x: 300, y: 300 });
@@ -221,5 +224,36 @@ describe("Phase 14-3: 엔진 ioMap 채널 연동 (PLC ↔ 스테이션)", () => 
     engine.tick(0.02);
     snap = engine.snapshot();
     expect(snap.components[stationId].mps?.lamps.green).toBe(false);
+  });
+});
+
+describe("골든 시나리오: MPS 기본동작 (예제 19)", () => {
+  async function runExample(workpieces: string) {
+    const { getExample } = await import("../../examples");
+    const { SimulationEngine } = await import("../engine");
+    const doc = getExample("mps-basic")!.build();
+    const station = doc.components.find((c) => c.type === "auto.mps-station")!;
+    station.properties.workpieces = workpieces;
+    const engine = new SimulationEngine(doc);
+    // PB2 눌러 기동 (0.1s 유지 — M11 자기유지)
+    engine.setMpsButton(station.id, 1, true);
+    for (let i = 0; i < 5; i++) engine.tick(0.02);
+    engine.setMpsButton(station.id, 1, false);
+    for (let i = 0; i < Math.round(12 / 0.02); i++) engine.tick(0.02);
+    return engine.snapshot().components[station.id].mps!;
+  }
+
+  it("금속: A공급 → 판별 → 가공 → 이송 → D실린더가 배출박스로 분류한다", async () => {
+    const mps = await runExample("금");
+    expect(mps.eject).toEqual(["metal"]);
+    expect(mps.store).toHaveLength(0);
+    expect(mps.belt).toHaveLength(0);
+  });
+
+  it("비금속: D 미작동 — 컨베이어 끝 저장박스로 분류한다", async () => {
+    const mps = await runExample("비");
+    expect(mps.store).toEqual(["nonmetal"]);
+    expect(mps.eject).toHaveLength(0);
+    expect(mps.belt).toHaveLength(0);
   });
 });

@@ -96,7 +96,7 @@ function buildCircuit(title: string, description: string, build: (b: Builder) =>
   };
 }
 
-export type ExampleCategory = "공압 기초" | "전기공압" | "유압" | "PLC" | "자격증 유형";
+export type ExampleCategory = "공압 기초" | "전기공압" | "유압" | "PLC" | "자격증 유형" | "자동화설비";
 
 export interface ExampleEntry {
   id: string;
@@ -584,7 +584,7 @@ export const examples: ExampleEntry[] = [
   {
     id: "plc-self-holding",
     category: "PLC",
-    name: "15. PLC — 자기유지 (XG5000 스타일)",
+    name: "15. PLC — 자기유지",
     build: () =>
       buildCircuit(
         "PLC 자기유지",
@@ -726,6 +726,100 @@ export const examples: ExampleEntry[] = [
           b.connect(sup24, "P", ps, "T");
           b.connect(ps, "B", lampL, "T");
           b.connect(lampL, "B", sup0, "P");
+        },
+      ),
+  },
+  {
+    id: "mps-basic",
+    category: "자동화설비",
+    name: "19. MPS 기본동작 — 공급·가공·분류",
+    build: () =>
+      buildCircuit(
+        "MPS 기본동작",
+        "PB2로 기동: A(공급) → 재질 판별(용량형/유도형) → B+드릴(가공) → C(이송) → 컨베이어 → 금속은 D실린더가 배출박스로, 비금속은 끝까지 가서 저장박스로. 장비 뷰에서 동작 확인. (실기 T0019=3.5s를 시뮬레이터 컨베이어 속도에 맞춰 5.1s로 조정)",
+        (b) => {
+          const st = b.place("auto.mps-station", 450, 260, { workpieces: "금,비" });
+          /**
+           * 자기유지 스텝 렁: coilDev = (c1 & c2[& c3...] | coilDev).
+           * 아래 행은 유지 접점 뒤를 hline으로 채워 기동 조건 전체와 병렬이 되게 한다
+           * (재합류 vlink가 c=contacts.length에 있으므로 그 앞까지 도통 필요)
+           */
+          const step = (contacts: [string, "no" | "nc"][], coilDev: string) =>
+            rungOf(
+              [
+                [...contacts.map(([d, k]) => lc(k, d)), lc("coil", coilDev)],
+                [
+                  lc("no", coilDev),
+                  ...Array.from({ length: contacts.length - 1 }, () => lc("hline")),
+                ],
+              ],
+              [
+                { r: 0, c: 0 },
+                { r: 0, c: contacts.length },
+              ],
+            );
+          b.setPlc(
+            {
+              rungs: [
+                // --- 입력부: 스텝 체인 M11~M17 (수업자료 기본동작) ---
+                step([["P0000C", "no"], ["P00001", "no"]], "M11"), // 매거진 & PB2
+                step([["P00005", "no"], ["M11", "no"]], "M12"), // A전센
+                step([["P00004", "no"], ["M12", "no"]], "M13"), // A후센
+                step([["P00007", "no"], ["M13", "no"]], "M14"), // B전센
+                step([["P00006", "no"], ["M14", "no"]], "M15"), // B후센
+                step([["P00009", "no"], ["M15", "no"]], "M16"), // C전센
+                step([["P00008", "no"], ["M16", "no"]], "M17"), // C후센
+                rungOf([[lc("no", "M17"), lc("ton", "T0018", 8)]]), // 컨베이어 구간
+                // --- 판별: 금속 M100 / 비금속 M101 ---
+                step([["P0000E", "no"], ["P0000F", "no"], ["M11", "no"]], "M100"),
+                step(
+                  [["P0000E", "no"], ["P0000F", "nc"], ["M11", "no"], ["M100", "nc"]],
+                  "M101",
+                ),
+                rungOf([[lc("no", "M100"), lc("ton", "T0019", 5.1)]]), // 금속 → D 지연
+                step([["P0000B", "no"], ["T0019", "no"]], "M20"), // D전센
+                step([["P0000A", "no"], ["M20", "no"]], "M21"), // D후센
+                // --- 출력부 ---
+                rungOf([[lc("no", "M11"), lc("nc", "M12"), lc("coil", "P00010")]]), // A전솔
+                rungOf([[lc("no", "M12"), lc("coil", "P00011")]]), // A후솔
+                rungOf([[lc("no", "M13"), lc("nc", "M14"), lc("coil", "P00012")]]), // B전솔
+                rungOf([[lc("no", "M15"), lc("nc", "M16"), lc("coil", "P00013")]]), // C전솔
+                rungOf([[lc("no", "T0019"), lc("nc", "M20"), lc("coil", "P00014")]]), // D전솔
+                rungOf([[lc("no", "M12"), lc("nc", "M15"), lc("coil", "P00015")]]), // 드릴모터
+                rungOf([[lc("no", "M17"), lc("nc", "T0018"), lc("coil", "P00016")]]), // 컨베이어
+                rungOf([[lc("no", "P0000C"), lc("coil", "P00019")]]), // 녹램 = 매거진
+              ],
+            },
+            [
+              // 수업자료 I/O 맵 20점 전체 (기본동작 미사용 채널 포함 — 실기 결선 감각)
+              { device: "P00000", direction: "input", componentId: st, channel: "PB1" },
+              { device: "P00001", direction: "input", componentId: st, channel: "PB2" },
+              { device: "P00002", direction: "input", componentId: st, channel: "PB3" },
+              { device: "P00003", direction: "input", componentId: st, channel: "PB4" },
+              { device: "P00004", direction: "input", componentId: st, channel: "A후센" },
+              { device: "P00005", direction: "input", componentId: st, channel: "A전센" },
+              { device: "P00006", direction: "input", componentId: st, channel: "B후센" },
+              { device: "P00007", direction: "input", componentId: st, channel: "B전센" },
+              { device: "P00008", direction: "input", componentId: st, channel: "C후센" },
+              { device: "P00009", direction: "input", componentId: st, channel: "C전센" },
+              { device: "P0000A", direction: "input", componentId: st, channel: "D후센" },
+              { device: "P0000B", direction: "input", componentId: st, channel: "D전센" },
+              { device: "P0000C", direction: "input", componentId: st, channel: "매거진" },
+              { device: "P0000D", direction: "input", componentId: st, channel: "포토" },
+              { device: "P0000E", direction: "input", componentId: st, channel: "용량형" },
+              { device: "P0000F", direction: "input", componentId: st, channel: "유도형" },
+              { device: "P00010", direction: "output", componentId: st, channel: "A전솔" },
+              { device: "P00011", direction: "output", componentId: st, channel: "A후솔" },
+              { device: "P00012", direction: "output", componentId: st, channel: "B전솔" },
+              { device: "P00013", direction: "output", componentId: st, channel: "C전솔" },
+              { device: "P00014", direction: "output", componentId: st, channel: "D전솔" },
+              { device: "P00015", direction: "output", componentId: st, channel: "드릴모터" },
+              { device: "P00016", direction: "output", componentId: st, channel: "컨베이어" },
+              { device: "P00017", direction: "output", componentId: st, channel: "적램" },
+              { device: "P00018", direction: "output", componentId: st, channel: "황램" },
+              { device: "P00019", direction: "output", componentId: st, channel: "녹램" },
+            ],
+          );
         },
       ),
   },

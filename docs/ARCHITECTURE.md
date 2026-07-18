@@ -24,7 +24,7 @@ src/
       schema.ts          # JSON 직렬화·파싱·경계 검증·버전 마이그레이션
     library/             # 부품 정의 (데이터 주도)
       types.ts           # ComponentDefinition, Behavior, PropertyField
-      pneumatic/ hydraulic/ electric/   # 도메인별 부품 정의
+      pneumatic/ hydraulic/ electric/ automation/   # 도메인별 부품 정의 (automation: MPS 스테이션, Phase 14)
       registry.ts        # 타입 ID → ComponentDefinition 레지스트리
     sim/
       engine.ts          # 고정 틱 루프, 밸브 전환·실린더/모터 적분, 디바이스 상태
@@ -33,6 +33,7 @@ src/
       step-controller.ts # 구분동작 실행 — 동작 경계·사이클 완료 감지 (Phase 11)
       recorder.ts        # 변위단계선도용 실린더 위치 기록
       validate.ts        # 실행 전 검증 (경고)
+      mps-station.ts     # MPS 스테이션 물리 상태기계 + 채널 상수 (Phase 14)
       types.ts           # SimulationSnapshot, ComponentRuntime
     plc/
       model.ts           # LadderRung, LadderCell(접점/코일/TON/TOFF/CTU/CTD), vlink

@@ -58,7 +58,7 @@ const ko = {
   learningActivityStale: "⚠ 회로가 바뀌어 설명이 현재 구성과 다를 수 있습니다. [자동 작성]으로 갱신할 수 있어요.",
   emptyHint1: "왼쪽 [부품]에서 기호를 골라 도면을 클릭하면 배치됩니다.",
   emptyHint2: "포트(○)끼리 클릭해 이으면 배선이 되고, [▶ 실행]으로 동작을 확인합니다.",
-  emptyHint3: "처음이라면 상단 [예제 열기…]에서 18가지 예제를 불러와 참고하세요.",
+  emptyHint3: "처음이라면 상단 [예제 열기…]에서 19가지 예제를 불러와 참고하세요.",
   emptyNotice1:
     "교육용 논리/상태 시뮬레이션입니다 — 수치를 정밀 계산하지 않으므로 실제 설비 선정·압력 설정·안전 검증에 사용하지 마세요.",
   emptyNotice2:
@@ -118,7 +118,7 @@ const en: Record<keyof typeof ko, string> = {
   learningActivityStale: "⚠ The circuit changed, so this description may not match. Use [Auto-fill] to refresh it.",
   emptyHint1: "Pick a symbol from [Parts] on the left, then click the canvas to place it.",
   emptyHint2: "Click port to port (○) to wire them up, then press [▶ Run] to see it work.",
-  emptyHint3: "New here? Load one of the 18 examples from [Open example…] above.",
+  emptyHint3: "New here? Load one of the 19 examples from [Open example…] above.",
   emptyNotice1:
     "Educational logic/state simulation — values are not precisely computed, so never use it to select real equipment, set pressures, or validate safety.",
   emptyNotice2:
