@@ -186,3 +186,64 @@ describe("M10: 같은 방향 일직선 포트 라우팅", () => {
     },
   );
 });
+
+describe("스키마 v4: ioMap channel (Phase 14)", () => {
+  /** 접점 부품이 있는 문서 — ioMap 입력 항목의 role 검사(elec-contact)를 통과시키기 위함 */
+  function docWithButton() {
+    let doc = createEmptyDocument("v4 테스트");
+    const btn = addComponent(doc, "elec.pushbutton", { x: 100, y: 100 });
+    doc = btn.doc;
+    return { doc, btnId: btn.component.id };
+  }
+
+  it("v3 문서는 v4로 마이그레이션되어 로드된다", () => {
+    const { doc } = docWithButton();
+    const v3 = { ...doc, schemaVersion: 3 };
+    const result = parseDocument(JSON.stringify(v3));
+    expect(result.ok).toBe(true);
+    expect(result.document?.schemaVersion).toBe(4);
+  });
+
+  it("channel이 있는 ioMap 항목이 저장·재열기에서 보존된다", () => {
+    const { doc, btnId } = docWithButton();
+    const withChannel = {
+      ...doc,
+      ioMap: [{ device: "P0", direction: "input" as const, componentId: btnId, channel: "PB1" }],
+    };
+    const result = parseDocument(serializeDocument(withChannel));
+    expect(result.ok).toBe(true);
+    expect(result.document?.ioMap?.[0].channel).toBe("PB1");
+  });
+
+  it.each([
+    ["숫자", 7],
+    ["빈 문자열", ""],
+    ["33자 초과", "x".repeat(33)],
+  ])("잘못된 channel(%s)을 거부한다", (_label, channel) => {
+    const { doc, btnId } = docWithButton();
+    const broken = {
+      ...doc,
+      ioMap: [{ device: "P0", direction: "input", componentId: btnId, channel }],
+    };
+    const result = parseDocument(JSON.stringify(broken));
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("채널");
+  });
+
+  it("ioMap 항목의 미등록 키는 재조립에서 제거된다", () => {
+    const { doc, btnId } = docWithButton();
+    const withExtra = {
+      ...doc,
+      ioMap: [
+        { device: "P0", direction: "input", componentId: btnId, hack: "주입", channel: "PB1" },
+      ],
+    };
+    const result = parseDocument(JSON.stringify(withExtra));
+    expect(result.ok).toBe(true);
+    const entry = result.document?.ioMap?.[0] as unknown as Record<string, unknown>;
+    expect(entry.channel).toBe("PB1");
+    expect("hack" in entry).toBe(false);
+    // 직렬화에도 새어 나가지 않는다
+    expect(serializeDocument(result.document!)).not.toContain("주입");
+  });
+});

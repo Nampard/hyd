@@ -55,6 +55,11 @@ export interface IoEntry {
   device: string; // "P0" | "P20" ...
   direction: "input" | "output";
   componentId: string;
+  /**
+   * 다채널 부품(Phase 14 MPS 스테이션처럼 한 부품에 I/O가 여러 점 물리는 경우)의
+   * 채널 이름 (예: "A전솔", "매거진센서"). 단채널 부품은 생략 (v4, 선택 필드).
+   */
+  channel?: string;
 }
 
 let rungCounter = 0;

@@ -98,7 +98,19 @@ function reconstructDocument(doc: Record<string, unknown>): CircuitDocument {
     wires: doc.wires as CircuitDocument["wires"],
   };
   if (doc.plcProgram !== undefined) result.plcProgram = doc.plcProgram as CircuitDocument["plcProgram"];
-  if (doc.ioMap !== undefined) result.ioMap = doc.ioMap as CircuitDocument["ioMap"];
+  if (doc.ioMap !== undefined) {
+    // 항목 단위로 알려진 키만 추려 재조립 — 항목 안의 미등록 키가 저장 파일로
+    // 새어 나가지 않게 한다 (meta 키 재조립과 같은 원칙, v4에서 강화)
+    result.ioMap = (doc.ioMap as Record<string, unknown>[]).map((entry) => {
+      const clean: NonNullable<CircuitDocument["ioMap"]>[number] = {
+        device: entry.device as string,
+        direction: entry.direction as "input" | "output",
+        componentId: entry.componentId as string,
+      };
+      if (typeof entry.channel === "string") clean.channel = entry.channel;
+      return clean;
+    });
+  }
   if (doc.equipmentLayout !== undefined) {
     result.equipmentLayout = doc.equipmentLayout as CircuitDocument["equipmentLayout"];
   }
@@ -271,6 +283,17 @@ function validateShape(doc: Record<string, unknown>): string | null {
       ) {
         return "ioMap 항목 형식이 잘못되었습니다.";
       }
+      // channel(v4): 다채널 부품의 채널 이름 — 형태 검증. 채널 의미(어떤 role이
+      // 어떤 채널을 갖는가)는 다채널 role 도입 시(Phase 14-3) 함께 검증한다
+      if (entry.channel !== undefined) {
+        if (
+          typeof entry.channel !== "string" ||
+          entry.channel === "" ||
+          entry.channel.length > 32
+        ) {
+          return `ioMap 채널 이름이 잘못되었습니다: ${entry.device}`;
+        }
+      }
       if (entry.componentId !== "" && !componentIds.has(entry.componentId)) {
         return `ioMap이 존재하지 않는 부품을 참조합니다: ${entry.device}`;
       }
@@ -371,6 +394,7 @@ function migrate(obj: Record<string, unknown>): Record<string, unknown> {
   let doc = obj;
   if (version < 2) doc = migrateV1toV2(doc);
   if (version < 3) doc = migrateV2toV3(doc);
+  if (version < 4) doc = migrateV3toV4(doc);
   doc.schemaVersion = CURRENT_SCHEMA_VERSION;
   return doc;
 }
@@ -388,5 +412,14 @@ function migrateV1toV2(doc: Record<string, unknown>): Record<string, unknown> {
  * 채워 넣는다. 여기서는 버전 표기만 올린다.
  */
 function migrateV2toV3(doc: Record<string, unknown>): Record<string, unknown> {
+  return doc;
+}
+
+/**
+ * v4: ioMap 항목에 channel(다채널 부품의 디바이스↔채널 매핑) 선택 필드 도입
+ * (Phase 14 MPS 스테이션). 필드가 optional이라 v3 문서는 그대로 유효 —
+ * 버전 표기만 올린다.
+ */
+function migrateV3toV4(doc: Record<string, unknown>): Record<string, unknown> {
   return doc;
 }

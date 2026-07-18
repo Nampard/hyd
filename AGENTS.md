@@ -1,7 +1,7 @@
 # HYD — 공압·유압·전기·PLC 교육용 웹 시뮬레이터
 
 특성화고 수업·자격증(공유압기능사) 대비용 회로 작도 + 시뮬레이션 웹앱.
-페이즈 0~13 완료, Phase 14(자동화설비 기능사 MPS 스테이션) 계획 확정 — ROADMAP 참고. 문서 스키마는 v3 (learningActivity, Phase 12).
+페이즈 0~13 완료, Phase 14(자동화설비 기능사 MPS 스테이션) 계획 확정 — ROADMAP 참고. 문서 스키마는 v4 (ioMap channel, Phase 14-1).
 
 `npm run dev`(5173) / `npm test` / `npm run build`. 브라우저 자동 검증 시 예제 로드는 `.example-select`에 값 설정 후 change 이벤트, `window.confirm` 우회 필요.
 

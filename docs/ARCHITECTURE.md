@@ -59,13 +59,13 @@ src/
 
 ```ts
 interface CircuitDocument {
-  schemaVersion: number;             // 현재 v3
+  schemaVersion: number;             // 현재 v4
   // learningActivity: 학습 활동 설명 (Phase 12) — 저장 시 자동 초안/수정 가능
   meta: { title: string; description?: string; createdAt: string; learningActivity?: string };
   components: ComponentInstance[];   // 모든 도메인의 부품이 한 문서에 공존
   wires: Wire[];                     // 포트-포트 연결 (kind가 같아야 유효)
   plcProgram?: LadderProgram;        // 렁 목록 + 디바이스 사용 정보
-  ioMap?: IoMapping[];               // P 디바이스 ↔ 부품 포트/속성 매핑
+  ioMap?: IoEntry[];                 // P 디바이스 ↔ 부품 매핑 (+channel: 다채널 부품용, v4/Phase 14)
   equipmentLayout?: Record<string, Point>; // 장비 뷰 자유 배치 좌표 (Phase 8 / v2)
 }
 // 저장 경로(파일·브라우저)는 parseDocument로 열고 prepareDocumentForPersistence로 저장한다.
