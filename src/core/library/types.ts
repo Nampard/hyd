@@ -145,6 +145,20 @@ export type Behavior =
    */
   | { role: "mps-station" };
 
+/**
+ * 다채널 부품(복합설비)의 I/O 채널 정의 (Phase 14). 한 부품에 PLC I/O가 여러 점
+ * 물리는 경우, 채널 목록을 정의 메타데이터로 선언한다. schema 검증·PLC UI·엔진은
+ * 이 메타데이터만 조회하고, 실제 물리는 core/sim의 EquipmentAdapter가 담당한다
+ * (부품 type 하드코딩 없이 데이터 주도 확장 — codex-review-phase-14 P1-6).
+ */
+export interface IoChannelDef {
+  /** 채널 이름 (ioMap.channel 값과 매칭) */
+  id: string;
+  direction: "input" | "output";
+  /** 표시용 라벨 (없으면 id 사용) */
+  label?: string;
+}
+
 export interface ComponentDefinition {
   type: string;
   domain: Domain;
@@ -160,6 +174,8 @@ export interface ComponentDefinition {
   behavior?: Behavior;
   /** 로컬 좌표 기준 기호 바운딩 박스 (선택 표시·히트 영역) */
   bounds: Bounds;
+  /** 다채널 부품의 PLC I/O 채널 목록 (복합설비 — Phase 14). 단채널 부품은 생략 */
+  ioChannels?: IoChannelDef[];
 }
 
 /** propertySchema의 default 값들로 초기 properties 객체 생성 */

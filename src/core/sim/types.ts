@@ -21,8 +21,11 @@ export interface ComponentRuntime {
   motorAngle?: number;
   /** 릴리프 밸브가 릴리빙 중 (솔버가 판정, 기호 표시용) */
   reliefActive?: boolean;
-  /** MPS 스테이션 상태 (Phase 14 — 워크피스 흐름·실린더·램프) */
-  mps?: import("./mps-station").MpsStationState;
+  /**
+   * 복합설비(EquipmentAdapter) 상태 — 어댑터가 소유하는 불투명 값 (Phase 14).
+   * 엔진은 형태를 모른 채 보관·전달하고, 해당 스프라이트만 자신의 타입으로 읽는다.
+   */
+  equipment?: unknown;
 }
 
 /** UI가 구독하는 스냅숏 (불변 평면 객체) */
@@ -41,8 +44,8 @@ export interface SimulationSnapshot {
       motorAngle?: number;
       /** 릴리프 밸브가 릴리빙 중 (솔버가 판정, 기호 표시용) */
       reliefActive?: boolean;
-      /** MPS 스테이션 상태 사본 (Phase 14 — 스프라이트 표시용) */
-      mps?: import("./mps-station").MpsStationState;
+      /** 복합설비 상태 사본 (Phase 14 — 스프라이트가 자신의 타입으로 캐스팅해 읽음) */
+      equipment?: unknown;
     }
   >;
   /**

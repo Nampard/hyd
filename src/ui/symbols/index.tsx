@@ -14,7 +14,8 @@ export interface SymbolRuntime {
   /** 릴리프 밸브가 릴리빙 중 (솔버 판정) */
   reliefActive?: boolean;
   /** MPS 스테이션 상태 (Phase 14 — 장비 뷰 스프라이트용) */
-  mps?: import("../../core/sim/mps-station").MpsStationState;
+  /** 복합설비(EquipmentAdapter) 상태 — 스프라이트가 자신의 타입으로 캐스팅해 읽음 (Phase 14) */
+  equipment?: unknown;
 }
 
 export interface SymbolProps {

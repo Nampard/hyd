@@ -254,21 +254,21 @@ describe("Phase 14-3: 엔진 ioMap 채널 연동 (PLC ↔ 스테이션)", () => 
     let snap = engine.tick(0.02);
     engine.tick(0.02); // 출력 반영 후 스테이션 물리 1틱 더
     snap = engine.snapshot();
-    expect(snap.components[stationId].mps?.lamps.green).toBe(false);
-    const offset1 = snap.components[stationId].mps?.beltOffset ?? 0;
+    expect((snap.components[stationId].equipment as MpsStationState | undefined)?.lamps.green).toBe(false);
+    const offset1 = (snap.components[stationId].equipment as MpsStationState | undefined)?.beltOffset ?? 0;
     expect(offset1).toBeGreaterThan(0); // 매거진 → 컨베이어 출력 → 벨트 진행
 
-    engine.setMpsButton(stationId, 0, true); // PB1 누름
+    engine.setDiscreteInput(stationId, "PB1", true); // PB1 누름
     engine.tick(0.02);
     engine.tick(0.02);
     snap = engine.snapshot();
-    expect(snap.components[stationId].mps?.lamps.green).toBe(true);
+    expect((snap.components[stationId].equipment as MpsStationState | undefined)?.lamps.green).toBe(true);
 
-    engine.setMpsButton(stationId, 0, false);
+    engine.setDiscreteInput(stationId, "PB1", false);
     engine.tick(0.02);
     engine.tick(0.02);
     snap = engine.snapshot();
-    expect(snap.components[stationId].mps?.lamps.green).toBe(false);
+    expect((snap.components[stationId].equipment as MpsStationState | undefined)?.lamps.green).toBe(false);
   });
 });
 
@@ -281,19 +281,19 @@ describe("골든 시나리오: MPS 자동운전 (예제 19 — 수업자료 슬�
     const station = doc.components.find((c) => c.type === "auto.mps-station")!;
     station.properties.workpieces = workpieces;
     const engine = new SimulationEngine(doc);
-    engine.setMpsButton(station.id, 1, true); // PB2 기동
+    engine.setDiscreteInput(station.id, "PB2", true); // PB2 기동
     for (let i = 0; i < 5; i++) engine.tick(0.02);
-    engine.setMpsButton(station.id, 1, false);
+    engine.setDiscreteInput(station.id, "PB2", false);
     const steps = Math.round(seconds / 0.02);
     for (let i = 0; i < steps; i++) {
       if (pb3At !== undefined) {
         const t = i * 0.02;
-        if (t >= pb3At && t < pb3At + 0.2) engine.setMpsButton(station.id, 2, true);
-        else engine.setMpsButton(station.id, 2, false);
+        if (t >= pb3At && t < pb3At + 0.2) engine.setDiscreteInput(station.id, "PB3", true);
+        else engine.setDiscreteInput(station.id, "PB3", false);
       }
       engine.tick(0.02);
     }
-    return { mps: engine.snapshot().components[station.id].mps!, engine, stationId: station.id };
+    return { mps: engine.snapshot().components[station.id].equipment as MpsStationState, engine, stationId: station.id };
   }
 
   it("금속: A공급 → 판별 → 가공 → 이송 → D실린더가 배출박스로 분류한다", async () => {
@@ -330,22 +330,22 @@ describe("골든 시나리오: MPS 자동운전 (예제 19 — 수업자료 슬�
     const doc = getExample("mps-basic")!.build();
     const station = doc.components.find((c) => c.type === "auto.mps-station")!;
     const engine = new SimulationEngine(doc);
-    engine.setMpsButton(station.id, 1, true);
+    engine.setDiscreteInput(station.id, "PB2", true);
     for (let i = 0; i < 5; i++) engine.tick(0.02);
-    engine.setMpsButton(station.id, 1, false);
+    engine.setDiscreteInput(station.id, "PB2", false);
     for (let i = 0; i < 50; i++) engine.tick(0.02); // 1.1s — 드릴 구간 진입
 
-    engine.setMpsButton(station.id, 3, true); // PB4 누름 = 일시정지
+    engine.setDiscreteInput(station.id, "PB4", true); // PB4 누름 = 일시정지
     for (let i = 0; i < 10; i++) engine.tick(0.02);
-    let snap = engine.snapshot().components[station.id];
-    expect(snap.mps?.lamps.red).toBe(true); // 적램 (점멸 위상 초반 ON)
-    const pausedB = snap.mps!.cyl.B;
+    let mps = engine.snapshot().components[station.id].equipment as MpsStationState;
+    expect(mps.lamps.red).toBe(true); // 적램 (점멸 위상 초반 ON)
+    const pausedB = mps.cyl.B;
 
     for (let i = 0; i < 25; i++) engine.tick(0.02); // 0.5s 더 정지 유지
-    snap = engine.snapshot().components[station.id];
-    expect(snap.mps!.cyl.B).toBeLessThanOrEqual(pausedB); // 전진 차단 (스프링 복귀만)
+    mps = engine.snapshot().components[station.id].equipment as MpsStationState;
+    expect(mps.cyl.B).toBeLessThanOrEqual(pausedB); // 전진 차단 (스프링 복귀만)
 
-    engine.setMpsButton(station.id, 3, false); // 뗌 → 음변환 → M26 초기화
+    engine.setDiscreteInput(station.id, "PB4", false); // 뗌 → 음변환 → M26 초기화
     for (let i = 0; i < 25; i++) engine.tick(0.02);
     const bits = engine.snapshot().plc?.bits ?? {};
     expect(bits.M00010 ?? false).toBe(false); // 기동 자기유지 해제
@@ -379,5 +379,31 @@ describe("예제 19 구조 계약 (codex-review-phase-14 P3)", () => {
     expect(parsed.ok).toBe(true);
     expect(parsed.document?.ioMap).toHaveLength(26);
     expect(parsed.document?.ioMap?.every((e) => e.componentId !== "")).toBe(true);
+  });
+});
+
+describe("P1-6: 다채널 capability 일반화 정합성", () => {
+  it("정의 메타데이터(ioChannels)와 상태기계 채널 목록이 일치한다", async () => {
+    const { getComponentDefinition } = await import("../../library/registry");
+    const { MPS_INPUT_CHANNELS, MPS_OUTPUT_CHANNELS } = await import("../mps-station");
+    const def = getComponentDefinition("auto.mps-station");
+    const inChans = def.ioChannels!.filter((c) => c.direction === "input").map((c) => c.id);
+    const outChans = def.ioChannels!.filter((c) => c.direction === "output").map((c) => c.id);
+    expect(inChans).toEqual([...MPS_INPUT_CHANNELS]);
+    expect(outChans).toEqual([...MPS_OUTPUT_CHANNELS]);
+  });
+
+  it("복합설비 어댑터가 부품 type으로 등록·조회된다", async () => {
+    const { getEquipmentAdapter } = await import("../equipment-adapter");
+    await import("../mps-station"); // 등록 side-effect
+    const adapter = getEquipmentAdapter("auto.mps-station");
+    expect(adapter).toBeDefined();
+    // create → setDiscreteInput("PB1") → readInputs가 반영
+    const s = adapter!.create({ workpieces: "금" });
+    expect(adapter!.readInputs(s).PB1).toBe(false);
+    adapter!.setDiscreteInput(s, "PB1", true);
+    expect(adapter!.readInputs(s).PB1).toBe(true);
+    // 알 수 없는 부품 type은 undefined
+    expect(getEquipmentAdapter("pneu.cylinder.double")).toBeUndefined();
   });
 });

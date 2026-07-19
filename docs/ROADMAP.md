@@ -370,6 +370,20 @@ I/O 26점 — 입력 16 + 출력 10 (수업자료 어드레스 그대로):
    교육용 논리/상태 시뮬레이션에서 개별 실린더 속도 조절은 학습 목표가
    아니며(제어 로직 학습이 핵심), 컨베이어·타이머 상수와의 정합만 유지하면
    충분하다는 판단. 필요 시 후속에서 propertySchema로 추가한다.
+9. **아키텍처 일반화 리팩터링** (14-9, codex-review-phase-14 P1-6/P2-8,
+   2026-07-19 인터뷰: 이번에 수행): 다채널 특례가 schema·engine·PLC UI·store에
+   `role === "mps-station"`으로 퍼져 있던 것을 정의 메타데이터 + adapter로 분리.
+   - `ComponentDefinition.ioChannels` 메타데이터 신설 → schema·PLC UI가 부품 type
+     하드코딩 없이 채널을 조회 (schema가 sim/mps-station을 역참조하던 계층 위반 제거)
+   - `EquipmentAdapter`(create/step/readInputs/snapshot/setDiscreteInput) 레지스트리
+     신설 → 엔진이 부품 type 분기 대신 어댑터로 물리 구동. 새 복합설비 = ioChannels
+     선언 + 어댑터 등록으로 끝(엔진 무수정). `runtime.mps` → 불투명 `runtime.equipment`
+   - `setMpsButton` → 범용 `setDiscreteInput(componentId, channel, active)`
+   - 모듈 분리: `validate-iomap.ts`(ioMap 검증), `examples/builder.ts`(조립 헬퍼)+
+     `examples/mps-example.ts`(예제 19), `equipment/MpsStationSprite.tsx`(장비 스프라이트),
+     `library/automation/channels.ts`(채널 단일 출처). 정의↔상태기계 채널 일치 테스트 추가.
+   - IoEntry 형태 유지 → schema v5 불필요. (PlcPanel의 IoMapEditor 컴포넌트 분리는
+     상태 결합이 커 이번 범위에서 제외 — 후순위)
 
 ## 후순위 후보 (미확정)
 

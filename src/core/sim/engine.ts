@@ -5,7 +5,8 @@ import type { ComponentRuntime, PressureState, SimulationSnapshot } from "./type
 import { solveFluid } from "./fluid-solver";
 import { solveElectric } from "./electric-solver";
 import { PlcRunner, type PlcMonitor } from "../plc/scanner";
-import { createMpsState, mpsInputs, stepMpsStation, type MpsOutputChannel } from "./mps-station";
+import { getEquipmentAdapter } from "./equipment-adapter";
+import "./mps-station"; // 부작용: MPS 어댑터 등록
 
 /** 릴레이·타이머·카운터 디바이스 상태 (이름표로 접점과 연결) */
 interface DeviceState {
@@ -61,8 +62,9 @@ export class SimulationEngine {
       if (behavior?.role === "cylinder") {
         runtime.cylinderPos = comp.properties.initialPosition === "extended" ? 1 : 0;
       }
-      if (behavior?.role === "mps-station") {
-        runtime.mps = createMpsState(comp.properties);
+      const adapter = getEquipmentAdapter(comp.type);
+      if (adapter) {
+        runtime.equipment = adapter.create(comp.properties);
       }
       if (behavior?.role === "motor") {
         runtime.motorAngle = 0;
@@ -124,10 +126,15 @@ export class SimulationEngine {
     return this.runtimes.get(componentId)?.manualActive ?? false;
   }
 
-  /** MPS 스테이션 조작 패널 푸시버튼 (PB1~PB4 = 0~3) 누름/뗌 (Phase 14) */
-  setMpsButton(componentId: string, button: 0 | 1 | 2 | 3, active: boolean): void {
-    const mps = this.runtimes.get(componentId)?.mps;
-    if (mps) mps.pb[button] = active;
+  /**
+   * 복합설비의 이산 수동 입력 (조작 패널 버튼 등)을 채널 이름으로 지정 (Phase 14).
+   * 예: 자동화설비 스테이션의 "PB1"~"PB4". 어댑터가 채널을 해석한다.
+   */
+  setDiscreteInput(componentId: string, channel: string, active: boolean): void {
+    const comp = this.doc.components.find((c) => c.id === componentId);
+    const runtime = this.runtimes.get(componentId);
+    if (!comp || !runtime?.equipment) return;
+    getEquipmentAdapter(comp.type)?.setDiscreteInput(runtime.equipment, channel, active);
   }
 
   tick(dt: number): SimulationSnapshot {
@@ -180,15 +187,15 @@ export class SimulationEngine {
       runtime.cylinderPos = clamp01((runtime.cylinderPos ?? 0) + velocity * dt);
     }
 
-    // 4.5 MPS 스테이션 물리 (Phase 14) — PLC가 강제한 출력 채널에 반응해
-    // 실린더·컨베이어·워크피스 흐름을 갱신. 유체·전기 솔브와 독립
+    // 4.5 복합설비 물리 (Phase 14) — PLC가 강제한 출력 채널에 반응해 어댑터가
+    // 실린더·컨베이어·워크피스 흐름을 갱신. 유체·전기 솔브와 독립 (부품 type 무하드코딩)
     for (const comp of this.doc.components) {
-      const behavior = getComponentDefinition(comp.type).behavior;
-      if (behavior?.role !== "mps-station") continue;
-      const mps = this.runtimes.get(comp.id)!.mps;
-      if (!mps) continue;
+      const runtime = this.runtimes.get(comp.id)!;
+      if (runtime.equipment === undefined) continue;
+      const adapter = getEquipmentAdapter(comp.type);
+      if (!adapter) continue;
       const forced = this.plcForcedChannels.get(comp.id);
-      stepMpsStation(mps, (ch: MpsOutputChannel) => forced?.get(ch) ?? false, dt);
+      adapter.step(runtime.equipment, (ch) => forced?.get(ch) ?? false, dt);
     }
 
     // 5. 모터 적분 (A 가압·B 배출 → 정회전, 반대 → 역회전)
@@ -364,16 +371,18 @@ export class SimulationEngine {
     const ioMap = this.doc.ioMap ?? [];
 
     const inputs = new Map<string, boolean>();
-    // 다채널 부품(MPS 스테이션)의 센서 이미지는 부품당 1회만 계산
-    const mpsImageCache = new Map<string, Record<string, boolean>>();
+    // 복합설비의 센서 이미지(readInputs)는 부품당 1회만 계산해 캐시
+    const equipmentImageCache = new Map<string, Record<string, boolean>>();
     for (const entry of ioMap) {
       if (entry.direction !== "input") continue;
       const runtime = this.runtimes.get(entry.componentId);
-      if (entry.channel !== undefined && runtime?.mps) {
-        let image = mpsImageCache.get(entry.componentId);
+      if (entry.channel !== undefined && runtime?.equipment !== undefined) {
+        let image = equipmentImageCache.get(entry.componentId);
         if (!image) {
-          image = mpsInputs(runtime.mps);
-          mpsImageCache.set(entry.componentId, image);
+          const comp = this.doc.components.find((c) => c.id === entry.componentId);
+          const adapter = comp ? getEquipmentAdapter(comp.type) : undefined;
+          image = adapter ? adapter.readInputs(runtime.equipment) : {};
+          equipmentImageCache.set(entry.componentId, image);
         }
         inputs.set(entry.device, image[entry.channel] ?? false);
       } else {
@@ -526,6 +535,12 @@ export class SimulationEngine {
   snapshot(): SimulationSnapshot {
     const components: SimulationSnapshot["components"] = {};
     for (const [id, runtime] of this.runtimes) {
+      let equipment: unknown;
+      if (runtime.equipment !== undefined) {
+        const comp = this.doc.components.find((c) => c.id === id);
+        const adapter = comp ? getEquipmentAdapter(comp.type) : undefined;
+        equipment = adapter ? adapter.snapshot(runtime.equipment) : undefined;
+      }
       components[id] = {
         valvePosition: runtime.valvePosition,
         cylinderPos: runtime.cylinderPos,
@@ -536,18 +551,7 @@ export class SimulationEngine {
         portLevel: runtime.portLevel ? { ...runtime.portLevel } : undefined,
         motorAngle: runtime.motorAngle,
         reliefActive: runtime.reliefActive,
-        mps: runtime.mps
-          ? {
-              ...runtime.mps,
-              magazine: [...runtime.mps.magazine],
-              belt: runtime.mps.belt.map((p) => ({ ...p })),
-              store: [...runtime.mps.store],
-              eject: [...runtime.mps.eject],
-              cyl: { ...runtime.mps.cyl },
-              pb: [...runtime.mps.pb] as [boolean, boolean, boolean, boolean],
-              lamps: { ...runtime.mps.lamps },
-            }
-          : undefined,
+        equipment,
       };
     }
     const wires: Record<string, PressureState> = {};

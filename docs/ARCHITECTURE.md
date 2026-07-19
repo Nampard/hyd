@@ -98,10 +98,11 @@ interface ComponentDefinition {
 ```
 
 새 부품 추가 = 정의 객체 + 기호 SVG 추가로 끝나야 한다. 솔버에 부품별 분기를 넣지 않는다.
-예외: `automation` 도메인의 자동화설비 스테이션(Phase 14)은 다채널 I/O를 갖는 복합
-장비라 엔진·PLC·UI에 MPS 전용 분기가 있다. 이 특례를 정의 메타데이터(`ioChannels`) +
-복합설비 adapter로 일반화하는 리팩터링은 ROADMAP 후순위 후보에 등재되어 있다
-(codex-review-phase-14 P1-6).
+복합설비(다채널 I/O)도 같은 원칙을 따른다: `ComponentDefinition.ioChannels`에 채널을
+선언하고 `core/sim/equipment-adapter.ts`의 `EquipmentAdapter`(create/step/readInputs/
+snapshot/setDiscreteInput)를 부품 type에 등록하면, 엔진·schema·PLC UI는 부품 type을
+하드코딩하지 않고 정의 메타데이터·어댑터만 조회한다 (Phase 14-9, codex-review-phase-14
+P1-6). 예: `automation` 도메인의 자동화설비 스테이션(core/sim/mps-station.ts).
 
 ## 4. 시뮬레이션 엔진
 

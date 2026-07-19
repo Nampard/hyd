@@ -12,7 +12,8 @@ import type { Point } from "../../core/model/types";
 import { addPoints, rotatePoint, rotateDirection, snapPoint } from "../../core/geometry";
 import { computeOrthogonalRoute } from "../../core/routing";
 import { getSymbol } from "../symbols";
-import { getSprite, MpsStationSprite } from "./sprites";
+import { getSprite } from "./sprites";
+import { MpsStationSprite } from "./MpsStationSprite";
 import { useT } from "../i18n";
 
 /**
@@ -236,16 +237,16 @@ export function EquipmentView(): ReactElement {
                     strokeDasharray="4 3"
                   />
                 )}
-                {behavior?.role === "mps-station" ? (
-                  // MPS 스테이션: PB1~4 클릭 조작이 필요해 전용 스프라이트에
-                  // 버튼 콜백을 직접 연결한다 (실행 중에만)
+                {def.ioChannels ? (
+                  // 복합설비(자동화설비 스테이션 등): 조작 패널 이산 입력이 필요해
+                  // 전용 스프라이트에 채널 콜백을 연결한다 (실행 중에만)
                   <MpsStationSprite
                     properties={comp.properties}
                     runtime={runtime}
-                    onButton={
+                    onDiscreteInput={
                       simRunning
-                        ? (button, active) =>
-                            useSimStore.getState().setMpsButton(comp.id, button, active)
+                        ? (channel, active) =>
+                            useSimStore.getState().setDiscreteInput(comp.id, channel, active)
                         : undefined
                     }
                   />

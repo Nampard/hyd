@@ -15,7 +15,6 @@ import {
 } from "../../core/plc/model";
 import type { PlcMonitor } from "../../core/plc/scanner";
 import { getComponentDefinition } from "../../core/library/registry";
-import { MPS_INPUT_CHANNELS, MPS_OUTPUT_CHANNELS } from "../../core/sim/mps-station";
 
 /**
  * PLC 래더 편집·모니터링 패널 (교육용 단순화, XG5000 표기 관례 참고, Phase 13 연속 선도 렌더링).
@@ -589,20 +588,30 @@ export function PlcPanel(): ReactElement | null {
     }));
   };
 
-  // 매핑 가능한 부품 목록
-  // 다채널 부품(MPS 스테이션)은 입력·출력 양쪽 후보에 포함 (채널로 구분)
+  // 매핑 가능한 부품 목록 — 다채널 부품(ioChannels 있음)은 해당 방향 채널이 있으면
+  // 후보에 포함. 부품 type 하드코딩 없이 정의 메타데이터로 판정 (codex-review P1-6)
+  const hasChannel = (type: string, dir: "input" | "output"): boolean =>
+    !!getComponentDefinition(type).ioChannels?.some((ch) => ch.direction === dir);
   const inputCandidates = doc.components.filter((c) => {
     const role = getComponentDefinition(c.type).behavior?.role;
-    return role === "elec-contact" || role === "mps-station";
+    return role === "elec-contact" || hasChannel(c.type, "input");
   });
   const outputCandidates = doc.components.filter((c) => {
     const role = getComponentDefinition(c.type).behavior?.role;
-    return role === "elec-load" || role === "mps-station";
+    return role === "elec-load" || hasChannel(c.type, "output");
   });
-  const isStation = (id: string): boolean => {
+  /** 다채널 부품(ioChannels 보유) 여부 */
+  const isMultiChannel = (id: string): boolean => {
     const comp = doc.components.find((c) => c.id === id);
-    if (!comp) return false;
-    return getComponentDefinition(comp.type).behavior?.role === "mps-station";
+    return !!comp && !!getComponentDefinition(comp.type).ioChannels;
+  };
+  /** 부품·방향의 채널 이름 목록 (정의 메타데이터) */
+  const channelsFor = (id: string, dir: "input" | "output"): string[] => {
+    const comp = doc.components.find((c) => c.id === id);
+    if (!comp) return [];
+    return (getComponentDefinition(comp.type).ioChannels ?? [])
+      .filter((ch) => ch.direction === dir)
+      .map((ch) => ch.id);
   };
   const componentLabel = (id: string): string => {
     const comp = doc.components.find((c) => c.id === id);
@@ -776,15 +785,9 @@ export function PlcPanel(): ReactElement | null {
                     onChange={(e) => {
                       const direction = e.target.value as IoEntry["direction"];
                       const next = [...ioMap];
-                      // 스테이션 항목은 방향이 바뀌면 그 방향의 첫 채널로 재설정
-                      next[i] = isStation(entry.componentId)
-                        ? {
-                            ...entry,
-                            direction,
-                            channel: (direction === "input"
-                              ? MPS_INPUT_CHANNELS
-                              : MPS_OUTPUT_CHANNELS)[0],
-                          }
+                      // 다채널 부품 항목은 방향이 바뀌면 그 방향의 첫 채널로 재설정
+                      next[i] = isMultiChannel(entry.componentId)
+                        ? { ...entry, direction, channel: channelsFor(entry.componentId, direction)[0] }
                         : { ...entry, direction };
                       commitIoMap(next);
                     }}
@@ -800,16 +803,12 @@ export function PlcPanel(): ReactElement | null {
                     onChange={(e) => {
                       const componentId = e.target.value;
                       const next = [...ioMap];
-                      if (isStation(componentId)) {
-                        // 스테이션 선택 시 방향에 맞는 첫 채널을 기본값으로
+                      if (isMultiChannel(componentId)) {
+                        // 다채널 부품 선택 시 방향에 맞는 첫 채널을 기본값으로
                         next[i] = {
                           ...entry,
                           componentId,
-                          channel:
-                            entry.channel ??
-                            (entry.direction === "input"
-                              ? MPS_INPUT_CHANNELS
-                              : MPS_OUTPUT_CHANNELS)[0],
+                          channel: entry.channel ?? channelsFor(componentId, entry.direction)[0],
                         };
                       } else {
                         // 단채널 부품으로 바꾸면 채널 제거 (스키마 규칙)
@@ -828,7 +827,7 @@ export function PlcPanel(): ReactElement | null {
                   </select>
                 </td>
                 <td>
-                  {isStation(entry.componentId) ? (
+                  {isMultiChannel(entry.componentId) ? (
                     <select
                       value={entry.channel ?? ""}
                       disabled={running}
@@ -838,13 +837,11 @@ export function PlcPanel(): ReactElement | null {
                         commitIoMap(next);
                       }}
                     >
-                      {(entry.direction === "input" ? MPS_INPUT_CHANNELS : MPS_OUTPUT_CHANNELS).map(
-                        (ch) => (
-                          <option key={ch} value={ch}>
-                            {ch}
-                          </option>
-                        ),
-                      )}
+                      {channelsFor(entry.componentId, entry.direction).map((ch) => (
+                        <option key={ch} value={ch}>
+                          {ch}
+                        </option>
+                      ))}
                     </select>
                   ) : (
                     <span className="plc-iomap-nochannel">—</span>

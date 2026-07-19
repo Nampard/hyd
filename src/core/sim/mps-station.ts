@@ -10,46 +10,24 @@
  *
  * 논리/상태 기반(고정 결정): 이동·가공은 스텝/시간 근사, 정량 해석 없음.
  * React 무관 — Node에서 단독 테스트 가능해야 한다.
+ *
+ * 이 모듈은 EquipmentAdapter로 등록되어(파일 하단), 엔진이 부품 type 하드코딩 없이
+ * 물리를 구동한다 (codex-review-phase-14 P1-6).
  */
+import { registerEquipmentAdapter, type EquipmentAdapter } from "./equipment-adapter";
 
 export type WorkpieceMaterial = "metal" | "nonmetal";
 
-/** 입력 채널 16점 — 수업자료 I/O 맵의 변수명 그대로 */
-export const MPS_INPUT_CHANNELS = [
-  "PB1",
-  "PB2",
-  "PB3",
-  "PB4",
-  "A후센",
-  "A전센",
-  "B후센",
-  "B전센",
-  "C후센",
-  "C전센",
-  "D후센",
-  "D전센",
-  "매거진",
-  "포토",
-  "용량형",
-  "유도형",
-] as const;
-
-/** 출력 채널 10점 — 수업자료 I/O 맵의 변수명 그대로 */
-export const MPS_OUTPUT_CHANNELS = [
-  "A전솔",
-  "A후솔",
-  "B전솔",
-  "C전솔",
-  "D전솔",
-  "드릴모터",
-  "컨베이어",
-  "적램",
-  "황램",
-  "녹램",
-] as const;
-
-export type MpsInputChannel = (typeof MPS_INPUT_CHANNELS)[number];
-export type MpsOutputChannel = (typeof MPS_OUTPUT_CHANNELS)[number];
+// 채널 이름 목록은 라이브러리 정의 메타데이터(ioChannels)와 공유하는 단일 출처에서
+// 가져온다 (library/automation/channels — 리프 모듈, 순환 없음). 재-export로 기존
+// import 경로 유지.
+export {
+  MPS_INPUT_CHANNELS,
+  MPS_OUTPUT_CHANNELS,
+  type MpsInputChannel,
+  type MpsOutputChannel,
+} from "../library/automation/channels";
+import type { MpsOutputChannel, MpsInputChannel } from "../library/automation/channels";
 
 /** 실린더 전 행정 시간 (초) — 논리 근사용 고정값 */
 const STROKE_TIME = 0.5;
@@ -267,3 +245,35 @@ export function mpsInputs(state: MpsStationState): Record<MpsInputChannel, boole
     유도형: inDetect("metal"),
   };
 }
+
+/** 스냅숏용 깊은 사본 (엔진이 매 틱 UI에 넘기는 불변 복제) */
+export function cloneMpsState(s: MpsStationState): MpsStationState {
+  return {
+    ...s,
+    magazine: [...s.magazine],
+    belt: s.belt.map((p) => ({ ...p })),
+    store: [...s.store],
+    eject: [...s.eject],
+    cyl: { ...s.cyl },
+    pb: [...s.pb] as [boolean, boolean, boolean, boolean],
+    lamps: { ...s.lamps },
+  };
+}
+
+// ---------- 복합설비 어댑터 등록 (Phase 14 P1-6) ----------
+
+/** PB1~PB4 입력 채널을 조작 패널 버튼 인덱스로 매핑 */
+const PB_CHANNELS: MpsInputChannel[] = ["PB1", "PB2", "PB3", "PB4"];
+
+export const mpsStationAdapter: EquipmentAdapter<MpsStationState> = {
+  create: (properties) => createMpsState(properties),
+  step: (state, out, dt) => stepMpsStation(state, out as (ch: MpsOutputChannel) => boolean, dt),
+  readInputs: (state) => mpsInputs(state),
+  snapshot: (state) => cloneMpsState(state),
+  setDiscreteInput: (state, channel, active) => {
+    const i = PB_CHANNELS.indexOf(channel as MpsInputChannel);
+    if (i >= 0) state.pb[i] = active;
+  },
+};
+
+registerEquipmentAdapter("auto.mps-station", mpsStationAdapter);
