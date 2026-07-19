@@ -75,8 +75,12 @@ export function AutomationStationSprite({
     <g>
       {/* 베이스 플레이트 */}
       <rect x={-140} y={-85} width={280} height={170} rx={6} fill="#e2e8f0" stroke="#3c5164" strokeWidth={1.5} />
-      <text x={-134} y={-72} fontSize={9} fontWeight={700} fill="#1f2937" stroke="none">
-        자동화설비 스테이션
+      {/* 두 줄로 표기 — 한 줄이면 뒤쪽 B실린더 블록에 가려짐 (Festo 상표 리네임 후 글자 수 증가) */}
+      <text x={-136} y={-78} fontSize={8} fontWeight={700} fill="#1f2937" stroke="none">
+        자동화설비
+      </text>
+      <text x={-136} y={-69} fontSize={8} fontWeight={700} fill="#1f2937" stroke="none">
+        스테이션
       </text>
 
       {/* 조작 패널: PB1~4 (램프는 우측 독립 타워 — 배치도 참고) */}
