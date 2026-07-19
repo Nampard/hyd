@@ -253,6 +253,15 @@ function validateShape(doc: Record<string, unknown>): string | null {
           if (isOutputKind(cell.kind as LadderCellKind) && c !== LADDER_COLS - 1) {
             return `PLC 출력 요소는 마지막 열에만 놓을 수 있습니다: ${rung.id}`;
           }
+          // 특수릴레이(_T1S/_T2S)는 스캐너가 매 스캔 생성하는 읽기 전용 클록 —
+          // 출력 요소로 쓰면 사용자 기록값이 클록을 덮어 오동작한다 (codex-review P2-1)
+          if (
+            isOutputKind(cell.kind as LadderCellKind) &&
+            typeof cell.device === "string" &&
+            /^_T[12]S$/.test(cell.device)
+          ) {
+            return `PLC 특수릴레이(_T1S/_T2S)는 접점에서만 쓸 수 있습니다: ${rung.id}`;
+          }
         }
       }
       // vlinks: [{r, c}] — null 항목·범위 밖·마지막 행(아래 행 없음)은 거부 (review-2 P0)
@@ -280,6 +289,11 @@ function validateShape(doc: Record<string, unknown>): string | null {
     const compById = new Map(
       (doc.components as Record<string, unknown>[]).map((c) => [c.id as string, c]),
     );
+    // 유일성 계약 (codex-review P1-3): 같은 (방향,디바이스)와 같은
+    // (부품,방향,채널)이 두 번 나오면 스캔·매핑이 배열 순서에 의존해 결과가
+    // 뒤집힌다. 문서 경계에서 거부한다.
+    const seenDeviceDir = new Set<string>();
+    const seenTarget = new Set<string>();
     for (const entry of doc.ioMap) {
       if (
         !isRecord(entry) ||
@@ -304,6 +318,20 @@ function validateShape(doc: Record<string, unknown>): string | null {
       }
       if (entry.componentId !== "" && !componentIds.has(entry.componentId)) {
         return `ioMap이 존재하지 않는 부품을 참조합니다: ${entry.device}`;
+      }
+      // (방향, 디바이스) 유일 — 같은 P 주소를 같은 방향으로 두 번 매핑 금지
+      const deviceDirKey = `${entry.direction}:${entry.device}`;
+      if (seenDeviceDir.has(deviceDirKey)) {
+        return `ioMap에 같은 디바이스가 중복됩니다: ${entry.device} (${entry.direction})`;
+      }
+      seenDeviceDir.add(deviceDirKey);
+      // (부품, 방향, 채널) 유일 — 같은 채널을 두 디바이스가 겹쳐 매핑 금지
+      if (entry.componentId !== "") {
+        const targetKey = `${entry.componentId}:${entry.direction}:${entry.channel ?? ""}`;
+        if (seenTarget.has(targetKey)) {
+          return `ioMap에 같은 대상이 중복됩니다: ${entry.channel ?? entry.device} (${entry.direction})`;
+        }
+        seenTarget.add(targetKey);
       }
       // 방향↔부품 역할 적합성: 입력=접점, 출력=부하 (review-2 P0).
       // 다채널 부품(mps-station)은 channel 필수 + 채널 이름이 방향별 목록에 있어야

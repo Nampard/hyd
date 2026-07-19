@@ -356,3 +356,89 @@ describe("Phase 14-3: 16진 어드레스 + MPS 채널 의미 검증", () => {
     expect(result.error).toContain("다채널");
   });
 });
+
+describe("P1-3: ioMap 유일성 (중복 매핑 거부)", () => {
+  function docWithStation() {
+    let doc = createEmptyDocument("유일성");
+    const st = addComponent(doc, "auto.mps-station", { x: 300, y: 300 });
+    return { doc: st.doc, stationId: st.component.id };
+  }
+
+  it("같은 (방향, 디바이스)가 중복되면 거부한다", () => {
+    const { doc, stationId } = docWithStation();
+    const dup = {
+      ...doc,
+      ioMap: [
+        { device: "P00019", direction: "output", componentId: stationId, channel: "녹램" },
+        { device: "P00019", direction: "output", componentId: stationId, channel: "황램" },
+      ],
+    };
+    const result = parseDocument(JSON.stringify(dup));
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("중복");
+  });
+
+  it("같은 (부품, 방향, 채널)이 중복되면 거부한다 — 배열 순서로 결과가 뒤집히는 것 차단", () => {
+    const { doc, stationId } = docWithStation();
+    const dup = {
+      ...doc,
+      ioMap: [
+        { device: "P00000", direction: "input", componentId: stationId, channel: "PB1" },
+        { device: "P00001", direction: "input", componentId: stationId, channel: "PB1" },
+      ],
+    };
+    const result = parseDocument(JSON.stringify(dup));
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("중복");
+  });
+
+  it("같은 디바이스라도 방향이 다르면 허용한다", () => {
+    const { doc, stationId } = docWithStation();
+    const ok = {
+      ...doc,
+      ioMap: [
+        { device: "P00000", direction: "input", componentId: stationId, channel: "PB1" },
+        { device: "P00010", direction: "output", componentId: stationId, channel: "A전솔" },
+      ],
+    };
+    expect(parseDocument(JSON.stringify(ok)).ok).toBe(true);
+  });
+});
+
+describe("P2-1: 특수릴레이 출력 금지", () => {
+  it("_T1S를 출력 코일 대상으로 쓰면 거부한다", () => {
+    const doc = createEmptyDocument("특수릴레이");
+    const broken = {
+      ...doc,
+      plcProgram: {
+        rungs: [
+          {
+            id: "r1",
+            cells: [[{ kind: "no", device: "P0" }, null, null, null, null, null, null, { kind: "coil", device: "_T1S" }]],
+            vlinks: [],
+          },
+        ],
+      },
+    };
+    const result = parseDocument(JSON.stringify(broken));
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("특수릴레이");
+  });
+
+  it("_T1S를 접점으로는 쓸 수 있다", () => {
+    const doc = createEmptyDocument("특수릴레이 접점");
+    const ok = {
+      ...doc,
+      plcProgram: {
+        rungs: [
+          {
+            id: "r1",
+            cells: [[{ kind: "no", device: "_T1S" }, null, null, null, null, null, null, { kind: "coil", device: "P19" }]],
+            vlinks: [],
+          },
+        ],
+      },
+    };
+    expect(parseDocument(JSON.stringify(ok)).ok).toBe(true);
+  });
+});

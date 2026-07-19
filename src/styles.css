@@ -438,6 +438,14 @@ body,
   margin: 4px 0 0;
 }
 
+.field-warn {
+  display: block;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--err);
+  margin-top: 3px;
+}
+
 .doc-meta-hint {
   font-size: 10px;
   line-height: 1.4;
@@ -687,6 +695,12 @@ body,
   border: none;
   font-size: 11px;
   background: transparent;
+}
+
+/* 중복 매핑 행 — 저장 시 거부되므로 편집 중 강조 (codex-review P1-3) */
+.plc-iomap-dup td {
+  background: #fef2f2;
+  color: var(--err);
 }
 
 .plc-side button {

@@ -87,13 +87,40 @@ describe("A실린더 공급 + 판별 센서", () => {
     expect(mpsInputs(nonmetal).유도형).toBe(false); // 유도형은 금속만
   });
 
-  it("양솔 무신호에서는 위치를 유지한다 (임펄스)", () => {
+  it("양솔 임펄스: 전진 1스캔 펄스 후 무신호여도 전진 종단까지 간다 (스풀 메모리)", () => {
     const state = createMpsState({});
-    run(state, ["A전솔"], 0.3); // 중간까지 전진
+    stepMpsStation(state, (ch) => ch === "A전솔", DT); // 1스캔 펄스만
+    run(state, [], 1); // 이후 무신호
+    expect(state.cyl.A).toBe(1);
+  });
+
+  it("양솔 임펄스: 후진 1스캔 펄스 후 무신호여도 후진 종단까지 온다", () => {
+    const state = createMpsState({});
+    run(state, ["A전솔"], 0.7); // 전진 종단
+    stepMpsStation(state, (ch) => ch === "A후솔", DT); // 후진 1스캔 펄스
+    run(state, [], 1);
+    expect(state.cyl.A).toBe(0);
+  });
+
+  it("양솔 임펄스: 양측 동시 여자 시 기존 스풀 방향을 유지한다", () => {
+    const state = createMpsState({});
+    stepMpsStation(state, (ch) => ch === "A전솔", DT); // 전진 스풀
+    run(state, ["A전솔", "A후솔"], 0.3); // 동시 여자 — 전진 유지
+    expect(state.cyl.A).toBeGreaterThan(0.5);
+    run(state, ["A전솔", "A후솔"], 1);
+    expect(state.cyl.A).toBe(1);
+  });
+
+  it("양솔 임펄스: 이동 중 반대 펄스가 오면 방향을 전환한다", () => {
+    const state = createMpsState({});
+    stepMpsStation(state, (ch) => ch === "A전솔", DT);
+    run(state, [], 0.3); // 전진 중
     const mid = state.cyl.A;
     expect(mid).toBeGreaterThan(0.3);
-    run(state, [], 0.5); // 무신호
-    expect(state.cyl.A).toBe(mid);
+    expect(mid).toBeLessThan(1);
+    stepMpsStation(state, (ch) => ch === "A후솔", DT); // 반대 펄스
+    run(state, [], 0.5);
+    expect(state.cyl.A).toBe(0); // 후진 종단
   });
 
   it("공급 위치가 차 있으면 재전진해도 매거진이 줄지 않는다 (잼 방지)", () => {
@@ -195,7 +222,7 @@ describe("램프·드릴 (시각 상태)", () => {
 });
 
 describe("Phase 14-3: 엔진 ioMap 채널 연동 (PLC ↔ 스테이션)", () => {
-  it("PB1 입력 채널 → 래더 → 녹램 출력 채널이 한 틱 안에 연결된다", async () => {
+  it("PB1 입력 채널 → 래더 → 녹램 출력 채널로 전파된다 (출력 반영 후 다음 틱에 물리 관찰)", async () => {
     const { createEmptyDocument } = await import("../../model/types");
     const { addComponent } = await import("../../model/operations");
     const { rungOf, lc } = await import("../../examples");
@@ -323,5 +350,34 @@ describe("골든 시나리오: MPS 자동운전 (예제 19 — 수업자료 슬�
     const bits = engine.snapshot().plc?.bits ?? {};
     expect(bits.M00010 ?? false).toBe(false); // 기동 자기유지 해제
     expect(bits.M00011 ?? false).toBe(false); // 스텝 체인 리셋
+  });
+});
+
+describe("예제 19 구조 계약 (codex-review-phase-14 P3)", () => {
+  it("래더 32렁 · ioMap 26점(입력16+출력10) · 채널 유일 · serialize→parse 왕복", async () => {
+    const { getExample } = await import("../../examples");
+    const { parseDocument, serializeDocument } = await import("../../model/schema");
+    const doc = getExample("mps-basic")!.build();
+
+    // 32렁
+    expect(doc.plcProgram?.rungs).toHaveLength(32);
+
+    // I/O 26점: 입력 16 + 출력 10
+    const inputs = doc.ioMap!.filter((e) => e.direction === "input");
+    const outputs = doc.ioMap!.filter((e) => e.direction === "output");
+    expect(inputs).toHaveLength(16);
+    expect(outputs).toHaveLength(10);
+
+    // 채널·디바이스 유일 (배열 순서 의존 없음)
+    const channels = doc.ioMap!.map((e) => `${e.direction}:${e.channel}`);
+    expect(new Set(channels).size).toBe(channels.length);
+    const devices = doc.ioMap!.map((e) => `${e.direction}:${e.device}`);
+    expect(new Set(devices).size).toBe(devices.length);
+
+    // serialize → parse 왕복 (경계 검증 통과 + ioMap/channel 보존)
+    const parsed = parseDocument(serializeDocument(doc));
+    expect(parsed.ok).toBe(true);
+    expect(parsed.document?.ioMap).toHaveLength(26);
+    expect(parsed.document?.ioMap?.every((e) => e.componentId !== "")).toBe(true);
   });
 });

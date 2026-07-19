@@ -42,6 +42,8 @@ interface Builder {
   place(type: string, x: number, y: number, props?: Record<string, unknown>, rotation?: Rotation): string;
   connect(fromId: string, fromPort: string, toId: string, toPort: string): void;
   setPlc(program: LadderProgram, ioMap: IoEntry[]): void;
+  /** 장비 뷰 전용 배치 좌표 (회로도 위치와 별개 — 좁은 장비 캔버스에 맞춰 배치) */
+  setEquipment(componentId: string, x: number, y: number): void;
   doc(): CircuitDocument;
 }
 
@@ -83,6 +85,12 @@ function buildCircuit(title: string, description: string, build: (b: Builder) =>
     },
     setPlc(program, ioMap) {
       doc = { ...doc, plcProgram: program, ioMap };
+    },
+    setEquipment(componentId, x, y) {
+      doc = {
+        ...doc,
+        equipmentLayout: { ...(doc.equipmentLayout ?? {}), [componentId]: { x, y } },
+      };
     },
     doc: () => doc,
   };
@@ -732,13 +740,16 @@ export const examples: ExampleEntry[] = [
   {
     id: "mps-basic",
     category: "자동화설비",
-    name: "19. MPS 자동운전 — 공급·가공·분류 (수업자료 LD)",
+    name: "19. 자동화설비 스테이션 자동운전 — 공급·가공·분류",
     build: () =>
       buildCircuit(
-        "MPS 자동운전",
+        "자동화설비 스테이션 자동운전",
         "수업자료 슬라이드 9의 래더를 그대로 재현: PB2 기동 → A공급 → B드릴 가공 → C이송 → 컨베이어 초입에서 용량형/유도형 판별 → 분류(기본: 금속=D배출박스/비금속=저장박스, PB3 누르면 반전). 사이클 후 매거진에 물품이 있으면 자동 재시작(M22), 없으면 종료(M23). 금1·비1 처리 시 카운터 종료(M25). PB4 누르면 일시정지(적램 점멸)·떼면 초기화(음변환). 녹램=운전 점멸, 황램=판별 점멸. (실기 T0019=3.5s는 시뮬레이터 컨베이어 속도·센서 위치에 맞춰 2.2s)",
         (b) => {
           const st = b.place("auto.mps-station", 450, 260, { workpieces: "금,비" });
+          // 장비 뷰 전용 위치: 스테이션(폭 280·높이 170)이 좁은 장비 캔버스에서
+          // 잘리지 않도록 좌상단 가까이 고정 (codex-review P1-2)
+          b.setEquipment(st, 170, 120);
           b.setPlc(
             {
               rungs: [

@@ -458,6 +458,28 @@ export function PlcPanel(): ReactElement | null {
   const program: LadderProgram = doc.plcProgram ?? createEmptyProgram();
   const ioMap: IoEntry[] = doc.ioMap ?? [];
 
+  // 중복 매핑 감지 (저장 시 거부되므로 편집 중 미리 경고) — codex-review P1-3.
+  // (방향,디바이스) 또는 (부품,방향,채널)이 겹치는 행의 인덱스 집합
+  const dupRows = new Set<number>();
+  {
+    const byDeviceDir = new Map<string, number>();
+    const byTarget = new Map<string, number>();
+    ioMap.forEach((e, i) => {
+      const dk = `${e.direction}:${e.device}`;
+      if (byDeviceDir.has(dk)) {
+        dupRows.add(i);
+        dupRows.add(byDeviceDir.get(dk)!);
+      } else byDeviceDir.set(dk, i);
+      if (e.componentId) {
+        const tk = `${e.componentId}:${e.direction}:${e.channel ?? ""}`;
+        if (byTarget.has(tk)) {
+          dupRows.add(i);
+          dupRows.add(byTarget.get(tk)!);
+        } else byTarget.set(tk, i);
+      }
+    });
+  }
+
   const commitProgram = (next: LadderProgram) => {
     useEditorStore.getState().commitDocument({ ...doc, plcProgram: next });
   };
@@ -625,6 +647,11 @@ export function PlcPanel(): ReactElement | null {
                     useEditorStore.getState().setStatus("디바이스는 P/M/T/C + 숫자 또는 _T1S/_T2S(점멸)만 사용할 수 있습니다 (P/M은 마지막 자리 A~F 허용, D는 워드 디바이스 — 미지원).");
                     return;
                   }
+                  // 특수릴레이는 읽기 전용 클록 — 출력 요소에는 지정 불가 (codex-review P2-1)
+                  if (/^_T[12]S$/.test(v) && isOutputKind(selectedCell.kind)) {
+                    useEditorStore.getState().setStatus("_T1S/_T2S는 접점에서만 쓸 수 있습니다 (출력 코일 대상 불가).");
+                    return;
+                  }
                   updateSelectedCell({ device: v });
                 }}
               />
@@ -730,7 +757,7 @@ export function PlcPanel(): ReactElement | null {
           </thead>
           <tbody>
             {ioMap.map((entry, i) => (
-              <tr key={i}>
+              <tr key={i} className={dupRows.has(i) ? "plc-iomap-dup" : undefined} title={dupRows.has(i) ? "중복 매핑 — 저장 시 거부됩니다. 디바이스나 채널을 다르게 바꾸세요." : undefined}>
                 <td>
                   <input
                     value={entry.device}

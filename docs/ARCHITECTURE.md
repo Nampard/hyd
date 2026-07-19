@@ -36,7 +36,8 @@ src/
       mps-station.ts     # MPS 스테이션 물리 상태기계 + 채널 상수 (Phase 14)
       types.ts           # SimulationSnapshot, ComponentRuntime
     plc/
-      model.ts           # LadderRung, LadderCell(접점/코일/TON/TOFF/CTU/CTD), vlink
+      model.ts           # LadderRung, LadderCell(a/b/음변환(N) 접점·코일·TON/TOFF/CTU/CTD), vlink
+                         #   특수릴레이 _T1S/_T2S(1초/2초 클록)는 스캐너 내장·접점 전용, 다채널 ioMap channel
       scanner.ts         # 노드 도달성 기반 스캔 실행기 + 모니터
     examples/index.ts    # 내장 예제 빌더
     storage/index.ts     # 브라우저(localStorage) 문서 저장소 어댑터
@@ -87,7 +88,7 @@ interface ComponentInstance {
 ```ts
 interface ComponentDefinition {
   type: string;
-  domain: "pneumatic" | "hydraulic" | "electric";
+  domain: "pneumatic" | "hydraulic" | "electric" | "automation";
   ports: PortDefinition[];           // 위치, kind, 라벨(P/A/B/R 등)
   propertySchema: PropertyField[];   // 속성 패널 자동 생성용
   behavior: BehaviorSpec;            // 솔버가 해석하는 동작 명세 (아래 4절)
@@ -97,6 +98,10 @@ interface ComponentDefinition {
 ```
 
 새 부품 추가 = 정의 객체 + 기호 SVG 추가로 끝나야 한다. 솔버에 부품별 분기를 넣지 않는다.
+예외: `automation` 도메인의 자동화설비 스테이션(Phase 14)은 다채널 I/O를 갖는 복합
+장비라 엔진·PLC·UI에 MPS 전용 분기가 있다. 이 특례를 정의 메타데이터(`ioChannels`) +
+복합설비 adapter로 일반화하는 리팩터링은 ROADMAP 후순위 후보에 등재되어 있다
+(codex-review-phase-14 P1-6).
 
 ## 4. 시뮬레이션 엔진
 

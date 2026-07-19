@@ -6,6 +6,7 @@ import { getComponentDefinition } from "../../core/library/registry";
 import type { PropertyField } from "../../core/library/types";
 import { summarizeLearningActivity } from "../../core/model/learning-activity";
 import { MAX_LEARNING_ACTIVITY } from "../../core/model/schema";
+import { parseWorkpieceQueueStrict, MPS_MAGAZINE_MAX } from "../../core/sim/mps-station";
 import { useT } from "../i18n";
 
 function FieldInput({
@@ -129,17 +130,29 @@ export function PropertyPanel(): ReactElement {
       <h2 className="panel-title">{t("properties")}</h2>
       <div className="property-header">{def.name}</div>
       {def.propertySchema.length === 0 && <p className="panel-empty">{t("noProperties")}</p>}
-      {def.propertySchema.map((field) => (
-        <label key={field.key} className="property-field">
-          <span className="field-label">{field.label}</span>
-          <FieldInput
-            field={field}
-            value={comp.properties[field.key]}
-            disabled={running}
-            onChange={(value) => useEditorStore.getState().setProperty(comp.id, field.key, value)}
-          />
-        </label>
-      ))}
+      {def.propertySchema.map((field) => {
+        // MPS 물품 큐: 인식 불가 토큰·개수 초과를 조용히 버리지 않고 경고 (codex-review P2-2)
+        const queueWarn =
+          field.key === "workpieces" &&
+          def.behavior?.role === "mps-station" &&
+          parseWorkpieceQueueStrict(comp.properties[field.key]).error;
+        return (
+          <label key={field.key} className="property-field">
+            <span className="field-label">{field.label}</span>
+            <FieldInput
+              field={field}
+              value={comp.properties[field.key]}
+              disabled={running}
+              onChange={(value) => useEditorStore.getState().setProperty(comp.id, field.key, value)}
+            />
+            {queueWarn && (
+              <span className="field-warn">
+                ⚠ 금/비(또는 금속/비금속)만 인식합니다. 인식 불가 토큰은 무시되며, 최대 {MPS_MAGAZINE_MAX}개까지입니다.
+              </span>
+            )}
+          </label>
+        );
+      })}
       <div className="property-hint">
         {running ? t("simEditLock") : t("editHint")}
       </div>

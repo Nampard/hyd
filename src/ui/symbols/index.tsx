@@ -1131,7 +1131,7 @@ function MpsStationBlock(_: SymbolProps): ReactElement {
     <g>
       <rect x={-140} y={-85} width={280} height={170} rx={4} {...S} />
       <text x={-132} y={-68} fontSize={13} fontWeight={700} fill="currentColor" stroke="none">
-        MPS 스테이션
+        자동화설비 스테이션
       </text>
       <text x={-132} y={-53} fontSize={9} fill="currentColor" stroke="none" opacity={0.75}>
         자동화설비 기능사 — 배선 대신 PLC I/O 매핑(채널)으로 연결

@@ -340,7 +340,7 @@ export function MpsStationSprite({
       {/* 베이스 플레이트 */}
       <rect x={-140} y={-85} width={280} height={170} rx={6} fill="#e2e8f0" stroke="#3c5164" strokeWidth={1.5} />
       <text x={-134} y={-72} fontSize={9} fontWeight={700} fill="#1f2937" stroke="none">
-        MPS 스테이션
+        자동화설비 스테이션
       </text>
 
       {/* 조작 패널: PB1~4 (램프는 우측 독립 타워 — 배치도 참고) */}
@@ -352,19 +352,42 @@ export function MpsStationSprite({
           <g
             key={i}
             style={onButton ? { cursor: "pointer" } : undefined}
+            role={onButton ? "button" : undefined}
+            tabIndex={onButton ? 0 : undefined}
+            aria-label={onButton ? `PB${i + 1} 푸시버튼` : undefined}
+            aria-pressed={onButton ? pressed : undefined}
             onPointerDown={
               onButton
                 ? (e) => {
                     e.stopPropagation();
+                    (e.target as Element).setPointerCapture?.(e.pointerId);
                     onButton(i, true);
-                    const release = () => {
-                      onButton(i, false);
-                      window.removeEventListener("pointerup", release);
-                    };
-                    window.addEventListener("pointerup", release);
                   }
                 : undefined
             }
+            // pointerup·cancel·창 밖 릴리스를 모두 처리해 눌린 채로 남지 않게 한다 (codex-review P2-6)
+            onPointerUp={onButton ? () => onButton(i, false) : undefined}
+            onPointerCancel={onButton ? () => onButton(i, false) : undefined}
+            onLostPointerCapture={onButton ? () => onButton(i, false) : undefined}
+            // 키보드 조작 (Enter/Space): 누름→다음 프레임 뗌 (모멘터리 펄스)
+            onKeyDown={
+              onButton
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onButton(i, true);
+                    }
+                  }
+                : undefined
+            }
+            onKeyUp={
+              onButton
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") onButton(i, false);
+                  }
+                : undefined
+            }
+            onBlur={onButton ? () => onButton(i, false) : undefined}
           >
             <circle cx={px} cy={-68} r={7} fill={pressed ? "#dc2626" : "#991b1b"} stroke="#1f2937" strokeWidth={1} />
             <text x={px - 6.5} y={-56} fontSize={6.5} fill="#1f2937" stroke="none">

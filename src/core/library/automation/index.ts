@@ -10,7 +10,7 @@ import type { ComponentDefinition } from "../types";
 export const mpsStation: ComponentDefinition = {
   type: "auto.mps-station",
   domain: "automation",
-  name: "MPS 스테이션 (자동화설비 기능사)",
+  name: "자동화설비 기능사 스테이션 (컨베이어 공정)",
   category: "자동화 · 설비",
   // 포트 없음 — 회로 배선 대신 PLC ioMap channel로 연결한다
   ports: [],
