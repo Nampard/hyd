@@ -1,6 +1,6 @@
 import type { CircuitDocument } from "../model/types";
 import { buildCircuit, lc, rungOf } from "./builder";
-import { buildMpsAutomation } from "./mps-example";
+import { buildAutomationStationExample } from "./automation-example";
 
 // 래더 조립 헬퍼(lc/rungOf)와 buildCircuit은 ./builder로 분리 — 테스트 호환을 위해 재-export
 export { lc, rungOf } from "./builder";
@@ -639,10 +639,10 @@ export const examples: ExampleEntry[] = [
       ),
   },
   {
-    id: "mps-basic",
+    id: "automation-basic",
     category: "자동화설비",
     name: "19. 자동화설비 스테이션 자동운전 — 공급·가공·분류",
-    build: () => buildMpsAutomation(),
+    build: () => buildAutomationStationExample(),
   },
 ];
 

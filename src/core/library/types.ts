@@ -138,12 +138,12 @@ export type Behavior =
       device: "relay" | "timer-on" | "timer-off" | "counter" | "counter-reset" | "solenoid" | "lamp" | "buzzer";
     }
   /**
-   * 자동화설비 기능사 MPS 스테이션 (Phase 14). 전기·유체 포트가 없는 장비 단위
+   * 자동화설비 기능사 스테이션 (Phase 14). 전기·유체 포트가 없는 장비 단위
    * 부품 — PLC ioMap channel로 I/O 26점이 물리고, 워크피스(금속/비금속) 흐름을
-   * 내부 상태기계(core/sim/mps-station.ts)로 시뮬레이션한다. 설비는 물리만 제공:
+   * 내부 상태기계(core/sim/automation-station.ts)로 시뮬레이션한다. 설비는 물리만 제공:
    * 액추에이터는 출력 채널에 반응, 센서는 입력 채널 상태 생성. 로직은 사용자 래더.
    */
-  | { role: "mps-station" };
+  | { role: "automation-station" };
 
 /**
  * 다채널 부품(복합설비)의 I/O 채널 정의 (Phase 14). 한 부품에 PLC I/O가 여러 점

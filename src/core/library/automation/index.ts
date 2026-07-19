@@ -1,6 +1,6 @@
 import { registerComponent } from "../registry";
 import type { ComponentDefinition } from "../types";
-import { MPS_IO_CHANNELS } from "./channels";
+import { AUTOMATION_IO_CHANNELS } from "./channels";
 
 /**
  * 자동화설비 기능사(구 생산자동화 기능사) 부품 라이브러리 — Phase 14.
@@ -10,8 +10,8 @@ import { MPS_IO_CHANNELS } from "./channels";
  * 데이터 주도 확장 — codex-review-phase-14 P1-6).
  */
 
-export const mpsStation: ComponentDefinition = {
-  type: "auto.mps-station",
+export const automationStation: ComponentDefinition = {
+  type: "auto.automation-station",
   domain: "automation",
   name: "자동화설비 기능사 스테이션 (컨베이어 공정)",
   category: "자동화 · 설비",
@@ -25,12 +25,12 @@ export const mpsStation: ComponentDefinition = {
       default: "금,비,금",
     },
   ],
-  symbolId: "auto.mps-station",
+  symbolId: "auto.automation-station",
   bounds: { x: -140, y: -85, width: 280, height: 170 },
-  behavior: { role: "mps-station" },
-  ioChannels: MPS_IO_CHANNELS,
+  behavior: { role: "automation-station" },
+  ioChannels: AUTOMATION_IO_CHANNELS,
 };
 
 export function registerAutomationLibrary(): void {
-  registerComponent(mpsStation);
+  registerComponent(automationStation);
 }

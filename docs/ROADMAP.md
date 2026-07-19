@@ -276,7 +276,7 @@ Phase 13의 좌측 모선 `c=0` 편집 결함 등을 통합 리뷰에서 지적�
 - **접근성 기본**: 도구 버튼 `aria-pressed`·`aria-label`, 학습 활동 textarea `label htmlFor`
   연결·글자 수 표시. (SVG 래더 전체의 키보드 편집은 후순위 후보에 등재)
 
-## Phase 14 — 자동화설비 기능사 MPS 스테이션 ✅ 완료 (2026-07-18)
+## Phase 14 — 자동화설비 기능사 스테이션 ✅ 완료 (2026-07-18)
 
 **배경**: 자동화설비 기능사(구 생산자동화 기능사) 실기 대비. 소유자 수업자료
 (구글 슬라이드, 2026-07-18 제공 — XG5000 래더 캡처 + I/O 맵 + 과제 시나리오)를
@@ -382,8 +382,23 @@ I/O 26점 — 입력 16 + 출력 10 (수업자료 어드레스 그대로):
    - 모듈 분리: `validate-iomap.ts`(ioMap 검증), `examples/builder.ts`(조립 헬퍼)+
      `examples/mps-example.ts`(예제 19), `equipment/MpsStationSprite.tsx`(장비 스프라이트),
      `library/automation/channels.ts`(채널 단일 출처). 정의↔상태기계 채널 일치 테스트 추가.
-   - IoEntry 형태 유지 → schema v5 불필요. (PlcPanel의 IoMapEditor 컴포넌트 분리는
-     상태 결합이 커 이번 범위에서 제외 — 후순위)
+   - IoEntry 형태 유지 → 이 리팩터링 자체로는 schema 변경 불필요. (PlcPanel의
+     IoMapEditor 컴포넌트 분리는 상태 결합이 커 이번 범위에서 제외 — 후순위)
+10. **오프라인 수업 허가 + 상표 리네임(v5)** (14-10, 2026-07-19 소유자 결정 —
+   codex 상표·라이선스 재검토 반영):
+   - **LICENSE**: "비상업적 교육용 오프라인 실행 허가" 절 신설 — 인터넷 제한
+     교육 현장을 위해 교사·학교·수업 참여 학생 기기에 변경되지 않은 사본의
+     복제·저장매체 이전·의존성 설치·빌드·로컬(내부망) 실행 허용. 공개 재호스팅·
+     재배포·유료 제공·수정본 배포·타 제품 전용은 계속 금지. README를 같은
+     내용으로 정합("인터넷 제한 환경에서의 교육용 로컬 실행" 절).
+   - **공개 시험자료 문구 정정**: "기능적 구성·공정 순서만 참고, 이미지·문구·도면
+     비복제, 별도 이용허락·제휴 주장 없음"으로 README 고지 정밀화. 소유자의
+     비상업적 활용 의도 확인.
+   - **상표 리네임(스키마 v5)**: MPS®가 Festo AG & Co. KG의 등록상표임을 확인,
+     내부 식별자까지 제거 — 부품 type `auto.mps-station` → `auto.automation-station`
+     (migrateV4toV5로 구버전 파일 자동 변환), 예제 id `mps-basic` →
+     `automation-basic`, behavior role·파일명(automation-station.ts 등)·코드
+     심벌(AutomationStation*) 일괄 리네임. README에 Festo 등록상표 명시 고지.
 
 ## 후순위 후보 (미확정)
 

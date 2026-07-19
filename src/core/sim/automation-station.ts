@@ -1,5 +1,5 @@
 /**
- * 자동화설비 기능사(구 생산자동화 기능사) MPS 스테이션 물리 모델 (Phase 14).
+ * 자동화설비 기능사(구 생산자동화 기능사) 자동화설비 스테이션 물리 모델 (Phase 14).
  *
  * 설비는 물리만 시뮬레이션한다 — 액추에이터는 PLC 출력 채널에 반응하고
  * 센서는 입력 채널 상태를 만들 뿐, 제어 로직은 전부 사용자의 래더가 담당한다.
@@ -22,12 +22,12 @@ export type WorkpieceMaterial = "metal" | "nonmetal";
 // 가져온다 (library/automation/channels — 리프 모듈, 순환 없음). 재-export로 기존
 // import 경로 유지.
 export {
-  MPS_INPUT_CHANNELS,
-  MPS_OUTPUT_CHANNELS,
-  type MpsInputChannel,
-  type MpsOutputChannel,
+  AUTOMATION_INPUT_CHANNELS,
+  AUTOMATION_OUTPUT_CHANNELS,
+  type AutomationInputChannel,
+  type AutomationOutputChannel,
 } from "../library/automation/channels";
-import type { MpsOutputChannel, MpsInputChannel } from "../library/automation/channels";
+import type { AutomationOutputChannel, AutomationInputChannel } from "../library/automation/channels";
 
 /** 실린더 전 행정 시간 (초) — 논리 근사용 고정값 */
 const STROKE_TIME = 0.5;
@@ -44,7 +44,7 @@ const DETECT_WINDOW: [number, number] = [0.06, 0.24];
 /** D실린더 분기 게이트 구간 (컨베이어 진행률) */
 const GATE_WINDOW: [number, number] = [0.45, 0.6];
 /** 매거진 최대 적재 수 */
-export const MPS_MAGAZINE_MAX = 8;
+export const AUTOMATION_MAGAZINE_MAX = 8;
 
 export interface BeltPiece {
   material: WorkpieceMaterial;
@@ -53,7 +53,7 @@ export interface BeltPiece {
 }
 
 /** 스테이션 런타임 상태 (엔진이 부품 런타임에 보관, 틱마다 갱신) */
-export interface MpsStationState {
+export interface AutomationStationState {
   /** 남은 매거진 큐 — 앞이 다음 공급 물품 */
   magazine: WorkpieceMaterial[];
   /** 공급/가공 위치의 물품 (A 공급 후 B 드릴 가공 위치 — 재질 판별은 벨트 초입에서) */
@@ -95,7 +95,7 @@ export interface WorkpieceQueueParse {
  * 매거진 물품 큐 속성 문자열을 검증하며 파싱한다.
  * - 유효 토큰: 금/금속 → metal, 비/비금속 → nonmetal (공백 허용)
  * - 빈 문자열/`,` 만 → 빈 매거진(유효, 오류 아님)
- * - 인식 불가 토큰 또는 MPS_MAGAZINE_MAX 초과 → error=true (빈칸은 무시)
+ * - 인식 불가 토큰 또는 AUTOMATION_MAGAZINE_MAX 초과 → error=true (빈칸은 무시)
  */
 export function parseWorkpieceQueueStrict(value: unknown): WorkpieceQueueParse {
   if (typeof value !== "string") return { items: [], error: value !== undefined };
@@ -108,8 +108,8 @@ export function parseWorkpieceQueueStrict(value: unknown): WorkpieceQueueParse {
     else if (t === "비" || t === "비금속") items.push("nonmetal");
     else error = true; // 인식 불가 토큰 — 조용히 버리지 않고 오류로 표시
   }
-  if (items.length > MPS_MAGAZINE_MAX) {
-    return { items: items.slice(0, MPS_MAGAZINE_MAX), error: true };
+  if (items.length > AUTOMATION_MAGAZINE_MAX) {
+    return { items: items.slice(0, AUTOMATION_MAGAZINE_MAX), error: true };
   }
   return { items, error };
 }
@@ -119,7 +119,7 @@ export function parseWorkpieceQueue(value: unknown): WorkpieceMaterial[] {
   return parseWorkpieceQueueStrict(value).items;
 }
 
-export function createMpsState(properties: Record<string, unknown>): MpsStationState {
+export function createAutomationState(properties: Record<string, unknown>): AutomationStationState {
   const parsed = parseWorkpieceQueueStrict(properties.workpieces);
   // 속성이 없으면(undefined) 데모용 기본 큐, 명시된 값(빈 큐 포함)은 그대로 존중
   const magazine =
@@ -149,9 +149,9 @@ function clamp01(v: number): number {
  * 한 틱 진행. out은 PLC가 강제한 출력 채널 상태 조회 함수.
  * 상태를 제자리에서 갱신한다 (엔진 런타임 관례).
  */
-export function stepMpsStation(
-  state: MpsStationState,
-  out: (channel: MpsOutputChannel) => boolean,
+export function stepAutomationStation(
+  state: AutomationStationState,
+  out: (channel: AutomationOutputChannel) => boolean,
   dt: number,
 ): void {
   const step = dt / STROKE_TIME;
@@ -214,7 +214,7 @@ export function stepMpsStation(
 }
 
 /** 센서 입력 이미지 — PLC 스캔의 입력 채널 상태 */
-export function mpsInputs(state: MpsStationState): Record<MpsInputChannel, boolean> {
+export function automationInputs(state: AutomationStationState): Record<AutomationInputChannel, boolean> {
   const inPhoto = state.belt.some(
     (p) => p.progress >= PHOTO_WINDOW[0] && p.progress <= PHOTO_WINDOW[1],
   );
@@ -247,7 +247,7 @@ export function mpsInputs(state: MpsStationState): Record<MpsInputChannel, boole
 }
 
 /** 스냅숏용 깊은 사본 (엔진이 매 틱 UI에 넘기는 불변 복제) */
-export function cloneMpsState(s: MpsStationState): MpsStationState {
+export function cloneAutomationState(s: AutomationStationState): AutomationStationState {
   return {
     ...s,
     magazine: [...s.magazine],
@@ -263,17 +263,17 @@ export function cloneMpsState(s: MpsStationState): MpsStationState {
 // ---------- 복합설비 어댑터 등록 (Phase 14 P1-6) ----------
 
 /** PB1~PB4 입력 채널을 조작 패널 버튼 인덱스로 매핑 */
-const PB_CHANNELS: MpsInputChannel[] = ["PB1", "PB2", "PB3", "PB4"];
+const PB_CHANNELS: AutomationInputChannel[] = ["PB1", "PB2", "PB3", "PB4"];
 
-export const mpsStationAdapter: EquipmentAdapter<MpsStationState> = {
-  create: (properties) => createMpsState(properties),
-  step: (state, out, dt) => stepMpsStation(state, out as (ch: MpsOutputChannel) => boolean, dt),
-  readInputs: (state) => mpsInputs(state),
-  snapshot: (state) => cloneMpsState(state),
+export const automationStationAdapter: EquipmentAdapter<AutomationStationState> = {
+  create: (properties) => createAutomationState(properties),
+  step: (state, out, dt) => stepAutomationStation(state, out as (ch: AutomationOutputChannel) => boolean, dt),
+  readInputs: (state) => automationInputs(state),
+  snapshot: (state) => cloneAutomationState(state),
   setDiscreteInput: (state, channel, active) => {
-    const i = PB_CHANNELS.indexOf(channel as MpsInputChannel);
+    const i = PB_CHANNELS.indexOf(channel as AutomationInputChannel);
     if (i >= 0) state.pb[i] = active;
   },
 };
 
-registerEquipmentAdapter("auto.mps-station", mpsStationAdapter);
+registerEquipmentAdapter("auto.automation-station", automationStationAdapter);

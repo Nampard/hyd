@@ -13,7 +13,7 @@ import { addPoints, rotatePoint, rotateDirection, snapPoint } from "../../core/g
 import { computeOrthogonalRoute } from "../../core/routing";
 import { getSymbol } from "../symbols";
 import { getSprite } from "./sprites";
-import { MpsStationSprite } from "./MpsStationSprite";
+import { AutomationStationSprite } from "./AutomationStationSprite";
 import { useT } from "../i18n";
 
 /**
@@ -240,7 +240,7 @@ export function EquipmentView(): ReactElement {
                 {def.ioChannels ? (
                   // 복합설비(자동화설비 스테이션 등): 조작 패널 이산 입력이 필요해
                   // 전용 스프라이트에 채널 콜백을 연결한다 (실행 중에만)
-                  <MpsStationSprite
+                  <AutomationStationSprite
                     properties={comp.properties}
                     runtime={runtime}
                     onDiscreteInput={

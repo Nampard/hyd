@@ -1,10 +1,10 @@
 import type { ReactElement } from "react";
 import type { SymbolProps } from "../symbols";
-import { parseWorkpieceQueue, type MpsStationState, type WorkpieceMaterial } from "../../core/sim/mps-station";
+import { parseWorkpieceQueue, type AutomationStationState, type WorkpieceMaterial } from "../../core/sim/automation-station";
 
 /**
  * 자동화설비 스테이션 장비 뷰 스프라이트 (Phase 14 — 모듈 분리).
- * 복합설비 상태(runtime.equipment)를 자신의 타입(MpsStationState)으로 읽어
+ * 복합설비 상태(runtime.equipment)를 자신의 타입(AutomationStationState)으로 읽어
  * 실린더·물품 흐름·판별 센서·램프를 애니메이션한다. 조작 패널 PB1~4는 실행 중
  * onDiscreteInput(채널, 눌림)으로 이산 입력을 emit한다 (엔진의 범용 setDiscreteInput).
  */
@@ -38,11 +38,11 @@ function Piece({
 }
 
 /**
- * MPS 스테이션 스프라이트. 정지 상태에서는 속성의 매거진 큐만 표시하고,
- * 실행 중에는 runtime.mps로 실린더·물품 흐름·램프를 애니메이션한다.
+ * 자동화설비 스테이션 스프라이트. 정지 상태에서는 속성의 매거진 큐만 표시하고,
+ * 실행 중에는 runtime.equipment로 실린더·물품 흐름·램프를 애니메이션한다.
  * PB1~4는 실행 중 클릭 가능 (onButton — EquipmentView가 연결).
  */
-export function MpsStationSprite({
+export function AutomationStationSprite({
   properties,
   runtime,
   onDiscreteInput,
@@ -50,17 +50,17 @@ export function MpsStationSprite({
   /** 이산 입력 emit — 채널 이름("PB1"~"PB4")과 눌림 여부 */
   onDiscreteInput?: (channel: string, active: boolean) => void;
 }): ReactElement {
-  const mps = runtime?.equipment as MpsStationState | undefined;
+  const station = runtime?.equipment as AutomationStationState | undefined;
   const onButton = onDiscreteInput
     ? (i: 0 | 1 | 2 | 3, active: boolean) => onDiscreteInput(`PB${i + 1}`, active)
     : undefined;
-  const magazine = mps ? mps.magazine : parseWorkpieceQueue(properties.workpieces);
-  const cyl = mps?.cyl ?? { A: 0, B: 0, C: 0, D: 0 };
-  const lamps = mps?.lamps ?? { red: false, yellow: false, green: false };
-  const supply = mps?.supply ?? null;
-  const belt = mps?.belt ?? [];
-  const store = mps?.store ?? [];
-  const eject = mps?.eject ?? [];
+  const magazine = station ? station.magazine : parseWorkpieceQueue(properties.workpieces);
+  const cyl = station?.cyl ?? { A: 0, B: 0, C: 0, D: 0 };
+  const lamps = station?.lamps ?? { red: false, yellow: false, green: false };
+  const supply = station?.supply ?? null;
+  const belt = station?.belt ?? [];
+  const store = station?.store ?? [];
+  const eject = station?.eject ?? [];
   const drillDrop = cyl.B * 14;
   const photoOn = belt.some((p) => p.progress >= 0.02 && p.progress <= 0.18);
   // 판별 센서 점등 (벨트 초입 감지 구간 — core DETECT_WINDOW와 동일 값)
@@ -69,7 +69,7 @@ export function MpsStationSprite({
     (p) => p.progress >= 0.06 && p.progress <= 0.24 && p.material === "metal",
   );
   // 벨트 무늬 이동 (12px 주기)
-  const dashShift = mps ? (mps.beltOffset * 26) % 12 : 0;
+  const dashShift = station ? (station.beltOffset * 26) % 12 : 0;
 
   return (
     <g>
@@ -83,7 +83,7 @@ export function MpsStationSprite({
       <rect x={44} y={-80} width={92} height={36} rx={4} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
       {([0, 1, 2, 3] as const).map((i) => {
         const px = 60 + i * 21;
-        const pressed = mps?.pb[i] ?? false;
+        const pressed = station?.pb[i] ?? false;
         return (
           <g
             key={i}
@@ -180,7 +180,7 @@ export function MpsStationSprite({
       <text x={-70} y={-66} fontSize={7} fontWeight={700} fill="#1f2937" stroke="none">B</text>
       <g transform={`translate(0, ${drillDrop})`}>
         <rect x={-76} y={-60} width={20} height={16} rx={2} fill="#64748b" stroke="#334155" strokeWidth={1.2} />
-        <g transform={`rotate(${mps?.drillAngle ?? 0}, -66, -36)`}>
+        <g transform={`rotate(${station?.drillAngle ?? 0}, -66, -36)`}>
           <circle cx={-66} cy={-36} r={6} fill="#94a3b8" stroke="#334155" strokeWidth={1.2} />
           <line x1={-72} y1={-36} x2={-60} y2={-36} stroke="#334155" strokeWidth={1.5} />
         </g>

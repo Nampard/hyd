@@ -6,7 +6,7 @@ import { solveFluid } from "./fluid-solver";
 import { solveElectric } from "./electric-solver";
 import { PlcRunner, type PlcMonitor } from "../plc/scanner";
 import { getEquipmentAdapter } from "./equipment-adapter";
-import "./mps-station"; // 부작용: MPS 어댑터 등록
+import "./automation-station"; // 부작용: MPS 어댑터 등록
 
 /** 릴레이·타이머·카운터 디바이스 상태 (이름표로 접점과 연결) */
 interface DeviceState {

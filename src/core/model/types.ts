@@ -62,7 +62,7 @@ export interface CircuitDocument {
   equipmentLayout?: Record<string, Point>;
 }
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 export function createEmptyDocument(title = "새 회로"): CircuitDocument {
   return {

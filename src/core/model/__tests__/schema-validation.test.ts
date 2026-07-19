@@ -196,18 +196,38 @@ describe("스키마 v4: ioMap channel (Phase 14)", () => {
     return { doc, btnId: btn.component.id };
   }
 
-  it("v3 문서는 v4로 마이그레이션되어 로드된다", () => {
+  it("v3 문서는 현재 버전(v5)으로 마이그레이션되어 로드된다", () => {
     const { doc } = docWithButton();
     const v3 = { ...doc, schemaVersion: 3 };
     const result = parseDocument(JSON.stringify(v3));
     expect(result.ok).toBe(true);
-    expect(result.document?.schemaVersion).toBe(4);
+    expect(result.document?.schemaVersion).toBe(5);
+  });
+
+  it("v4 문서의 auto.mps-station 부품 type이 v5에서 auto.automation-station으로 변환된다", () => {
+    let doc0 = createEmptyDocument("v5 마이그레이션");
+    const st = addComponent(doc0, "auto.automation-station", { x: 300, y: 300 });
+    doc0 = st.doc;
+    // v4 저장 파일 재현: 옛 type 문자열로 되돌린 문서
+    const v4 = {
+      ...doc0,
+      schemaVersion: 4,
+      components: doc0.components.map((c) => ({ ...c, type: "auto.mps-station" })),
+      ioMap: [
+        { device: "P00000", direction: "input", componentId: st.component.id, channel: "PB1" },
+      ],
+    };
+    const result = parseDocument(JSON.stringify(v4));
+    expect(result.ok).toBe(true);
+    expect(result.document?.schemaVersion).toBe(5);
+    expect(result.document?.components[0].type).toBe("auto.automation-station");
+    expect(result.document?.ioMap?.[0].channel).toBe("PB1"); // 채널 검증도 새 정의로 통과
   });
 
   it("channel이 있는 ioMap 항목이 저장·재열기에서 보존된다", () => {
-    // channel은 다채널 부품(MPS 스테이션)에서만 유효 (14-3 의미 검증)
+    // channel은 다채널 부품(자동화설비 스테이션)에서만 유효 (14-3 의미 검증)
     let doc = createEmptyDocument("v4 채널 보존");
-    const st = addComponent(doc, "auto.mps-station", { x: 300, y: 300 });
+    const st = addComponent(doc, "auto.automation-station", { x: 300, y: 300 });
     doc = st.doc;
     const withChannel = {
       ...doc,
@@ -237,7 +257,7 @@ describe("스키마 v4: ioMap channel (Phase 14)", () => {
 
   it("ioMap 항목의 미등록 키는 재조립에서 제거된다", () => {
     let doc0 = createEmptyDocument("v4 키 재조립");
-    const st = addComponent(doc0, "auto.mps-station", { x: 300, y: 300 });
+    const st = addComponent(doc0, "auto.automation-station", { x: 300, y: 300 });
     doc0 = st.doc;
     const withExtra = {
       ...doc0,
@@ -261,10 +281,10 @@ describe("스키마 v4: ioMap channel (Phase 14)", () => {
   });
 });
 
-describe("Phase 14-3: 16진 어드레스 + MPS 채널 의미 검증", () => {
+describe("Phase 14-3: 16진 어드레스 + 다채널 의미 검증", () => {
   function docWithStation() {
-    let doc = createEmptyDocument("MPS 테스트");
-    const st = addComponent(doc, "auto.mps-station", { x: 300, y: 300 });
+    let doc = createEmptyDocument("다채널 테스트");
+    const st = addComponent(doc, "auto.automation-station", { x: 300, y: 300 });
     doc = st.doc;
     const lamp = addComponent(doc, "elec.lamp", { x: 100, y: 100 });
     doc = lamp.doc;
@@ -312,7 +332,7 @@ describe("Phase 14-3: 16진 어드레스 + MPS 채널 의미 검증", () => {
     expect(result.error).toContain("디바이스");
   });
 
-  it("MPS 스테이션 항목에는 유효한 채널이 필수다", () => {
+  it("자동화설비 스테이션 항목에는 유효한 채널이 필수다", () => {
     const { doc, stationId } = docWithStation();
     // 채널 없음
     let result = parseDocument(
@@ -360,7 +380,7 @@ describe("Phase 14-3: 16진 어드레스 + MPS 채널 의미 검증", () => {
 describe("P1-3: ioMap 유일성 (중복 매핑 거부)", () => {
   function docWithStation() {
     let doc = createEmptyDocument("유일성");
-    const st = addComponent(doc, "auto.mps-station", { x: 300, y: 300 });
+    const st = addComponent(doc, "auto.automation-station", { x: 300, y: 300 });
     return { doc: st.doc, stationId: st.component.id };
   }
 

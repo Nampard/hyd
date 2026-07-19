@@ -6,7 +6,7 @@ import { getComponentDefinition } from "../../core/library/registry";
 import type { PropertyField } from "../../core/library/types";
 import { summarizeLearningActivity } from "../../core/model/learning-activity";
 import { MAX_LEARNING_ACTIVITY } from "../../core/model/schema";
-import { parseWorkpieceQueueStrict, MPS_MAGAZINE_MAX } from "../../core/sim/mps-station";
+import { parseWorkpieceQueueStrict, AUTOMATION_MAGAZINE_MAX } from "../../core/sim/automation-station";
 import { useT } from "../i18n";
 
 function FieldInput({
@@ -131,10 +131,10 @@ export function PropertyPanel(): ReactElement {
       <div className="property-header">{def.name}</div>
       {def.propertySchema.length === 0 && <p className="panel-empty">{t("noProperties")}</p>}
       {def.propertySchema.map((field) => {
-        // MPS 물품 큐: 인식 불가 토큰·개수 초과를 조용히 버리지 않고 경고 (codex-review P2-2)
+        // 자동화설비 스테이션 물품 큐: 인식 불가 토큰·개수 초과를 조용히 버리지 않고 경고 (codex-review P2-2)
         const queueWarn =
           field.key === "workpieces" &&
-          def.behavior?.role === "mps-station" &&
+          def.behavior?.role === "automation-station" &&
           parseWorkpieceQueueStrict(comp.properties[field.key]).error;
         return (
           <label key={field.key} className="property-field">
@@ -147,7 +147,7 @@ export function PropertyPanel(): ReactElement {
             />
             {queueWarn && (
               <span className="field-warn">
-                ⚠ 금/비(또는 금속/비금속)만 인식합니다. 인식 불가 토큰은 무시되며, 최대 {MPS_MAGAZINE_MAX}개까지입니다.
+                ⚠ 금/비(또는 금속/비금속)만 인식합니다. 인식 불가 토큰은 무시되며, 최대 {AUTOMATION_MAGAZINE_MAX}개까지입니다.
               </span>
             )}
           </label>

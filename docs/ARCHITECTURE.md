@@ -24,7 +24,7 @@ src/
       schema.ts          # JSON 직렬화·파싱·경계 검증·버전 마이그레이션
     library/             # 부품 정의 (데이터 주도)
       types.ts           # ComponentDefinition, Behavior, PropertyField
-      pneumatic/ hydraulic/ electric/ automation/   # 도메인별 부품 정의 (automation: MPS 스테이션, Phase 14)
+      pneumatic/ hydraulic/ electric/ automation/   # 도메인별 부품 정의 (automation: 자동화설비 스테이션, Phase 14)
       registry.ts        # 타입 ID → ComponentDefinition 레지스트리
     sim/
       engine.ts          # 고정 틱 루프, 밸브 전환·실린더/모터 적분, 디바이스 상태
@@ -33,7 +33,7 @@ src/
       step-controller.ts # 구분동작 실행 — 동작 경계·사이클 완료 감지 (Phase 11)
       recorder.ts        # 변위단계선도용 실린더 위치 기록
       validate.ts        # 실행 전 검증 (경고)
-      mps-station.ts     # MPS 스테이션 물리 상태기계 + 채널 상수 (Phase 14)
+      automation-station.ts # 자동화설비 스테이션 물리 상태기계 + 복합설비 어댑터 (Phase 14)
       types.ts           # SimulationSnapshot, ComponentRuntime
     plc/
       model.ts           # LadderRung, LadderCell(a/b/음변환(N) 접점·코일·TON/TOFF/CTU/CTD), vlink
@@ -61,7 +61,7 @@ src/
 
 ```ts
 interface CircuitDocument {
-  schemaVersion: number;             // 현재 v4
+  schemaVersion: number;             // 현재 v5
   // learningActivity: 학습 활동 설명 (Phase 12) — 저장 시 자동 초안/수정 가능
   meta: { title: string; description?: string; createdAt: string; learningActivity?: string };
   components: ComponentInstance[];   // 모든 도메인의 부품이 한 문서에 공존
@@ -102,7 +102,7 @@ interface ComponentDefinition {
 선언하고 `core/sim/equipment-adapter.ts`의 `EquipmentAdapter`(create/step/readInputs/
 snapshot/setDiscreteInput)를 부품 type에 등록하면, 엔진·schema·PLC UI는 부품 type을
 하드코딩하지 않고 정의 메타데이터·어댑터만 조회한다 (Phase 14-9, codex-review-phase-14
-P1-6). 예: `automation` 도메인의 자동화설비 스테이션(core/sim/mps-station.ts).
+P1-6). 예: `automation` 도메인의 자동화설비 스테이션(core/sim/automation-station.ts).
 
 ## 4. 시뮬레이션 엔진
 

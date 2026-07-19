@@ -13,7 +13,7 @@ export interface SymbolRuntime {
   motorAngle?: number;
   /** 릴리프 밸브가 릴리빙 중 (솔버 판정) */
   reliefActive?: boolean;
-  /** MPS 스테이션 상태 (Phase 14 — 장비 뷰 스프라이트용) */
+  /** 자동화설비 스테이션 상태 (Phase 14 — 장비 뷰 스프라이트용) */
   /** 복합설비(EquipmentAdapter) 상태 — 스프라이트가 자신의 타입으로 캐스팅해 읽음 (Phase 14) */
   equipment?: unknown;
 }
@@ -1117,11 +1117,11 @@ function Supply0V(_: SymbolProps): ReactElement {
 }
 
 /**
- * MPS 스테이션 단자대 블록 (Phase 14). 회로도 뷰 표기 — 작동·애니메이션은
+ * 자동화설비 스테이션 단자대 블록 (Phase 14). 회로도 뷰 표기 — 작동·애니메이션은
  * 장비 뷰가 담당한다. 단자 번호는 실제 어드레스의 마지막 자리:
  * 입력 P00000~F(16진), 출력 P00010~19.
  */
-function MpsStationBlock(_: SymbolProps): ReactElement {
+function AutomationStationBlock(_: SymbolProps): ReactElement {
   const inputs = "0123456789ABCDEF".split("");
   const outputs = ["10", "11", "12", "13", "14", "15", "16", "17", "18", "19"];
   const inW = 16;
@@ -1223,7 +1223,7 @@ const symbolRegistry: Record<string, SymbolComponent> = {
   "elec.solenoid": ElecSolenoid,
   "elec.lamp": ElecLamp,
   "elec.buzzer": ElecBuzzer,
-  "auto.mps-station": MpsStationBlock,
+  "auto.automation-station": AutomationStationBlock,
 };
 
 export function getSymbol(symbolId: string): SymbolComponent {

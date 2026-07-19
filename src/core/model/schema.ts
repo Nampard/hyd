@@ -375,6 +375,7 @@ function migrate(obj: Record<string, unknown>): Record<string, unknown> {
   if (version < 2) doc = migrateV1toV2(doc);
   if (version < 3) doc = migrateV2toV3(doc);
   if (version < 4) doc = migrateV3toV4(doc);
+  if (version < 5) doc = migrateV4toV5(doc);
   doc.schemaVersion = CURRENT_SCHEMA_VERSION;
   return doc;
 }
@@ -397,9 +398,26 @@ function migrateV2toV3(doc: Record<string, unknown>): Record<string, unknown> {
 
 /**
  * v4: ioMap 항목에 channel(다채널 부품의 디바이스↔채널 매핑) 선택 필드 도입
- * (Phase 14 MPS 스테이션). 필드가 optional이라 v3 문서는 그대로 유효 —
+ * (Phase 14 자동화설비 스테이션). 필드가 optional이라 v3 문서는 그대로 유효 —
  * 버전 표기만 올린다.
  */
 function migrateV3toV4(doc: Record<string, unknown>): Record<string, unknown> {
+  return doc;
+}
+
+/**
+ * v5: 자동화설비 스테이션의 부품 type 리네임 — "auto.mps-station" →
+ * "auto.automation-station". "MPS"는 Festo의 교육 플랫폼 등록상표(MPS®)와 겹쳐
+ * 내부 식별자에서도 제거했다 (2026-07-19 소유자 결정, codex 상표 검토 반영).
+ * 구버전 저장 파일은 열 때 자동 변환된다.
+ */
+function migrateV4toV5(doc: Record<string, unknown>): Record<string, unknown> {
+  if (Array.isArray(doc.components)) {
+    doc.components = doc.components.map((c) =>
+      isRecord(c) && c.type === "auto.mps-station"
+        ? { ...c, type: "auto.automation-station" }
+        : c,
+    );
+  }
   return doc;
 }
