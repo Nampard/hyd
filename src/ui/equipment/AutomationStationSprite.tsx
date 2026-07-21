@@ -75,13 +75,7 @@ export function AutomationStationSprite({
     <g>
       {/* 베이스 플레이트 */}
       <rect x={-140} y={-85} width={280} height={170} rx={6} fill="#e2e8f0" stroke="#3c5164" strokeWidth={1.5} />
-      {/* 두 줄로 표기 — 한 줄이면 뒤쪽 B실린더 블록에 가려짐 (Festo 상표 리네임 후 글자 수 증가) */}
-      <text x={-136} y={-78} fontSize={8} fontWeight={700} fill="#1f2937" stroke="none">
-        자동화설비
-      </text>
-      <text x={-136} y={-69} fontSize={8} fontWeight={700} fill="#1f2937" stroke="none">
-        스테이션
-      </text>
+      {/* 제목은 맨 아래(마지막 자식)에서 그린다 — 아래 "제목 오버레이" 참고 */}
 
       {/* 조작 패널: PB1~4 (램프는 우측 독립 타워 — 배치도 참고) */}
       <rect x={44} y={-80} width={92} height={36} rx={4} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
@@ -227,21 +221,38 @@ export function AutomationStationSprite({
       <line x1={43} y1={26} x2={43} y2={26 + cyl.D * 16} stroke="#475569" strokeWidth={3} />
       <rect x={36} y={24 + cyl.D * 16} width={14} height={3} fill="#475569" />
 
-      {/* 배출박스 (D 열) / 저장박스 (컨베이어 끝) */}
+      {/* 배출박스 (D 열) / 저장박스 (컨베이어 끝).
+          라벨은 윗줄, 적재 물품은 아랫줄로 분리한다 — 같은 줄에 두면 개수 숫자가
+          물품 사각형에 가려진다 (금속/비금속 모두). */}
       <rect x={26} y={66} width={38} height={18} fill="#f1f5f9" stroke="#64748b" strokeWidth={1.2} />
-      <text x={29} y={78} fontSize={7} fill="#1f2937" stroke="none">
+      <text x={29} y={73.5} fontSize={6.5} fill="#1f2937" stroke="none">
         배출 {eject.length}
       </text>
       {eject.slice(-2).map((m, i) => (
-        <Piece key={i} x={48 - i * 8} y={72} material={m} w={7} h={9} />
+        <Piece key={i} x={55 - i * 9} y={75.5} material={m} w={7} h={8} />
       ))}
       <rect x={86} y={66} width={38} height={18} fill="#f1f5f9" stroke="#64748b" strokeWidth={1.2} />
-      <text x={89} y={78} fontSize={7} fill="#1f2937" stroke="none">
+      <text x={89} y={73.5} fontSize={6.5} fill="#1f2937" stroke="none">
         저장 {store.length}
       </text>
       {store.slice(-2).map((m, i) => (
-        <Piece key={i} x={108 - i * 8} y={72} material={m} w={7} h={9} />
+        <Piece key={i} x={115 - i * 9} y={75.5} material={m} w={7} h={8} />
       ))}
+
+      {/* 제목 오버레이 — 모든 장비 도형보다 뒤에 그려 절대 가려지지 않게 한다.
+          2줄로 나누고 플레이트색 헤일로(paint-order)를 둘러, 폰트 폭이 넓은 환경
+          (윈도우 맑은 고딕 등)에서 글자가 번져도 B실린더 블록에 묻히지 않는다. */}
+      <g
+        fontSize={8}
+        fontWeight={700}
+        fill="#1f2937"
+        stroke="#e2e8f0"
+        strokeWidth={2.5}
+        paintOrder="stroke"
+      >
+        <text x={-136} y={-77}>자동화설비</text>
+        <text x={-136} y={-68}>스테이션</text>
+      </g>
     </g>
   );
 }
