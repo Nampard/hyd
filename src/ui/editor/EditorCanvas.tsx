@@ -295,6 +295,9 @@ export function EditorCanvas(): ReactElement {
           <p className="canvas-empty-line">{t("emptyHint1")}</p>
           <p className="canvas-empty-line">{t("emptyHint2")}</p>
           <p className="canvas-empty-line is-accent">{t("emptyHint3")}</p>
+          {/* 갱신 안내: SW가 네트워크 우선이라 온라인 새로고침이면 대개 최신본을 받지만,
+              캐시가 남은 PC를 위해 강력 새로고침 단축키를 함께 알려 준다 */}
+          <p className="canvas-empty-update">{t("emptyUpdate")}</p>
           {/* 고지: 면책(용도 한계·표준 미인증) + 라이선스 요약 — 상세는 README·LICENSE */}
           <div className="canvas-empty-notice">
             <p>{t("emptyNotice1")}</p>
