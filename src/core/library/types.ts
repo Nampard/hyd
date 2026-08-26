@@ -89,6 +89,28 @@ export type Behavior =
       /** 단동 (스프링 복귀) */
       singleActing?: boolean;
     }
+  /**
+   * 어큐뮬레이터 (Phase 15). 가압되면 그 레벨로 충전되고, 공급이 끊기면
+   * properties.holdTime(초) 동안 선형 방전하며 라인을 가압한다 (레벨 = 충전압 × 잔량).
+   * 서지 흡수·맥동 저감은 표현하지 않는 교육용 단순화.
+   */
+  | { role: "accumulator"; port: string }
+  /**
+   * 압력 조작 밸브 (Phase 15) — 파일럿 압력이 properties.pressure 이상이면
+   * portIn→portOut을 개방한다. 시퀀스 밸브(내부 파일럿)와 카운터밸런스 밸브
+   * (외부 파일럿 + 체크 바이패스)를 같은 규칙으로 표현한다.
+   * 한번 열리면 파일럿 포트가 무압이 될 때까지 유지된다 (히스테리시스 — 부하압
+   * 캡과 결합했을 때의 개폐 채터 방지).
+   */
+  | {
+      role: "pressure-pilot-valve";
+      portIn: string;
+      portOut: string;
+      /** 생략 시 portIn 압력으로 판정 (내부 파일럿) */
+      pilotPort?: string;
+      /** portOut→portIn 자유 흐름 체크 바이패스 내장 (카운터밸런스) */
+      checkBypass?: boolean;
+    }
   /** 속도제어밸브: A→B 자유 흐름, B→A는 properties.openness(0~1) 교축 */
   | { role: "restrictor"; portA: string; portB: string }
   | { role: "shuttle"; inA: string; inB: string; out: string }

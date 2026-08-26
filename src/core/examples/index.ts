@@ -639,9 +639,155 @@ export const examples: ExampleEntry[] = [
       ),
   },
   {
+    id: "hyd-meter-in",
+    category: "유압",
+    name: "19. 유압 미터인 속도 제어",
+    build: () =>
+      buildCircuit(
+        "유압 미터인",
+        "실린더로 들어가는 유량을 교축해 전진 속도를 제어한다. 미터아웃과 달리 부하가 끌어당기는 방향에서는 속도가 불안정해질 수 있다.",
+        (b) => {
+          const cyl = b.place("hyd.cylinder.double", 420, 100);
+          // rotation 90: A 위, B 아래 — 밸브(아래)에서 실린더(위)로 들어가는 B→A가 교축
+          const fc = b.place("hyd.flow-control", 390, 200, { openness: 0.3 }, 90);
+          const valve = b.place("hyd.valve.4-2-lever", 420, 320);
+          const pu = b.place("hyd.power-unit", 450, 450);
+          const tk = b.place("hyd.tank", 570, 380);
+
+          b.connect(fc, "B", valve, "A");
+          b.connect(fc, "A", cyl, "HEAD");
+          b.connect(valve, "B", cyl, "ROD");
+          b.connect(pu, "P", valve, "P");
+          b.connect(valve, "T", tk, "T");
+        },
+      ),
+  },
+  {
+    id: "hyd-sequence",
+    category: "유압",
+    name: "20. 압력 시퀀스 회로 — A 완료 후 B 전진",
+    build: () =>
+      buildCircuit(
+        "압력 시퀀스 회로",
+        "A가 전진하는 동안은 라인 압력이 부하압(15bar)에 머물러 시퀀스 밸브가 닫혀 있다. A가 행정을 완료하면 압력이 40bar로 올라 시퀀스 밸브(30bar)가 열리고 B가 전진한다. 압력계로 압력 상승을 확인한다.",
+        (b) => {
+          const cylA = b.place("hyd.cylinder.double", 330, 90, {
+            label: "A",
+            strokeTime: 2,
+            loadPressure: 15,
+          });
+          const cylB = b.place("hyd.cylinder.double", 700, 90, { label: "B", strokeTime: 2 });
+          const seq = b.place("hyd.sequence", 590, 210, { pressure: 30 });
+          const teeG = b.place("hyd.tee", 330, 300);
+          const gauge = b.place("hyd.gauge", 230, 260);
+          const teeSup = b.place("hyd.tee", 450, 230);
+          const teeRet = b.place("hyd.tee", 560, 380);
+          const valve = b.place("hyd.valve.4-2-lever", 330, 470);
+          const pu = b.place("hyd.power-unit", 360, 600);
+          const tk = b.place("hyd.tank", 500, 530);
+
+          // 공급: 밸브 A → (압력계) → A 헤드 + 시퀀스 밸브 입구
+          b.connect(valve, "A", teeG, "3");
+          b.connect(teeG, "1", gauge, "P");
+          b.connect(teeG, "2", teeSup, "3");
+          b.connect(teeSup, "1", cylA, "HEAD");
+          b.connect(teeSup, "2", seq, "P");
+          b.connect(seq, "A", cylB, "HEAD");
+
+          // 귀환: A·B 로드측 → 밸브 B
+          b.connect(cylA, "ROD", teeRet, "1");
+          b.connect(cylB, "ROD", teeRet, "2");
+          b.connect(teeRet, "3", valve, "B");
+
+          b.connect(pu, "P", valve, "P");
+          b.connect(valve, "T", tk, "T");
+        },
+      ),
+  },
+  {
+    id: "hyd-counterbalance",
+    category: "유압",
+    name: "21. 카운터밸런스 — 공급압이 걸려야 하강",
+    build: () =>
+      buildCircuit(
+        "카운터밸런스 회로",
+        "로드측 귀환 라인의 카운터밸런스 밸브가 공급 라인 압력(파일럿 X)이 설정압(25bar)에 도달해야 열린다. 설정압을 공급압보다 높이면 실린더가 내려가지 않는 것을 확인한다. 복귀는 내장 체크로 자유롭게 흐른다.",
+        (b) => {
+          const cyl = b.place("hyd.cylinder.double", 420, 100, { label: "A", strokeTime: 2 });
+          const cb = b.place("hyd.counterbalance", 620, 230, { pressure: 25 });
+          const teeP = b.place("hyd.tee", 300, 250);
+          const teeX = b.place("hyd.tee", 400, 320);
+          const gauge = b.place("hyd.gauge", 200, 210);
+          const valve = b.place("hyd.valve.4-2-lever", 380, 420);
+          const pu = b.place("hyd.power-unit", 410, 550);
+          const tk = b.place("hyd.tank", 550, 480);
+
+          // 공급 라인: 밸브 A → 헤드 + 카운터밸런스 파일럿(X) + 압력계
+          b.connect(valve, "A", teeP, "3");
+          b.connect(teeP, "1", gauge, "P");
+          b.connect(teeP, "2", teeX, "1");
+          b.connect(teeX, "2", cyl, "HEAD");
+          b.connect(teeX, "3", cb, "X");
+
+          // 귀환 라인: 로드 → 카운터밸런스 → 밸브 B
+          b.connect(cyl, "ROD", cb, "B");
+          b.connect(cb, "A", valve, "B");
+
+          b.connect(pu, "P", valve, "P");
+          b.connect(valve, "T", tk, "T");
+        },
+      ),
+  },
+  {
+    id: "hyd-accumulator",
+    category: "유압",
+    name: "22. 어큐뮬레이터 — 공급 차단 후 압력 유지",
+    build: () =>
+      buildCircuit(
+        "어큐뮬레이터 압력 유지",
+        "레버를 올리면 어큐뮬레이터가 충전된다. 레버를 내리면 펌프는 무부하로 돌고 체크밸브가 역류를 막아 어큐뮬레이터만으로 라인 압력이 유지된다. 유지 시간(4초)에 걸쳐 압력계 수치가 떨어지고, 15bar 아래에서 압력 스위치가 떨어져 램프가 꺼진다.",
+        (b) => {
+          const acc = b.place("hyd.accumulator", 470, 160, { holdTime: 4 });
+          const chk = b.place("hyd.check", 380, 250);
+          const tee1 = b.place("hyd.tee", 520, 250);
+          const tee2 = b.place("hyd.tee", 590, 250);
+          const gauge = b.place("hyd.gauge", 590, 160);
+          const ps = b.place("hyd.pressure-switch", 670, 250, {
+            contactType: "NO",
+            threshold: 15,
+            name: "PS1",
+          });
+          const valve = b.place("hyd.valve.4-2-lever", 300, 400);
+          const pu = b.place("hyd.power-unit", 330, 540);
+          // 귀환 라인을 분리해 그린다 — 레버를 내리면 P→B로 펌프가 무부하로 돌고,
+          // 충전 라인(A→T)은 그와 별개로 탱크로 열린다
+          const tkA = b.place("hyd.tank", 180, 470);
+          const tkB = b.place("hyd.tank", 480, 470);
+
+          b.connect(valve, "A", chk, "A");
+          b.connect(chk, "B", tee1, "1");
+          b.connect(tee1, "3", acc, "P");
+          b.connect(tee1, "2", tee2, "1");
+          b.connect(tee2, "3", gauge, "P");
+          b.connect(tee2, "2", ps, "P");
+          b.connect(pu, "P", valve, "P");
+          b.connect(valve, "T", tkA, "T");
+          b.connect(valve, "B", tkB, "T");
+
+          // 압력 스위치 → 램프 (압력 유지 구간을 눈으로 확인)
+          const sup24 = b.place("elec.supply-24v", 670, 130);
+          const lamp = b.place("elec.lamp", 670, 360, { name: "L1" });
+          const sup0 = b.place("elec.supply-0v", 670, 450);
+          b.connect(sup24, "P", ps, "T");
+          b.connect(ps, "B", lamp, "T");
+          b.connect(lamp, "B", sup0, "P");
+        },
+      ),
+  },
+  {
     id: "automation-basic",
     category: "자동화설비",
-    name: "19. 자동화설비 스테이션 자동운전 — 공급·가공·분류",
+    name: "23. 자동화설비 스테이션 자동운전 — 공급·가공·분류",
     build: () => buildAutomationStationExample(),
   },
 ];

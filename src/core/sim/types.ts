@@ -22,6 +22,15 @@ export interface ComponentRuntime {
   /** 릴리프 밸브가 릴리빙 중 (솔버가 판정, 기호 표시용) */
   reliefActive?: boolean;
   /**
+   * 압력 조작 밸브(시퀀스·카운터밸런스)가 열려 있는지 (Phase 15).
+   * 솔버가 판정하고 다음 틱의 히스테리시스 입력으로도 쓰인다.
+   */
+  pressureValveOpen?: boolean;
+  /** 어큐뮬레이터 잔량 0..1 (Phase 15) */
+  accumulatorCharge?: number;
+  /** 어큐뮬레이터가 충전된 압력 (bar) */
+  accumulatorLevel?: number;
+  /**
    * 복합설비(EquipmentAdapter) 상태 — 어댑터가 소유하는 불투명 값 (Phase 14).
    * 엔진은 형태를 모른 채 보관·전달하고, 해당 스프라이트만 자신의 타입으로 읽는다.
    */
@@ -44,6 +53,10 @@ export interface SimulationSnapshot {
       motorAngle?: number;
       /** 릴리프 밸브가 릴리빙 중 (솔버가 판정, 기호 표시용) */
       reliefActive?: boolean;
+      /** 압력 조작 밸브가 열림 (Phase 15 — 기호 표시용) */
+      pressureValveOpen?: boolean;
+      /** 어큐뮬레이터 잔량 0..1 (Phase 15 — 기호 표시용) */
+      accumulatorCharge?: number;
       /** 복합설비 상태 사본 (Phase 14 — 스프라이트가 자신의 타입으로 캐스팅해 읽음) */
       equipment?: unknown;
     }

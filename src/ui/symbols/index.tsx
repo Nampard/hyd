@@ -13,6 +13,10 @@ export interface SymbolRuntime {
   motorAngle?: number;
   /** 릴리프 밸브가 릴리빙 중 (솔버 판정) */
   reliefActive?: boolean;
+  /** 압력 조작 밸브(시퀀스·카운터밸런스)가 열림 (솔버 판정, Phase 15) */
+  pressureValveOpen?: boolean;
+  /** 어큐뮬레이터 잔량 0..1 (Phase 15) */
+  accumulatorCharge?: number;
   /** 자동화설비 스테이션 상태 (Phase 14 — 장비 뷰 스프라이트용) */
   /** 복합설비(EquipmentAdapter) 상태 — 스프라이트가 자신의 타입으로 캐스팅해 읽음 (Phase 14) */
   equipment?: unknown;
@@ -881,6 +885,84 @@ function HydReducing({ properties }: SymbolProps): ReactElement {
   );
 }
 
+/**
+ * 압력 조작 밸브 (Phase 15) — 시퀀스 밸브(내부 파일럿) · 카운터밸런스 밸브(외부 파일럿).
+ * 하나의 외곽 박스 안에 압력 조작 유로(상단)와 체크 바이패스(하단)를 함께 그려
+ * "체크 내장"을 표현한다. 개방은 기하를 바꾸지 않고 색상 overlay로만 표시 (review-3 원칙).
+ */
+function HydPressureValve({
+  properties,
+  runtime,
+  pilot,
+}: SymbolProps & { pilot: "internal" | "external" }): ReactElement {
+  const setpoint = Number(properties.pressure ?? 30);
+  const open = runtime?.pressureValveOpen === true;
+  return (
+    <g>
+      <rect x={-20} y={-18} width={40} height={36} {...S} fill={open ? "var(--energized)" : "none"} />
+      {/* 상단: 압력 도달 시 열리는 유로 (정상 닫힘이라 포트 라인에서 오프셋) */}
+      <FlowArrow x1={-14} y1={-9} x2={14} y2={-9} />
+      {/* 하단: 체크 바이패스 (역방향 자유 흐름) */}
+      <polyline points="6,3 -2,9 6,15" {...Sthin} />
+      <line x1={-4} y1={3} x2={-4} y2={15} {...Sthin} />
+      {/* 유로 스텁 */}
+      <line x1={-30} y1={0} x2={-20} y2={0} {...S} />
+      <line x1={20} y1={0} x2={30} y2={0} {...S} />
+      {/* 설정 스프링 */}
+      <g transform="translate(0,-18) rotate(90)">
+        <SpringH x={0} dir={-1} />
+      </g>
+      {/* 파일럿 — 내부(입구압) / 외부(X 포트) */}
+      {pilot === "internal" ? (
+        <polyline points="-26,0 -26,28 0,28 0,18" {...Sthin} strokeDasharray="4 3" />
+      ) : (
+        <>
+          <line x1={0} y1={30} x2={0} y2={18} {...Sthin} strokeDasharray="4 3" />
+          <text x={4} y={30} fontSize={9} fill="currentColor" stroke="none">X</text>
+        </>
+      )}
+      <text x={24} y={-22} fontSize={8} fill="currentColor" stroke="none">{setpoint} bar</text>
+    </g>
+  );
+}
+
+/** 어큐뮬레이터 (Phase 15) — 가스식 축압기. 잔량을 유체 채움으로 표시 */
+function HydAccumulator({ properties, runtime }: SymbolProps): ReactElement {
+  const charge = Math.max(0, Math.min(1, Number(runtime?.accumulatorCharge ?? 0)));
+  const top = -28;
+  const height = 44;
+  const fillH = (height - 16) * charge;
+  return (
+    <g>
+      <rect x={-14} y={top} width={28} height={height} rx={13} {...S} />
+      {charge > 0 && (
+        <rect
+          x={-12}
+          y={top + height - 2 - fillH}
+          width={24}
+          height={fillH}
+          fill="var(--energized)"
+          opacity={0.55}
+          stroke="none"
+        />
+      )}
+      {/* 가스실 경계 */}
+      <path d={`M -12 ${top + 15} Q 0 ${top + 6} 12 ${top + 15}`} {...Sthin} />
+      <line x1={0} y1={top + height} x2={0} y2={30} {...S} />
+      {runtime && (
+        <text x={17} y={-6} fontSize={8} fill="currentColor" stroke="none">
+          {Math.round(charge * 100)}%
+        </text>
+      )}
+      {!runtime && (
+        <text x={17} y={-6} fontSize={8} fill="currentColor" stroke="none">
+          {Number(properties.holdTime ?? 4)}초
+        </text>
+      )}
+    </g>
+  );
+}
+
 /** 압력 스위치: 접점 + 압력 파일럿 표시 (공압/유압 공용) */
 function PressureSwitchSymbol({ properties, runtime }: SymbolProps): ReactElement {
   const closed = contactClosedNow(properties, runtime);
@@ -1208,6 +1290,9 @@ const symbolRegistry: Record<string, SymbolComponent> = {
   "hyd.pilot-check": () => <HydCheck pilot />,
   "hyd.flow-control": SpeedController,
   "hyd.reducing": HydReducing,
+  "hyd.sequence": (p) => <HydPressureValve {...p} pilot="internal" />,
+  "hyd.counterbalance": (p) => <HydPressureValve {...p} pilot="external" />,
+  "hyd.accumulator": HydAccumulator,
   "hyd.motor": HydMotor,
   "elec.pressure-switch": PressureSwitchSymbol,
   "hyd.cylinder.double": CylinderDouble,

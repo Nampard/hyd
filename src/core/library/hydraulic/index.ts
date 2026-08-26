@@ -254,6 +254,67 @@ export const hydPressureSwitch: ComponentDefinition = {
   behavior: { role: "elec-contact", portA: "T", portB: "B", source: "pressure", pressurePort: "P" },
 };
 
+// ---------- 압력제어 (Phase 15) ----------
+
+export const sequenceValve: ComponentDefinition = {
+  type: "hyd.sequence",
+  domain: "hydraulic",
+  name: "압력 시퀀스 밸브 (체크 내장)",
+  category: "유압 · 압력제어",
+  ports: [
+    { id: "P", label: "P", kind: "hydraulic", offset: { x: -30, y: 0 }, direction: "left" },
+    { id: "A", label: "A", kind: "hydraulic", offset: { x: 30, y: 0 }, direction: "right" },
+  ],
+  propertySchema: [
+    { key: "pressure", label: "작동 압력", type: "number", default: 30, min: 1, max: 300, step: 1, unit: "bar" },
+  ],
+  symbolId: "hyd.sequence",
+  bounds: { x: -32, y: -40, width: 64, height: 74 },
+  // 내부 파일럿(P) — 입구 압력이 설정압에 도달하면 2차 회로(A)를 연다.
+  // 체크 바이패스로 A→P 귀환은 자유 (2차 실린더 복귀 경로)
+  behavior: { role: "pressure-pilot-valve", portIn: "P", portOut: "A", checkBypass: true },
+};
+
+export const counterbalanceValve: ComponentDefinition = {
+  type: "hyd.counterbalance",
+  domain: "hydraulic",
+  name: "카운터밸런스 밸브 (외부 파일럿)",
+  category: "유압 · 압력제어",
+  ports: [
+    { id: "B", label: "B", kind: "hydraulic", offset: { x: -30, y: 0 }, direction: "left" },
+    { id: "A", label: "A", kind: "hydraulic", offset: { x: 30, y: 0 }, direction: "right" },
+    { id: "X", label: "X", kind: "hydraulic", offset: { x: 0, y: 30 }, direction: "down" },
+  ],
+  propertySchema: [
+    { key: "pressure", label: "작동 압력", type: "number", default: 25, min: 1, max: 300, step: 1, unit: "bar" },
+  ],
+  symbolId: "hyd.counterbalance",
+  bounds: { x: -32, y: -40, width: 64, height: 74 },
+  // B(실린더측)→A(탱크측) 귀환은 외부 파일럿 X가 설정압에 도달해야 열린다 —
+  // 공급압이 걸려야만 부하가 내려간다. A→B는 체크 바이패스로 자유 (복귀 공급)
+  behavior: {
+    role: "pressure-pilot-valve",
+    portIn: "B",
+    portOut: "A",
+    pilotPort: "X",
+    checkBypass: true,
+  },
+};
+
+export const accumulator: ComponentDefinition = {
+  type: "hyd.accumulator",
+  domain: "hydraulic",
+  name: "어큐뮬레이터 (축압기)",
+  category: "유압 · 압력제어",
+  ports: [{ id: "P", label: "P", kind: "hydraulic", offset: { x: 0, y: 30 }, direction: "down" }],
+  propertySchema: [
+    { key: "holdTime", label: "압력 유지 시간", type: "number", default: 4, min: 0.5, max: 60, step: 0.5, unit: "초" },
+  ],
+  symbolId: "hyd.accumulator",
+  bounds: { x: -18, y: -30, width: 36, height: 62 },
+  behavior: { role: "accumulator", port: "P" },
+};
+
 // ---------- 체크 · 유량 ----------
 
 export const checkValve: ComponentDefinition = {
@@ -328,6 +389,10 @@ export const hydCylinderDouble: ComponentDefinition = {
       ],
     },
     { key: "strokeTime", label: "전 행정 시간", type: "number", default: 2, min: 0.2, max: 20, step: 0.1, unit: "초" },
+    // Phase 15: 0이면 사용 안 함(라인 압력 = 소스 압력 유지). 0보다 크면 운동 중
+    // 공급 유로 압력이 이 값으로 낮아지고 행정 완료 시 소스 압력까지 상승한다 —
+    // 압력 시퀀스 회로(선행 실린더 완료 → 압력 상승 → 후속 회로 작동) 학습용
+    { key: "loadPressure", label: "부하압 (0 = 사용 안 함)", type: "number", default: 0, min: 0, max: 300, step: 1, unit: "bar" },
   ],
   symbolId: "hyd.cylinder.double",
   bounds: { x: -40, y: -32, width: 130, height: 57 },
@@ -365,6 +430,9 @@ const allDefinitions = [
   pilotCheckValve,
   flowControl,
   reducingValve,
+  sequenceValve,
+  counterbalanceValve,
+  accumulator,
   hydPressureSwitch,
   hydCylinderDouble,
   hydMotor,

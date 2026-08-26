@@ -69,6 +69,10 @@ export class SimulationEngine {
       if (behavior?.role === "motor") {
         runtime.motorAngle = 0;
       }
+      if (behavior?.role === "accumulator") {
+        runtime.accumulatorCharge = 0;
+        runtime.accumulatorLevel = 0;
+      }
       if (behavior?.role === "elec-contact") {
         runtime.manualActive = false;
         runtime.contactClosed = false;
@@ -187,6 +191,24 @@ export class SimulationEngine {
       runtime.cylinderPos = clamp01((runtime.cylinderPos ?? 0) + velocity * dt);
     }
 
+    // 4.4 어큐뮬레이터 충·방전 (Phase 15) — 외부 압력원이 살아 있으면 라인 압력으로
+    // 충전(단순화: 즉시), 끊기면 holdTime 동안 선형 방전하며 그 사이 라인을 가압한다
+    // (공급 레벨 = 충전압 × 잔량 — 압력계·압력 스위치가 서서히 떨어지는 것을 관찰)
+    for (const comp of this.doc.components) {
+      const behavior = getComponentDefinition(comp.type).behavior;
+      if (behavior?.role !== "accumulator") continue;
+      const runtime = this.runtimes.get(comp.id)!;
+      if (solve.accumulatorSupplied.get(comp.id) === true) {
+        runtime.accumulatorCharge = 1;
+        runtime.accumulatorLevel = solve.supplyLevel.get(key(comp.id, behavior.port)) ?? 0;
+      } else {
+        const holdTime = Math.max(0.1, Number(comp.properties.holdTime ?? 3));
+        const remain = Math.max(0, (runtime.accumulatorCharge ?? 0) - dt / holdTime);
+        runtime.accumulatorCharge = remain;
+        if (remain === 0) runtime.accumulatorLevel = 0;
+      }
+    }
+
     // 4.5 복합설비 물리 (Phase 14) — PLC가 강제한 출력 채널에 반응해 어댑터가
     // 실린더·컨베이어·워크피스 흐름을 갱신. 유체·전기 솔브와 독립 (부품 type 무하드코딩)
     for (const comp of this.doc.components) {
@@ -235,6 +257,8 @@ export class SimulationEngine {
       runtime.portLevel = portLevel;
       const relief = solve.reliefActive.get(comp.id);
       if (relief !== undefined) runtime.reliefActive = relief;
+      const pressureValve = solve.pressureValveOpen.get(comp.id);
+      if (pressureValve !== undefined) runtime.pressureValveOpen = pressureValve;
     }
     this.lastWireState = solve.wireState;
     this.fluidConverged = solve.converged !== false;
@@ -551,6 +575,8 @@ export class SimulationEngine {
         portLevel: runtime.portLevel ? { ...runtime.portLevel } : undefined,
         motorAngle: runtime.motorAngle,
         reliefActive: runtime.reliefActive,
+        pressureValveOpen: runtime.pressureValveOpen,
+        accumulatorCharge: runtime.accumulatorCharge,
         equipment,
       };
     }

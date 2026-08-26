@@ -32,6 +32,13 @@ export interface SolveResult {
   converged?: boolean;
   /** 릴리프 밸브 compId → 이번 솔브에서 릴리빙 중인지 (기호 표시용, review-2 P1) */
   reliefActive: Map<string, boolean>;
+  /** 압력 조작 밸브 compId → 열림 여부 (Phase 15, 다음 틱 히스테리시스 입력) */
+  pressureValveOpen: Map<string, boolean>;
+  /**
+   * 어큐뮬레이터 compId → 외부 압력원(자신 제외)이 공급 중인지 (Phase 15).
+   * 엔진이 충전/방전 판정에 쓴다.
+   */
+  accumulatorSupplied: Map<string, boolean>;
 }
 
 interface Edge {
@@ -100,6 +107,23 @@ export function solveFluid(
   const staticEdges: Edge[] = [];
   /** 릴리프 밸브 목록 (활성 시 유로 레벨 상한) */
   const reliefs: { compId: string; netP: number; netT: number; setpoint: number }[] = [];
+  /**
+   * 부하압이 설정된 실린더 (Phase 15). 아직 행정이 남은 방향으로 실제 이동 가능하면
+   * 공급 유로 전체의 레벨을 부하압으로 제한한다 — 운동 중에는 라인 압력이 부하압까지
+   * 낮아지고 행정 완료(정지)에서 소스 압력까지 상승하는 거동.
+   */
+  const loadCylinders: {
+    compId: string;
+    headPort: string;
+    rodPort?: string;
+    netHead: number;
+    netRod?: number;
+    load: number;
+  }[] = [];
+  /** 어큐뮬레이터 (Phase 15) — 잔량이 있으면 보조 압력원 */
+  const accumulators: { compId: string; net: number }[] = [];
+  /** 압력원 중 어큐뮬레이터를 제외한 실제 소스 (충전/방전 판정용) */
+  const realSourceNets = new Set<number>();
 
   const net = (compId: string, pid: string) => netOfPort.get(portKey(compId, pid))!;
   const addSource = (n: number, level: number) => {
@@ -116,7 +140,16 @@ export function solveFluid(
     switch (behavior.role) {
       case "source":
         addSource(net(comp.id, behavior.port), Number(comp.properties.pressure ?? 6));
+        realSourceNets.add(net(comp.id, behavior.port));
         break;
+      case "accumulator": {
+        accumulators.push({ compId: comp.id, net: net(comp.id, behavior.port) });
+        // 잔량이 있으면 보조 압력원 — 방전에 따라 레벨이 함께 낮아진다
+        const charge = clamp01(Number(runtime?.accumulatorCharge ?? 0));
+        const stored = Number(runtime?.accumulatorLevel ?? 0);
+        if (charge > 0 && stored > 0) addSource(net(comp.id, behavior.port), stored * charge);
+        break;
+      }
       case "reducer":
         // 정방향만 감압 — 역방향 흐름에는 cap을 적용하지 않는다 (codex-review 감압 방향 결함)
         staticEdges.push({
@@ -167,6 +200,7 @@ export function solveFluid(
       }
       case "hydraulic-power-unit":
         addSource(net(comp.id, behavior.pressurePort), Number(comp.properties.pressure ?? 40));
+        realSourceNets.add(net(comp.id, behavior.pressurePort));
         exhaustNets.add(net(comp.id, behavior.tankPort));
         break;
       case "check-valve":
@@ -182,11 +216,25 @@ export function solveFluid(
           // R은 배기 전용 — 동적 연결 단계에서 A→R이 열릴 때만 의미 있음
         }
         break;
+      case "cylinder": {
+        const load = Number(comp.properties.loadPressure ?? 0);
+        if (load > 0) {
+          loadCylinders.push({
+            compId: comp.id,
+            headPort: behavior.headPort,
+            rodPort: behavior.rodPort,
+            netHead: net(comp.id, behavior.headPort),
+            netRod: behavior.rodPort ? net(comp.id, behavior.rodPort) : undefined,
+            load,
+          });
+        }
+        break;
+      }
       case "motor": // 실린더처럼 두 포트를 소비 단자로 취급 (가압/배출 조합이 회전 방향)
-      case "cylinder":
       case "shuttle":
       case "two-pressure":
       case "pilot-check":
+      case "pressure-pilot-valve": // 개폐가 파일럿 레벨에 의존 — 아래 반복 해석에서
         break;
       case "elec-supply":
       case "elec-contact":
@@ -214,16 +262,25 @@ export function solveFluid(
   let result: SolveResult | null = null;
 
   // 동적 연결 부품 수에 비례한 반복 상한 (긴 셔틀 체인 등도 한 틱에 수렴)
-  const dynamicCount = doc.components.filter((c) => {
-    const role = getComponentDefinition(c.type).behavior?.role;
-    return role === "shuttle" || role === "two-pressure" || role === "quick-exhaust" || role === "pilot-check";
-  }).length;
+  const dynamicCount =
+    doc.components.filter((c) => {
+      const role = getComponentDefinition(c.type).behavior?.role;
+      return (
+        role === "shuttle" ||
+        role === "two-pressure" ||
+        role === "quick-exhaust" ||
+        role === "pilot-check" ||
+        role === "pressure-pilot-valve"
+      );
+    }).length + loadCylinders.length;
   const maxIter = Math.max(4, dynamicCount + 2);
   let converged = false;
 
   for (let iter = 0; iter < maxIter; iter++) {
     const edges = [...staticEdges];
     const dynExhaustNets = new Set(exhaustNets);
+    /** 이번 반복의 압력 조작 밸브 개폐 (Phase 15) */
+    const pressureValveOpenNow = new Map<string, boolean>();
 
     for (const comp of doc.components) {
       const behavior = getComponentDefinition(comp.type).behavior;
@@ -270,6 +327,23 @@ export function solveFluid(
           factorAB: 1,
           factorBA: pilotOn ? 1 : 0,
         });
+      } else if (behavior.role === "pressure-pilot-valve") {
+        // 파일럿 압력이 설정압 이상이면 개방. 한번 열리면 파일럿이 무압이 될 때까지
+        // 유지한다 (히스테리시스 — 부하압 캡과의 개폐 채터 방지, Phase 15)
+        const pilotPid = behavior.pilotPort ?? behavior.portIn;
+        const pilotKey = portKey(comp.id, pilotPid);
+        const pilotOn = (portStatePrev.get(pilotKey) ?? "blocked") === "pressurized";
+        const pilotLevel = portLevelPrev.get(pilotKey) ?? 0;
+        const setpoint = Number(comp.properties.pressure ?? 30);
+        const latched = runtimes.get(comp.id)?.pressureValveOpen === true;
+        const open = pilotOn && (pilotLevel >= setpoint || latched);
+        pressureValveOpenNow.set(comp.id, open);
+        edges.push({
+          a: net(comp.id, behavior.portIn),
+          b: net(comp.id, behavior.portOut),
+          factorAB: open ? 1 : 0,
+          factorBA: behavior.checkBypass ? 1 : 0,
+        });
       } else if (behavior.role === "quick-exhaust") {
         if (stateOf(behavior.inP) === "pressurized") {
           edges.push({ a: net(comp.id, behavior.inP), b: net(comp.id, behavior.outA), factorAB: 1, factorBA: 1 });
@@ -286,6 +360,15 @@ export function solveFluid(
     for (const n of sourceNets) supply[n] = 1;
     relax(supply, edges);
 
+    // 어큐뮬레이터 충전/방전 판정용 — 어큐뮬레이터를 뺀 실제 압력원만으로 재전파.
+    // 외부 공급이 살아 있으면 충전, 끊기면 방전 (Phase 15)
+    let supplyExternal: number[] | null = null;
+    if (accumulators.length > 0) {
+      supplyExternal = new Array<number>(netCount).fill(0);
+      for (const n of realSourceNets) supplyExternal[n] = 1;
+      relax(supplyExternal, edges);
+    }
+
     // 배기(탱크 개방) 전파 — 흐름 방향을 따라 배기 터미널까지 열린 유로 전체를 계산.
     // 공급이 함께 닿은 넷은 관통 유로(언로딩)로 분류된다 (review-2: 오픈/탠덤 센터 무부하)
     const exhaust = new Array<number>(netCount).fill(0);
@@ -298,6 +381,30 @@ export function solveFluid(
     relaxLevel(level, edges);
     /** cap 적용 전 레벨 — 릴리프의 "초과분 존재" 판정용 */
     const preCapLevel = [...level];
+
+    // 부하압 캡 (Phase 15): 실제로 움직일 수 있는 실린더는 유량을 소비하므로
+    // 공급 유로 전체가 부하압까지 낮아진다. 행정 끝이거나 반대편이 갇혀(클로즈드
+    // 센터 등) 움직이지 못하면 캡이 없어 소스 압력까지 상승한다.
+    // 릴리프 캡보다 먼저 적용해, 실린더 운동 중에는 릴리프가 열리지 않도록 한다.
+    for (const lc of loadCylinders) {
+      const pos = runtimes.get(lc.compId)?.cylinderPos ?? 0;
+      const stateAt = (pid: string) => portStatePrev.get(portKey(lc.compId, pid)) ?? "blocked";
+      const head = stateAt(lc.headPort);
+      const rod = lc.rodPort ? stateAt(lc.rodPort) : undefined;
+      let capNet: number | null = null;
+      if (rod === undefined) {
+        // 단동: 가압되면 전진, 배기되면 스프링 복귀 (복귀는 공급 유로가 없음)
+        if (head === "pressurized" && pos < 1 - STROKE_EPS) capNet = lc.netHead;
+      } else if (head === "pressurized" && rod === "exhausted" && pos < 1 - STROKE_EPS) {
+        capNet = lc.netHead;
+      } else if (rod === "pressurized" && head === "exhausted" && pos > STROKE_EPS) {
+        capNet = lc.netRod ?? null;
+      }
+      if (capNet === null) continue;
+      for (const n of connectedRegion(capNet, netCount, edges)) {
+        level[n] = Math.min(level[n], lc.load);
+      }
+    }
 
     // 릴리프 밸브: 탱크 경로가 살아 있고 라인이 설정압을 넘으면
     // 압력 포트가 속한 유로(간선으로 이어진 영역) 전체의 레벨을 설정값으로 제한 (H6)
@@ -354,7 +461,20 @@ export function solveFluid(
       if (wire.kind === "electric") continue;
       wireState.set(wire.id, portState.get(portKey(wire.from.componentId, wire.from.portId)) ?? "blocked");
     }
-    result = { portState, supplyFactor, exhaustFactor, supplyLevel, wireState, reliefActive };
+    const accumulatorSupplied = new Map<string, boolean>();
+    for (const acc of accumulators) {
+      accumulatorSupplied.set(acc.compId, (supplyExternal?.[acc.net] ?? 0) > 0);
+    }
+    result = {
+      portState,
+      supplyFactor,
+      exhaustFactor,
+      supplyLevel,
+      wireState,
+      reliefActive,
+      pressureValveOpen: pressureValveOpenNow,
+      accumulatorSupplied,
+    };
 
     // 고정점 검사 (상태 + 레벨)
     let changed = false;
@@ -399,6 +519,9 @@ function connectedRegion(start: number, netCount: number, edges: Edge[]): Set<nu
   }
   return seen;
 }
+
+/** 행정 끝 판정 허용 오차 (부하압 캡 — 끝에 닿으면 압력이 소스까지 상승) */
+const STROKE_EPS = 1e-6;
 
 function clamp01(v: number, min = 0): number {
   if (Number.isNaN(v)) return min;
