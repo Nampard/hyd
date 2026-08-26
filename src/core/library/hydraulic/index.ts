@@ -269,7 +269,7 @@ export const sequenceValve: ComponentDefinition = {
     { key: "pressure", label: "작동 압력", type: "number", default: 30, min: 1, max: 300, step: 1, unit: "bar" },
   ],
   symbolId: "hyd.sequence",
-  bounds: { x: -32, y: -40, width: 64, height: 74 },
+  bounds: { x: -30, y: -50, width: 60, height: 78 },
   // 내부 파일럿(P) — 입구 압력이 설정압에 도달하면 2차 회로(A)를 연다.
   // 체크 바이패스로 A→P 귀환은 자유 (2차 실린더 복귀 경로)
   behavior: { role: "pressure-pilot-valve", portIn: "P", portOut: "A", checkBypass: true },
@@ -289,7 +289,7 @@ export const counterbalanceValve: ComponentDefinition = {
     { key: "pressure", label: "작동 압력", type: "number", default: 25, min: 1, max: 300, step: 1, unit: "bar" },
   ],
   symbolId: "hyd.counterbalance",
-  bounds: { x: -32, y: -40, width: 64, height: 74 },
+  bounds: { x: -30, y: -50, width: 60, height: 86 },
   // B(실린더측)→A(탱크측) 귀환은 외부 파일럿 X가 설정압에 도달해야 열린다 —
   // 공급압이 걸려야만 부하가 내려간다. A→B는 체크 바이패스로 자유 (복귀 공급)
   behavior: {
@@ -311,7 +311,7 @@ export const accumulator: ComponentDefinition = {
     { key: "holdTime", label: "압력 유지 시간", type: "number", default: 4, min: 0.5, max: 60, step: 0.5, unit: "초" },
   ],
   symbolId: "hyd.accumulator",
-  bounds: { x: -18, y: -30, width: 36, height: 62 },
+  bounds: { x: -16, y: -28, width: 32, height: 60 },
   behavior: { role: "accumulator", port: "P" },
 };
 

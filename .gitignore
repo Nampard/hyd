@@ -11,3 +11,6 @@ codex-review*.md
 
 # codex-review 증거 산출물 (리뷰 도구 생성)
 .omo/
+
+# 외부 에이전트 도구의 세션 상태 (프로젝트 산출물 아님)
+.omx/

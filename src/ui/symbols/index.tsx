@@ -887,8 +887,14 @@ function HydReducing({ properties }: SymbolProps): ReactElement {
 
 /**
  * 압력 조작 밸브 (Phase 15) — 시퀀스 밸브(내부 파일럿) · 카운터밸런스 밸브(외부 파일럿).
- * 하나의 외곽 박스 안에 압력 조작 유로(상단)와 체크 바이패스(하단)를 함께 그려
- * "체크 내장"을 표현한다. 개방은 기하를 바꾸지 않고 색상 overlay로만 표시 (review-3 원칙).
+ *
+ * KS B 0054 / ISO 1219-1 관례를 따른 교육용 단순화 작도:
+ * - 압력 조작 밸브는 사각 하나로 그리고, **정상 닫힘**은 유로 화살표를 포트 라인에서
+ *   스풀 축 방향으로 어긋나게 배치해 표현한다 (릴리프·감압 기호와 같은 규칙).
+ * - 스풀 축은 유로와 직각 — 설정 스프링은 사각 위, 파일럿은 사각 아래에 붙는다.
+ * - 체크 내장형은 **조합 유닛**: 압력 밸브와 체크밸브를 별개 기호로 그리고 좌·우
+ *   매니폴드로 병렬 연결한 뒤 일점쇄선 외곽으로 묶는다 (한 몸체임을 뜻하는 표기).
+ * 개방 상태는 기하를 바꾸지 않고 색상 overlay로만 표시한다 (review-3 원칙).
  */
 function HydPressureValve({
   properties,
@@ -899,66 +905,91 @@ function HydPressureValve({
   const open = runtime?.pressureValveOpen === true;
   return (
     <g>
-      <rect x={-20} y={-18} width={40} height={36} {...S} fill={open ? "var(--energized)" : "none"} />
-      {/* 상단: 압력 도달 시 열리는 유로 (정상 닫힘이라 포트 라인에서 오프셋) */}
-      <FlowArrow x1={-14} y1={-9} x2={14} y2={-9} />
-      {/* 하단: 체크 바이패스 (역방향 자유 흐름) */}
-      <polyline points="6,3 -2,9 6,15" {...Sthin} />
-      <line x1={-4} y1={3} x2={-4} y2={15} {...Sthin} />
-      {/* 유로 스텁 */}
-      <line x1={-30} y1={0} x2={-20} y2={0} {...S} />
-      <line x1={20} y1={0} x2={30} y2={0} {...S} />
-      {/* 설정 스프링 */}
-      <g transform="translate(0,-18) rotate(90)">
+      {/* 조합 유닛 외곽 (일점쇄선) — 두 기호가 한 몸체임을 뜻한다 */}
+      <rect
+        x={-28}
+        y={-48}
+        width={56}
+        height={74}
+        {...Sthin}
+        strokeDasharray="9 3 2 3"
+        opacity={0.5}
+      />
+      {/* 설정 스프링 (스풀 축 = 세로) */}
+      <g transform="translate(0,-34) rotate(90) scale(0.55)">
         <SpringH x={0} dir={-1} />
       </g>
-      {/* 파일럿 — 내부(입구압) / 외부(X 포트) */}
+      {/* 압력 조작 밸브 — 유로 화살표가 포트 라인(사각 중심 y=-22)에서 위로
+          어긋나 있어 정상 닫힘을 뜻한다 (릴리프·감압 기호와 같은 규칙) */}
+      <rect x={-16} y={-34} width={32} height={24} {...S} fill={open ? "var(--energized)" : "none"} />
+      <FlowArrow x1={-11} y1={-28} x2={11} y2={-28} />
+      <line x1={-22} y1={-22} x2={-16} y2={-22} {...S} />
+      <line x1={16} y1={-22} x2={22} y2={-22} {...S} />
+      {/* 좌·우 매니폴드 — 압력 밸브와 체크를 병렬로 잇는다 */}
+      <line x1={-22} y1={-22} x2={-22} y2={18} {...S} />
+      <line x1={22} y1={-22} x2={22} y2={18} {...S} />
+      {/* 외부 포트 + 분기점 */}
+      <line x1={-30} y1={0} x2={-22} y2={0} {...S} />
+      <line x1={22} y1={0} x2={30} y2={0} {...S} />
+      <circle cx={-22} cy={0} r={2.5} fill="currentColor" stroke="none" />
+      <circle cx={22} cy={0} r={2.5} fill="currentColor" stroke="none" />
+      {/* 파일럿 — 내부(입구압 인출) / 외부(X 포트) */}
       {pilot === "internal" ? (
-        <polyline points="-26,0 -26,28 0,28 0,18" {...Sthin} strokeDasharray="4 3" />
+        <polyline points="-22,8 0,8 0,-10" {...Sthin} strokeDasharray="4 3" />
       ) : (
         <>
-          <line x1={0} y1={30} x2={0} y2={18} {...Sthin} strokeDasharray="4 3" />
-          <text x={4} y={30} fontSize={9} fill="currentColor" stroke="none">X</text>
+          <polyline points="0,30 0,24 -11,24 -11,-10" {...Sthin} strokeDasharray="4 3" />
+          <text x={4} y={31} fontSize={9} fill="currentColor" stroke="none">
+            X
+          </text>
         </>
       )}
-      <text x={24} y={-22} fontSize={8} fill="currentColor" stroke="none">{setpoint} bar</text>
+      {/* 체크 바이패스 — 자유 흐름은 오른쪽(A)에서 들어와 볼을 시트에서 밀어낸다 */}
+      <line x1={-22} y1={18} x2={-4} y2={18} {...S} />
+      <circle cx={2} cy={18} r={5} {...S} />
+      <polyline points="3,11 10,18 3,25" {...S} />
+      <line x1={10} y1={18} x2={22} y2={18} {...S} />
+      <text x={6} y={-36} fontSize={7} fill="currentColor" stroke="none">
+        {setpoint} bar
+      </text>
     </g>
   );
 }
 
-/** 어큐뮬레이터 (Phase 15) — 가스식 축압기. 잔량을 유체 채움으로 표시 */
+/**
+ * 어큐뮬레이터 (Phase 15) — 기체식 축압기.
+ * KS B 0054 / ISO 1219-1 관례: 세로 캡슐 + 상부를 가로지르는 기체실 경계선,
+ * 하단 중앙에 접속 유로. 잔량(충전율)은 규범 기호가 아니라 시뮬레이션 overlay로
+ * 액실 채움 + 수치 표시.
+ */
 function HydAccumulator({ properties, runtime }: SymbolProps): ReactElement {
   const charge = Math.max(0, Math.min(1, Number(runtime?.accumulatorCharge ?? 0)));
-  const top = -28;
-  const height = 44;
-  const fillH = (height - 16) * charge;
+  const top = -26;
+  const bottom = 18;
+  const gasLine = -13; // 기체실 경계 (상부 1/3)
+  const fluidTop = gasLine + 1;
+  const fillH = (bottom - 1 - fluidTop) * charge;
   return (
     <g>
-      <rect x={-14} y={top} width={28} height={height} rx={13} {...S} />
       {charge > 0 && (
         <rect
-          x={-12}
-          y={top + height - 2 - fillH}
-          width={24}
+          x={-11}
+          y={bottom - 1 - fillH}
+          width={22}
           height={fillH}
           fill="var(--energized)"
-          opacity={0.55}
+          opacity={0.5}
           stroke="none"
         />
       )}
-      {/* 가스실 경계 */}
-      <path d={`M -12 ${top + 15} Q 0 ${top + 6} 12 ${top + 15}`} {...Sthin} />
-      <line x1={0} y1={top + height} x2={0} y2={30} {...S} />
-      {runtime && (
-        <text x={17} y={-6} fontSize={8} fill="currentColor" stroke="none">
-          {Math.round(charge * 100)}%
-        </text>
-      )}
-      {!runtime && (
-        <text x={17} y={-6} fontSize={8} fill="currentColor" stroke="none">
-          {Number(properties.holdTime ?? 4)}초
-        </text>
-      )}
+      <rect x={-13} y={top} width={26} height={bottom - top} rx={13} {...S} />
+      {/* 기체실 경계 */}
+      <line x1={-12.5} y1={gasLine} x2={12.5} y2={gasLine} {...S} />
+      {/* 접속 유로 */}
+      <line x1={0} y1={bottom} x2={0} y2={30} {...S} />
+      <text x={0} y={11} fontSize={7} textAnchor="middle" fill="currentColor" stroke="none">
+        {runtime ? `${Math.round(charge * 100)}%` : `${Number(properties.holdTime ?? 4)}초`}
+      </text>
     </g>
   );
 }
