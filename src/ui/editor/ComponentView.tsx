@@ -42,7 +42,8 @@ interface Props {
   wireTargets: Map<string, boolean> | null;
   /** 시뮬레이션 런타임 (실행 중이 아니면 null) */
   runtime: SymbolRuntime | null;
-  onSelect(): void;
+  /** additive=true면 Shift+클릭 — 다중 선택 토글 (Phase 18) */
+  onSelect(additive: boolean): void;
   onDragStart(e: React.PointerEvent): void;
   onPortClick(ref: PortRef): void;
 }
@@ -78,8 +79,9 @@ export function ComponentView({
     if (e.button !== 0) return;
     e.stopPropagation();
     if (!simRunning) {
-      onSelect();
-      onDragStart(e);
+      onSelect(e.shiftKey);
+      // Shift+클릭은 선택만 바꾸고 드래그를 시작하지 않는다 (다중 선택 중 오이동 방지)
+      if (!e.shiftKey) onDragStart(e);
       return;
     }
     if (actuatable) {
@@ -96,7 +98,7 @@ export function ComponentView({
         window.addEventListener("pointerup", release);
       }
     } else {
-      onSelect(); // 실행 중에도 속성 열람은 허용
+      onSelect(false); // 실행 중에도 속성 열람은 허용
     }
   };
 

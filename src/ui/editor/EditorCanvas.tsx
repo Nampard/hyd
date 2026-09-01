@@ -3,6 +3,7 @@ import { useEditorStore } from "./store";
 import type { Point, PortRef } from "../../core/model/types";
 import {
   canConnect,
+  componentsInRect,
   getComponent,
   getPortDefinition,
   getPortWorldPosition,
@@ -23,7 +24,8 @@ const MAX_ZOOM = 4;
 type Gesture =
   | { mode: "idle" }
   | { mode: "pan"; startScreen: Point; startViewport: Point }
-  | { mode: "drag-component"; id: string; grabOffset: Point; started: boolean };
+  | { mode: "drag-component"; id: string; grabOffset: Point; started: boolean }
+  | { mode: "marquee"; startWorld: Point };
 
 export function EditorCanvas(): ReactElement {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -32,6 +34,8 @@ export function EditorCanvas(): ReactElement {
 
   const doc = useEditorStore((s) => s.document);
   const selection = useEditorStore((s) => s.selection);
+  const selectedIds = useEditorStore((s) => s.selectedIds);
+  const [marquee, setMarquee] = useState<{ a: Point; b: Point } | null>(null);
   const viewport = useEditorStore((s) => s.viewport);
   const placingType = useEditorStore((s) => s.placingType);
   const pendingWireFrom = useEditorStore((s) => s.pendingWireFrom);
@@ -92,6 +96,14 @@ export function EditorCanvas(): ReactElement {
       s.cancelWire();
       return;
     }
+    // Shift + 좌드래그 = 영역 선택 (좌드래그 팬은 그대로 유지, Phase 18)
+    if (e.button === 0 && e.shiftKey) {
+      const start = screenToWorld(e.clientX, e.clientY);
+      gestureRef.current = { mode: "marquee", startWorld: start };
+      setMarquee({ a: start, b: start });
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+      return;
+    }
     if (e.button === 0 || e.button === 1) {
       gestureRef.current = {
         mode: "pan",
@@ -115,6 +127,8 @@ export function EditorCanvas(): ReactElement {
         y: g.startViewport.y + (e.clientY - g.startScreen.y),
         zoom: s.viewport.zoom,
       });
+    } else if (g.mode === "marquee") {
+      setMarquee({ a: g.startWorld, b: world });
     } else if (g.mode === "drag-component") {
       const s = useEditorStore.getState();
       if (!g.started) {
@@ -132,6 +146,16 @@ export function EditorCanvas(): ReactElement {
     const g = gestureRef.current;
     if (g.mode === "drag-component" && g.started) {
       useEditorStore.getState().endDrag();
+    }
+    if (g.mode === "marquee" && marquee) {
+      const rect = {
+        minX: Math.min(marquee.a.x, marquee.b.x),
+        minY: Math.min(marquee.a.y, marquee.b.y),
+        maxX: Math.max(marquee.a.x, marquee.b.x),
+        maxY: Math.max(marquee.a.y, marquee.b.y),
+      };
+      useEditorStore.getState().selectArea(componentsInRect(doc, rect));
+      setMarquee(null);
     }
     gestureRef.current = { mode: "idle" };
   };
@@ -265,14 +289,37 @@ export function EditorCanvas(): ReactElement {
           <ComponentView
             key={comp.id}
             component={comp}
-            selected={selection?.type === "component" && selection.id === comp.id}
+            selected={
+              selectedIds.includes(comp.id) ||
+              (selection?.type === "component" && selection.id === comp.id)
+            }
             wireTargets={simRunning ? null : wireTargetsFor(comp.id)}
             runtime={simRunning ? (simSnapshot?.components[comp.id] ?? null) : null}
-            onSelect={() => useEditorStore.getState().select({ type: "component", id: comp.id })}
+            onSelect={(additive) => {
+              const s = useEditorStore.getState();
+              // Shift+클릭이면 다중 선택에 추가/제거 (Phase 18)
+              if (additive) s.toggleSelected(comp.id);
+              else s.select({ type: "component", id: comp.id });
+            }}
             onDragStart={startComponentDrag(comp.id)}
             onPortClick={onPortClick}
           />
         ))}
+
+        {marquee && (
+          <rect
+            x={Math.min(marquee.a.x, marquee.b.x)}
+            y={Math.min(marquee.a.y, marquee.b.y)}
+            width={Math.abs(marquee.b.x - marquee.a.x)}
+            height={Math.abs(marquee.b.y - marquee.a.y)}
+            fill="var(--accent)"
+            fillOpacity={0.08}
+            stroke="var(--accent)"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            pointerEvents="none"
+          />
+        )}
 
         {placingGhost}
       </g>

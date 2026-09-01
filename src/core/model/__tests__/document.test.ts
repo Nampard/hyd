@@ -5,8 +5,11 @@ import {
   addComponent,
   addWire,
   canConnect,
+  componentsInRect,
   deleteComponent,
   duplicateComponent,
+  extractGroup,
+  pasteGroup,
   getPortWorldPosition,
   getPortDefinition,
   moveComponent,
@@ -318,5 +321,61 @@ describe("직교 라우팅", () => {
       { x: 0, y: 10 },
       { x: 60, y: 10 },
     ]);
+  });
+});
+
+describe("그룹 복사·붙여넣기 (Phase 18)", () => {
+  /** 부품 3개 + 배선 2개 (source→cylinder HEAD, source→cylinder ROD는 만들지 않음) */
+  function rig() {
+    let doc = createEmptyDocument();
+    const src = addComponent(doc, "pneu.source", { x: 0, y: 0 });
+    const cyl = addComponent(src.doc, "pneu.cylinder.double", { x: 200, y: 0 });
+    const other = addComponent(cyl.doc, "pneu.source", { x: 400, y: 400 });
+    doc = addWire(
+      other.doc,
+      { componentId: src.component.id, portId: "P" },
+      { componentId: cyl.component.id, portId: "HEAD" },
+      [],
+    );
+    // 선택 밖으로 나가는 배선 — 복사되면 안 된다
+    doc = addWire(
+      doc,
+      { componentId: other.component.id, portId: "P" },
+      { componentId: cyl.component.id, portId: "ROD" },
+      [],
+    );
+    return { doc, srcId: src.component.id, cylId: cyl.component.id, otherId: other.component.id };
+  }
+
+  it("선택 안의 배선만 함께 뽑는다", () => {
+    const { doc, srcId, cylId } = rig();
+    const group = extractGroup(doc, [srcId, cylId]);
+    expect(group.components).toHaveLength(2);
+    expect(group.wires).toHaveLength(1); // 선택 밖으로 나가는 배선은 제외
+  });
+
+  it("붙여넣으면 부품과 내부 배선이 새 id로 복제된다", () => {
+    const { doc, srcId, cylId } = rig();
+    const group = extractGroup(doc, [srcId, cylId]);
+    const { doc: pasted, componentIds } = pasteGroup(doc, group, { x: 20, y: 20 });
+
+    expect(componentIds).toHaveLength(2);
+    expect(pasted.components).toHaveLength(5); // 원본 3 + 사본 2
+    expect(pasted.wires).toHaveLength(3); // 원본 2 + 사본 1
+    // 사본 배선은 사본 부품끼리 이어진다 (원본에 끼어들지 않는다)
+    const newWire = pasted.wires[pasted.wires.length - 1];
+    expect(componentIds).toContain(newWire.from.componentId);
+    expect(componentIds).toContain(newWire.to.componentId);
+    // 위치는 offset만큼 옮겨진다
+    const pastedSrc = pasted.components.find((c) => c.id === componentIds[0])!;
+    expect(pastedSrc.position).toEqual({ x: 20, y: 20 });
+  });
+
+  it("영역 선택은 사각형과 겹치는 부품을 고른다", () => {
+    const { doc, srcId, cylId, otherId } = rig();
+    const near = componentsInRect(doc, { minX: -50, minY: -50, maxX: 250, maxY: 50 });
+    expect(near).toContain(srcId);
+    expect(near).toContain(cylId);
+    expect(near).not.toContain(otherId);
   });
 });

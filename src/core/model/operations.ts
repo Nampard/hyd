@@ -53,6 +53,94 @@ export function duplicateComponent(
   return { doc: { ...doc, components: [...doc.components, component] }, component };
 }
 
+/** 복사·붙여넣기 스냅숏 (Phase 18) — 부품들과 그 사이의 내부 배선 */
+export interface ComponentGroup {
+  components: ComponentInstance[];
+  wires: Wire[];
+}
+
+/**
+ * 선택된 부품들과 **양끝이 모두 선택 안에 있는 배선**만 스냅숏으로 뽑는다 (Phase 18).
+ * 한쪽 끝이 선택 밖인 배선을 함께 복사하면 붙여넣은 사본이 원본 회로에 끼어들어
+ * 의도치 않은 연결을 만든다.
+ */
+export function extractGroup(doc: CircuitDocument, componentIds: string[]): ComponentGroup {
+  const ids = new Set(componentIds);
+  const components = doc.components
+    .filter((c) => ids.has(c.id))
+    .map((c) => ({ ...c, properties: { ...c.properties } }));
+  const wires = doc.wires.filter(
+    (w) => ids.has(w.from.componentId) && ids.has(w.to.componentId),
+  );
+  return { components, wires };
+}
+
+/**
+ * 스냅숏을 offset만큼 옮겨 붙여넣는다 (Phase 18). 부품은 새 id를 받고,
+ * 내부 배선은 새 id로 다시 이어 붙이며 경로를 재계산한다.
+ */
+export function pasteGroup(
+  doc: CircuitDocument,
+  group: ComponentGroup,
+  offset: Point,
+): { doc: CircuitDocument; componentIds: string[] } {
+  const idMap = new Map<string, string>();
+  let next = doc;
+  const componentIds: string[] = [];
+  for (const source of group.components) {
+    const result = duplicateComponent(next, source, {
+      x: source.position.x + offset.x,
+      y: source.position.y + offset.y,
+    });
+    next = result.doc;
+    idMap.set(source.id, result.component.id);
+    componentIds.push(result.component.id);
+  }
+  for (const wire of group.wires) {
+    const fromId = idMap.get(wire.from.componentId);
+    const toId = idMap.get(wire.to.componentId);
+    if (!fromId || !toId) continue;
+    next = autoWire(
+      next,
+      { componentId: fromId, portId: wire.from.portId },
+      { componentId: toId, portId: wire.to.portId },
+    );
+  }
+  return { doc: next, componentIds };
+}
+
+/** 부품의 월드 좌표 AABB (회전 반영) — 영역 선택 판정용 (Phase 18) */
+export function getComponentWorldBounds(comp: ComponentInstance): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+} {
+  const b = getComponentDefinition(comp.type).bounds;
+  const corners: Point[] = [
+    { x: b.x, y: b.y },
+    { x: b.x + b.width, y: b.y },
+    { x: b.x, y: b.y + b.height },
+    { x: b.x + b.width, y: b.y + b.height },
+  ].map((p) => addPoints(comp.position, rotatePoint(p, comp.rotation)));
+  const xs = corners.map((p) => p.x);
+  const ys = corners.map((p) => p.y);
+  return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+}
+
+/** 사각 영역과 겹치는 부품 id 목록 (Phase 18 — 영역 선택) */
+export function componentsInRect(
+  doc: CircuitDocument,
+  rect: { minX: number; minY: number; maxX: number; maxY: number },
+): string[] {
+  return doc.components
+    .filter((c) => {
+      const b = getComponentWorldBounds(c);
+      return b.minX <= rect.maxX && b.maxX >= rect.minX && b.minY <= rect.maxY && b.maxY >= rect.minY;
+    })
+    .map((c) => c.id);
+}
+
 export function moveComponent(
   doc: CircuitDocument,
   componentId: string,

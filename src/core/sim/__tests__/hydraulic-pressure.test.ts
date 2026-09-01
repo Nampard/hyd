@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerLibraries } from "../../library";
 import { getExample } from "../../examples";
+import { buildCircuit } from "../../examples/builder";
 import { SimulationEngine } from "../engine";
 import type { CircuitDocument } from "../../model/types";
 
@@ -209,5 +210,80 @@ describe("부하압 캡 (Phase 15)", () => {
     snap = run(engine, 1.5); // 행정 완료 → 압력 상승
     expect(snap.components[cyl].cylinderPos).toBe(1);
     expect(snap.components[gauge].portLevel!.P).toBeCloseTo(40, 5);
+  });
+});
+
+/**
+ * Phase 17 — 무부하(관통 배기) 라인은 하류로 압력을 밀어내지 못한다.
+ *
+ * 레버를 내리면 P→B가 탱크와 통해 펌프가 무부하로 돌고, 체크밸브 너머 라인은 격리된다.
+ * 정정 전에는 무부하 펌프의 만압이 체크밸브를 넘어 전파돼, 같은 회로에서 포트는
+ * "배기 0bar"인데 하류 압력계는 만압을 가리키고 어큐뮬레이터는 방전을 시작하지 못했다.
+ */
+function buildUnloadingRig(withAccumulator: boolean): CircuitDocument {
+  return buildCircuit("무부하 라인 시험", "레버를 내리면 펌프가 무부하로 돈다", (b) => {
+    const pu = b.place("hyd.power-unit", 300, 520);
+    const valve = b.place("hyd.valve.4-2-lever", 300, 390);
+    const chk = b.place("hyd.check", 430, 250);
+    const tee = b.place("hyd.tee", 540, 250);
+    const gauge = b.place("hyd.gauge", 540, 160);
+    // 귀환을 한 탱크로 모은다 — 레버를 내리면 P→B가 탱크와 통해 펌프가 무부하가 된다
+    const teeT = b.place("hyd.tee", 470, 480);
+    const tk = b.place("hyd.tank", 580, 480);
+
+    b.connect(pu, "P", valve, "P");
+    b.connect(valve, "A", chk, "A");
+    b.connect(chk, "B", tee, "1");
+    b.connect(tee, "3", gauge, "P");
+    if (withAccumulator) {
+      const acc = b.place("hyd.accumulator", 640, 160, { holdTime: 4 });
+      b.connect(tee, "2", acc, "P");
+    }
+    b.connect(valve, "T", teeT, "1");
+    b.connect(valve, "B", teeT, "3");
+    b.connect(teeT, "2", tk, "T");
+  });
+}
+
+describe("무부하 라인 압력 전파 (Phase 17)", () => {
+  it("펌프가 무부하로 돌면 체크밸브 너머로 만압이 전파되지 않는다", () => {
+    const doc = buildUnloadingRig(false);
+    const gauge = first(doc, "hyd.gauge");
+    const valve = first(doc, "hyd.valve.4-2-lever");
+    const engine = new SimulationEngine(doc);
+
+    // 레버 ON: P→A로 정상 공급 → 체크 너머도 40bar
+    engine.setManual(valve, true);
+    let snap = run(engine, 0.5);
+    expect(snap.components[gauge].portLevel!.P).toBeCloseTo(40, 5);
+    expect(snap.components[gauge].portState.P).toBe("pressurized");
+
+    // 레버 OFF: P→B가 탱크와 통해 펌프 무부하 → 하류는 갇힌 구간으로 0bar
+    engine.setManual(valve, false);
+    snap = run(engine, 0.5);
+    expect(snap.components[gauge].portLevel!.P).toBe(0);
+    expect(snap.components[gauge].portState.P).not.toBe("pressurized");
+  });
+
+  it("무부하 회로에서도 어큐뮬레이터가 방전을 시작한다", () => {
+    const doc = buildUnloadingRig(true);
+    const acc = first(doc, "hyd.accumulator");
+    const gauge = first(doc, "hyd.gauge");
+    const valve = first(doc, "hyd.valve.4-2-lever");
+    const engine = new SimulationEngine(doc);
+
+    engine.setManual(valve, true);
+    let snap = run(engine, 0.5);
+    expect(snap.components[acc].accumulatorCharge).toBe(1);
+    expect(snap.components[gauge].portLevel!.P).toBeCloseTo(40, 5);
+
+    // 펌프가 무부하로 돌아도 "공급 중"으로 오판하지 않고 방전이 시작된다
+    engine.setManual(valve, false);
+    snap = run(engine, 1);
+    expect(snap.components[acc].accumulatorCharge!).toBeCloseTo(0.75, 1);
+    expect(snap.components[gauge].portLevel!.P).toBeCloseTo(30, 0);
+
+    snap = run(engine, 3.5);
+    expect(snap.components[acc].accumulatorCharge).toBe(0);
   });
 });

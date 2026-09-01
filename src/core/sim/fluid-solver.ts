@@ -360,25 +360,45 @@ export function solveFluid(
     for (const n of sourceNets) supply[n] = 1;
     relax(supply, edges);
 
-    // 어큐뮬레이터 충전/방전 판정용 — 어큐뮬레이터를 뺀 실제 압력원만으로 재전파.
-    // 외부 공급이 살아 있으면 충전, 끊기면 방전 (Phase 15)
-    let supplyExternal: number[] | null = null;
-    if (accumulators.length > 0) {
-      supplyExternal = new Array<number>(netCount).fill(0);
-      for (const n of realSourceNets) supplyExternal[n] = 1;
-      relax(supplyExternal, edges);
-    }
-
     // 배기(탱크 개방) 전파 — 흐름 방향을 따라 배기 터미널까지 열린 유로 전체를 계산.
     // 공급이 함께 닿은 넷은 관통 유로(언로딩)로 분류된다 (review-2: 오픈/탠덤 센터 무부하)
     const exhaust = new Array<number>(netCount).fill(0);
     for (const n of dynExhaustNets) exhaust[n] = 1;
     relaxExhaust(exhaust, edges);
 
-    // 압력 레벨 전파 (경로상 최소 캡, 준정량)
+    /**
+     * 언로딩(관통 유로) 넷 — 공급과 탱크 개방이 동시에 닿아 압력이 서지 않는 구간.
+     * 결과 조립에서 "배기 0bar"로 보고되는 넷이므로, **레벨 전파에서도 같게 취급**한다
+     * (Phase 17). 이 판정을 레벨 전파 뒤에 두면 무부하 펌프의 만압이 체크밸브·감압밸브
+     * 너머 하류로 새어, 같은 회로에서 포트는 0bar인데 압력계는 만압인 모순이 생긴다.
+     */
+    const unloaded = new Array<boolean>(netCount);
+    for (let n = 0; n < netCount; n++) unloaded[n] = exhaust[n] > 0 && supply[n] > 0;
+
+    // 압력 레벨 전파 (경로상 최소 캡, 준정량). 언로딩 넷은 시딩에서 제외되고
+    // 전파 경로로도 쓰이지 않는다 — 압력이 서지 않는 구간은 하류를 밀어낼 수 없다.
     const level = new Array<number>(netCount).fill(0);
-    for (const [n, lv] of sourceLevels) level[n] = lv;
-    relaxLevel(level, edges);
+    for (const [n, lv] of sourceLevels) if (!unloaded[n]) level[n] = lv;
+    relaxLevel(level, edges, unloaded);
+
+    /**
+     * 어큐뮬레이터 충전/방전 판정 (Phase 15, 기준 정정 Phase 17).
+     * 어큐뮬레이터를 뺀 **실제 압력원만으로 레벨을 다시 전파**한다. 원시 가압 전파로
+     * 판정하면 무부하로 도는 펌프까지 "공급 중"으로 읽혀 방전이 시작되지 않는다.
+     */
+    let levelExternal: number[] | null = null;
+    if (accumulators.length > 0) {
+      const supplyExt = new Array<number>(netCount).fill(0);
+      for (const n of realSourceNets) supplyExt[n] = 1;
+      relax(supplyExt, edges);
+      const unloadedExt = new Array<boolean>(netCount);
+      for (let n = 0; n < netCount; n++) unloadedExt[n] = exhaust[n] > 0 && supplyExt[n] > 0;
+      levelExternal = new Array<number>(netCount).fill(0);
+      for (const [n, lv] of sourceLevels) {
+        if (realSourceNets.has(n) && !unloadedExt[n]) levelExternal[n] = lv;
+      }
+      relaxLevel(levelExternal, edges, unloadedExt);
+    }
     /** cap 적용 전 레벨 — 릴리프의 "초과분 존재" 판정용 */
     const preCapLevel = [...level];
 
@@ -443,18 +463,20 @@ export function solveFluid(
     const supplyLevel = new Map<string, number>();
     for (const k of allPortKeys) {
       const n = netOfPort.get(k)!;
-      const unloaded = exhaust[n] > 0 && supply[n] > 0;
-      const st: PressureState = unloaded
+      // 언로딩 구간을 거쳐 온 공급은 압력이 서지 않으므로 유효한 가압이 아니다.
+      // (레벨 전파가 언로딩 넷에서 끊기므로 level=0으로 나타난다 — Phase 17)
+      const pressurized = !unloaded[n] && supply[n] > 0 && level[n] > 0;
+      const st: PressureState = unloaded[n]
         ? "exhausted"
-        : supply[n] > 0
+        : pressurized
           ? "pressurized"
           : exhaust[n] > 0
             ? "exhausted"
             : "blocked";
       portState.set(k, st);
-      supplyFactor.set(k, unloaded ? 0 : supply[n]);
+      supplyFactor.set(k, pressurized ? supply[n] : 0);
       exhaustFactor.set(k, exhaust[n]);
-      supplyLevel.set(k, !unloaded && supply[n] > 0 ? level[n] : 0);
+      supplyLevel.set(k, pressurized ? level[n] : 0);
     }
     const wireState = new Map<string, PressureState>();
     for (const wire of doc.wires) {
@@ -463,7 +485,7 @@ export function solveFluid(
     }
     const accumulatorSupplied = new Map<string, boolean>();
     for (const acc of accumulators) {
-      accumulatorSupplied.set(acc.compId, (supplyExternal?.[acc.net] ?? 0) > 0);
+      accumulatorSupplied.set(acc.compId, (levelExternal?.[acc.net] ?? 0) > 0);
     }
     result = {
       portState,
@@ -548,19 +570,23 @@ function relax(values: number[], edges: Edge[]): void {
   }
 }
 
-/** 압력 레벨 완화: level[n] = max over 인접 (min(level[nb], 간선 레벨 캡)). 계수 0 간선은 통과 불가 */
-function relaxLevel(levels: number[], edges: Edge[]): void {
+/**
+ * 압력 레벨 완화: level[n] = max over 인접 (min(level[nb], 간선 레벨 캡)).
+ * 계수 0 간선은 통과 불가. `blocked[n]`(언로딩 넷)은 레벨을 받지도 전달하지도 않는다
+ * — 관통 배기로 압력이 서지 않는 구간은 하류를 밀어낼 수 없다 (Phase 17).
+ */
+function relaxLevel(levels: number[], edges: Edge[], blocked: boolean[]): void {
   for (let i = 0; i < levels.length + 1; i++) {
     let changed = false;
     for (const e of edges) {
-      if (e.factorAB > 0) {
+      if (e.factorAB > 0 && !blocked[e.a] && !blocked[e.b]) {
         const via = Math.min(levels[e.a], e.levelCapAB ?? Infinity);
         if (via > levels[e.b]) {
           levels[e.b] = via;
           changed = true;
         }
       }
-      if (e.factorBA > 0) {
+      if (e.factorBA > 0 && !blocked[e.a] && !blocked[e.b]) {
         const via = Math.min(levels[e.b], e.levelCapBA ?? Infinity);
         if (via > levels[e.a]) {
           levels[e.a] = via;

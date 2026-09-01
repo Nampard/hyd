@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { CircuitDocument, ComponentInstance, Point, PortRef } from "../../core/model/types";
+import type { CircuitDocument, Point, PortRef } from "../../core/model/types";
 import { createEmptyDocument } from "../../core/model/types";
 import {
   addComponent,
@@ -7,12 +7,14 @@ import {
   canConnect,
   deleteComponent,
   deleteWire,
-  duplicateComponent,
+  extractGroup,
   moveComponent,
+  pasteGroup,
   rerouteAttachedWires,
   rotateComponent,
   updateComponentProperty,
 } from "../../core/model/operations";
+import type { ComponentGroup } from "../../core/model/operations";
 
 export type Selection = { type: "component" | "wire"; id: string } | null;
 
@@ -44,10 +46,12 @@ interface EditorState {
   equipmentViewOpen: boolean;
   /** 변위단계선도 패널 표시 여부 */
   diagramPanelOpen: boolean;
-  /** 복사한 부품 (Phase 16-3). 문서에 저장되지 않는 편집 세션 상태 */
-  clipboard: ComponentInstance | null;
-  /** 연속 붙여넣기 시 겹치지 않도록 직전 붙여넣기 위치를 기억한다 */
-  lastPastePosition: Point | null;
+  /** 복사한 부품 묶음 (Phase 16-3, Phase 18에서 다중 선택으로 확장) */
+  clipboard: ComponentGroup | null;
+  /** 연속 붙여넣기 시 겹치지 않도록 누적하는 오프셋 단계 */
+  pasteSteps: number;
+  /** 다중 선택된 부품 id 목록 (Phase 18). 단일 선택은 selection과 함께 유지된다 */
+  selectedIds: string[];
 
   // 문서 수명주기
   newDocument(): void;
@@ -70,10 +74,14 @@ interface EditorState {
   rotateSelection(): void;
   deleteSelection(): void;
   setProperty(componentId: string, key: string, value: unknown): void;
-  /** 선택한 부품을 클립보드에 복사 (Phase 16-3) */
+  /** 선택한 부품(들)을 내부 배선과 함께 클립보드에 복사 (Phase 16-3 · 18) */
   copySelection(): void;
-  /** 클립보드의 부품을 조금 어긋난 위치에 붙여넣고 선택 상태로 만든다 */
+  /** 클립보드 묶음을 조금 어긋난 위치에 붙여넣고 선택 상태로 만든다 */
   pasteClipboard(): void;
+  /** 영역 선택 결과로 다중 선택을 설정 (Phase 18) */
+  selectArea(ids: string[]): void;
+  /** Shift+클릭 — 다중 선택에 추가/제거 (Phase 18) */
+  toggleSelected(id: string): void;
 
   // 배선
   startWire(from: PortRef): void;
@@ -101,6 +109,16 @@ const MAX_HISTORY = 100;
 /** 붙여넣기 위치 오프셋 (그리드 10px 기준 2칸 — 원본과 겹치지 않으면서 가깝게) */
 const PASTE_OFFSET = 20;
 
+/**
+ * 현재 선택된 부품 id 목록 (Phase 18).
+ * 다중 선택이 있으면 그것을, 없으면 단일 선택(부품일 때)을 쓴다 —
+ * 기존 단일 선택 동작(속성 편집·회전·삭제)이 그대로 유지된다.
+ */
+function selectedComponentIds(state: { selectedIds: string[]; selection: Selection }): string[] {
+  if (state.selectedIds.length > 0) return state.selectedIds;
+  return state.selection?.type === "component" ? [state.selection.id] : [];
+}
+
 function pushHistory(state: EditorState, snapshot: CircuitDocument) {
   const past = [...state.past, snapshot];
   if (past.length > MAX_HISTORY) past.shift();
@@ -124,7 +142,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   equipmentViewOpen: false,
   diagramPanelOpen: false,
   clipboard: null,
-  lastPastePosition: null,
+  pasteSteps: 0,
+  selectedIds: [],
 
   newDocument() {
     const doc = createEmptyDocument();
@@ -134,6 +153,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       past: [],
       future: [],
       selection: null,
+      selectedIds: [],
       pendingWireFrom: null,
       placingType: null,
       statusMessage: "새 회로를 시작했습니다.",
@@ -147,6 +167,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       past: [],
       future: [],
       selection: null,
+      selectedIds: [],
       pendingWireFrom: null,
       placingType: null,
       statusMessage: `"${doc.meta.title}" 불러오기 완료`,
@@ -184,7 +205,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   startPlacing(type) {
-    set({ placingType: type, pendingWireFrom: null, selection: null, statusMessage: null });
+    set({ placingType: type, pendingWireFrom: null, selection: null, selectedIds: [], statusMessage: null });
   },
 
   cancelPlacing() {
@@ -226,49 +247,84 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   rotateSelection() {
     const state = get();
-    if (state.selection?.type !== "component") return;
-    let doc = rotateComponent(state.document, state.selection.id);
-    doc = rerouteAttachedWires(doc, state.selection.id);
+    const ids = selectedComponentIds(state);
+    if (ids.length === 0) return;
+    let doc = state.document;
+    for (const id of ids) {
+      doc = rotateComponent(doc, id);
+      doc = rerouteAttachedWires(doc, id);
+    }
     set({ document: doc, ...pushHistory(state, state.document) });
   },
 
   copySelection() {
     const state = get();
-    if (state.selection?.type !== "component") return;
-    const source = state.document.components.find((c) => c.id === state.selection!.id);
-    if (!source) return;
+    const ids = selectedComponentIds(state);
+    if (ids.length === 0) return;
+    const group = extractGroup(state.document, ids);
     set({
-      // 속성 객체까지 복사해 원본 편집이 클립보드에 새지 않게 한다
-      clipboard: { ...source, properties: { ...source.properties } },
-      lastPastePosition: null,
-      statusMessage: "부품을 복사했습니다 — Ctrl+V로 붙여넣기",
+      clipboard: group,
+      pasteSteps: 0,
+      statusMessage:
+        group.components.length > 1
+          ? `부품 ${group.components.length}개와 그 사이 배선 ${group.wires.length}개를 복사했습니다 — Ctrl+V로 붙여넣기`
+          : "부품을 복사했습니다 — Ctrl+V로 붙여넣기",
     });
   },
 
   pasteClipboard() {
     const state = get();
-    const source = state.clipboard;
-    if (!source) return;
-    // 연속으로 붙여넣으면 직전 붙여넣기 위치에서 다시 어긋나게 쌓인다
-    const base = state.lastPastePosition ?? source.position;
-    const position = { x: base.x + PASTE_OFFSET, y: base.y + PASTE_OFFSET };
-    const { doc, component } = duplicateComponent(state.document, source, position);
+    const group = state.clipboard;
+    if (!group || group.components.length === 0) return;
+    // 연속으로 붙여넣으면 단계마다 더 어긋나게 쌓인다
+    const steps = state.pasteSteps + 1;
+    const delta = PASTE_OFFSET * steps;
+    const { doc, componentIds } = pasteGroup(state.document, group, { x: delta, y: delta });
     set({
       document: doc,
       ...pushHistory(state, state.document),
-      selection: { type: "component", id: component.id },
-      lastPastePosition: component.position,
+      selection: componentIds.length === 1 ? { type: "component", id: componentIds[0] } : null,
+      selectedIds: componentIds,
+      pasteSteps: steps,
       statusMessage: null,
+    });
+  },
+
+  selectArea(ids) {
+    set({
+      selectedIds: ids,
+      selection: ids.length === 1 ? { type: "component", id: ids[0] } : null,
+      statusMessage: ids.length > 1 ? `부품 ${ids.length}개 선택됨` : null,
+    });
+  },
+
+  toggleSelected(id) {
+    const state = get();
+    const current = selectedComponentIds(state);
+    const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+    set({
+      selectedIds: next,
+      selection: next.length === 1 ? { type: "component", id: next[0] } : null,
+      statusMessage: next.length > 1 ? `부품 ${next.length}개 선택됨` : null,
     });
   },
 
   deleteSelection() {
     const state = get();
-    if (!state.selection) return;
-    const doc =
-      state.selection.type === "component"
-        ? deleteComponent(state.document, state.selection.id)
-        : deleteWire(state.document, state.selection.id);
+    const ids = selectedComponentIds(state);
+    if (ids.length > 0) {
+      let doc = state.document;
+      for (const id of ids) doc = deleteComponent(doc, id);
+      set({
+        document: doc,
+        ...pushHistory(state, state.document),
+        selection: null,
+        selectedIds: [],
+      });
+      return;
+    }
+    if (state.selection?.type !== "wire") return;
+    const doc = deleteWire(state.document, state.selection.id);
     set({ document: doc, ...pushHistory(state, state.document), selection: null });
   },
 
@@ -279,7 +335,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   startWire(from) {
-    set({ pendingWireFrom: from, placingType: null, selection: null, statusMessage: null });
+    set({ pendingWireFrom: from, placingType: null, selection: null, selectedIds: [], statusMessage: null });
   },
 
   completeWire(to) {
@@ -307,7 +363,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   select(sel) {
-    set({ selection: sel, statusMessage: null });
+    // 단일 선택은 다중 선택 집합도 함께 맞춘다 (Phase 18)
+    set({
+      selection: sel,
+      selectedIds: sel?.type === "component" ? [sel.id] : [],
+      statusMessage: null,
+    });
   },
 
   setViewport(v) {

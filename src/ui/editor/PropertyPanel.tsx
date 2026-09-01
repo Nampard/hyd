@@ -70,6 +70,7 @@ function FieldInput({
 export function PropertyPanel(): ReactElement {
   const doc = useEditorStore((s) => s.document);
   const selection = useEditorStore((s) => s.selection);
+  const selectedIds = useEditorStore((s) => s.selectedIds);
   const running = useSimStore((s) => s.running);
   const t = useT();
 
@@ -82,7 +83,11 @@ export function PropertyPanel(): ReactElement {
       <div className="property-panel">
         <h2 className="panel-title">{t("properties")}</h2>
         <p className="panel-empty">
-          {selection?.type === "wire" ? t("wireSelected") : t("selectHint")}
+          {selectedIds.length > 1
+            ? `부품 ${selectedIds.length}개 선택됨 — Ctrl+C로 복사, R로 회전, Delete로 삭제`
+            : selection?.type === "wire"
+              ? t("wireSelected")
+              : t("selectHint")}
         </p>
         <div className="doc-meta-field">
           <label className="field-label" htmlFor="learning-activity-input">
