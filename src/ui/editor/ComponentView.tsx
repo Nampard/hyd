@@ -19,9 +19,8 @@ function detectionMarkers(
   if (!label) return [];
   const linked = allComponents.filter((c) => {
     const b = getComponentDefinition(c.type).behavior;
-    const senses =
-      (b?.role === "valve" && (b.left.kind === "roller" || b.right.kind === "roller")) ||
-      (b?.role === "elec-contact" && b.source === "limit");
+    // 전기 리밋 스위치는 실린더 위 장치 표시(LimitSwitchDeviceMarker)로 그려지므로 제외
+    const senses = b?.role === "valve" && (b.left.kind === "roller" || b.right.kind === "roller");
     return senses && String(c.properties.cylinderLabel ?? "") === label;
   });
   const namesAt = (trigger: string) =>
@@ -145,6 +144,8 @@ export function ComponentView({
         )}
         <Symbol properties={component.properties} runtime={runtime ?? undefined} />
         {/* 감지 마커: 연결된 리밋 스위치·롤러 밸브의 감지 위치 안내 */}
+        {/* 롤러 밸브(공압 리밋)만 스트로크 끝을 붉은 표식으로 알린다.
+            전기 리밋 스위치는 Phase 19-3에서 실린더 위 장치 표시로 대체됐다 */}
         {markers.map((m) => (
           <g key={m.x} pointerEvents="none">
             <line

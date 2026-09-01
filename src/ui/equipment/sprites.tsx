@@ -208,57 +208,60 @@ function LimitSwitchSprite({ properties, runtime }: SymbolProps): ReactElement {
   const active = properties.contactType === "NC" ? !closed : closed;
   return (
     <g>
-      {/* 몸체 — 도면의 배치도 표기: 사각 박스를 대각선으로 나누고 위 칸에 접점을 그린다 */}
-      <rect x={-15} y={-14} width={30} height={28} rx={2} fill="#fbbf24" stroke="#92400e" strokeWidth={1.5} />
-      <line x1={-15} y1={14} x2={15} y2={-14} stroke="#92400e" strokeWidth={1.2} />
-      {/* 접점 — 눌리면 붙고(수평), 떨어지면 사선 */}
-      <line x1={1} y1={-5} x2={12} y2={-5} stroke="#92400e" strokeWidth={1.6} />
+      {/* 몸체 — 도면의 배치도 표기: 사각 박스를 대각선으로 나누고 위 칸에 접점을 그린다.
+          두 스위치가 행정 길이(40px)만큼만 떨어져 있어 몸체는 좁게 유지한다 */}
+      <rect x={-13} y={-13} width={26} height={26} rx={2} fill="#fde68a" stroke="#92400e" strokeWidth={1.6} />
+      <line x1={-13} y1={13} x2={13} y2={-13} stroke="#b45309" strokeWidth={1} opacity={0.7} />
+      {/* 접점 — 눌리면 수평으로 붙고, 떨어지면 사선 (도면의 위 칸 접점) */}
+      <line x1={9} y1={-6} x2={12} y2={-6} stroke="#92400e" strokeWidth={1.6} />
+      <circle cx={-1} cy={-6} r={1.4} fill="#92400e" />
       <line
-        x1={1}
-        y1={-5}
-        x2={active ? 9 : 10}
-        y2={active ? -5 : -10}
+        x1={-1}
+        y1={-6}
+        x2={9}
+        y2={active ? -6 : -11}
         stroke="#92400e"
-        strokeWidth={2.4}
+        strokeWidth={2.2}
         strokeLinecap="round"
       />
-      {/* 복귀 스프링 — 도면처럼 좌상단 모서리에서 비스듬히 */}
+      {/* 복귀 스프링 — 도면처럼 좌상단 모서리에서 비스듬히 (짧고 굵게 정리) */}
       <polyline
-        points="-11,-14 -14,-19 -8,-22 -16,-26 -10,-29 -17,-33"
+        points="-9,-13 -13,-17 -7,-20 -14,-23 -9,-26"
         fill="none"
         stroke="#92400e"
         strokeWidth={1.6}
         strokeLinejoin="round"
+        strokeLinecap="round"
       />
       {/* 조작 플런저 + 롤러 — 눌리면 밀려 들어간다. 실린더 로드의 캠이 롤러를 민다 */}
       <line
         x1={0}
-        y1={14}
+        y1={13}
         x2={0}
-        y2={active ? 20 : 24}
+        y2={active ? 18 : 22}
         stroke="#92400e"
-        strokeWidth={3}
+        strokeWidth={2.6}
         strokeLinecap="round"
       />
       <circle
         cx={0}
-        cy={active ? 23 : 27}
-        r={3.5}
-        fill="#e5e7eb"
+        cy={active ? 21 : 25}
+        r={3.2}
+        fill={active ? "#fbbf24" : "#e5e7eb"}
         stroke="#92400e"
         strokeWidth={1.5}
       />
-      {/* 어느 실린더의 어느 끝을 감지하는지 함께 표시 */}
+      {/* 어느 실린더의 어느 끝을 감지하는지 표시 — 옆 스위치와 겹치지 않게 박스 위 중앙 */}
       <text
-        x={2}
-        y={-38}
-        fontSize={8.5}
+        x={0}
+        y={-30}
+        fontSize={8}
         fontWeight={700}
         textAnchor="middle"
         fill="#1f2937"
         stroke="none"
       >
-        {String(properties.name ?? "")} {String(properties.cylinderLabel ?? "")}
+        {String(properties.name ?? "")}
         {properties.triggerAt === "retracted" ? "↓" : "↑"}
       </text>
     </g>

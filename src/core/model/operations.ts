@@ -220,19 +220,68 @@ export function getEquipmentAttachment(
 ): { host: ComponentInstance; offset: Point } | null {
   const behavior = getComponentDefinition(comp.type).behavior;
   if (behavior?.role !== "elec-contact" || behavior.source !== "limit") return null;
-  const label = String(comp.properties.cylinderLabel ?? "");
-  if (!label) return null;
-  const host = doc.components.find(
-    (c) =>
-      getComponentDefinition(c.type).behavior?.role === "cylinder" &&
-      String(c.properties.label ?? "") === label,
-  );
+  const host = findCylinderByLabel(doc, String(comp.properties.cylinderLabel ?? ""));
   if (!host) return null;
   const offset =
     comp.properties.triggerAt === "retracted"
       ? LIMIT_SWITCH_MOUNT.retracted
       : LIMIT_SWITCH_MOUNT.extended;
   return { host, offset };
+}
+
+/** 이름표로 실린더를 찾는다 (리밋 스위치·롤러 밸브의 감지 대상 매칭) */
+function findCylinderByLabel(doc: CircuitDocument, label: string): ComponentInstance | undefined {
+  if (!label) return undefined;
+  return doc.components.find(
+    (c) =>
+      getComponentDefinition(c.type).behavior?.role === "cylinder" &&
+      String(c.properties.label ?? "") === label,
+  );
+}
+
+/**
+ * 회로도에 덧그릴 리밋 스위치 장치 표시 위치 (Phase 19-3).
+ * 실기 도면은 회로도에서도 실린더 위에 리밋 스위치 몸체를 그려 "어디에 달렸는지"를
+ * 보여준다. 회로도 실린더 기호의 로드 끝은 후진 x=44 · 전진 x=84이므로 그 위에 둔다.
+ */
+const SCHEMATIC_LIMIT_MARKER: Record<"retracted" | "extended", Point> = {
+  retracted: { x: 44, y: -42 },
+  extended: { x: 84, y: -42 },
+};
+
+export interface LimitSwitchMarker {
+  /** 리밋 스위치 부품 id — 런타임 상태(눌림) 조회용 */
+  switchId: string;
+  position: Point;
+  rotation: Rotation;
+  name: string;
+  atRetracted: boolean;
+  /** b접점 여부 — 눌림 상태를 접점 상태에서 되짚는 데 쓴다 */
+  isNC: boolean;
+}
+
+/** 회로도용 리밋 스위치 장치 표시 목록 (감지 대상 실린더를 찾은 것만) */
+export function getLimitSwitchMarkers(doc: CircuitDocument): LimitSwitchMarker[] {
+  const markers: LimitSwitchMarker[] = [];
+  for (const comp of doc.components) {
+    const behavior = getComponentDefinition(comp.type).behavior;
+    if (behavior?.role !== "elec-contact" || behavior.source !== "limit") continue;
+    const host = findCylinderByLabel(doc, String(comp.properties.cylinderLabel ?? ""));
+    if (!host) continue;
+    const atRetracted = comp.properties.triggerAt === "retracted";
+    const offset = atRetracted
+      ? SCHEMATIC_LIMIT_MARKER.retracted
+      : SCHEMATIC_LIMIT_MARKER.extended;
+    markers.push({
+      switchId: comp.id,
+      position: addPoints(host.position, rotatePoint(offset, host.rotation)),
+      rotation: host.rotation,
+      name: String(comp.properties.name ?? ""),
+      atRetracted,
+      isNC: comp.properties.contactType === "NC",
+    });
+  }
+  return markers;
 }
 
 export function getEquipmentPosition(doc: CircuitDocument, comp: ComponentInstance): Point {

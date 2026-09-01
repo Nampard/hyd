@@ -5,6 +5,7 @@ import {
   canConnect,
   componentsInRect,
   getComponent,
+  getLimitSwitchMarkers,
   getPortDefinition,
   getPortWorldPosition,
 } from "../../core/model/operations";
@@ -12,7 +13,7 @@ import { getComponentDefinition } from "../../core/library/registry";
 import { GRID, snapPoint } from "../../core/geometry";
 import { ComponentView } from "./ComponentView";
 import { WireView } from "./WireView";
-import { getSymbol } from "../symbols";
+import { getSymbol, LimitSwitchDeviceMarker } from "../symbols";
 import { PORT_COLORS } from "./colors";
 import { useSimStore } from "../sim/simStore";
 import { useT } from "../i18n";
@@ -304,6 +305,27 @@ export function EditorCanvas(): ReactElement {
             onDragStart={startComponentDrag(comp.id)}
             onPortClick={onPortClick}
           />
+        ))}
+
+        {/* 리밋 스위치 장치 표시 (Phase 19-3) — 실기 도면처럼 실린더 위에 몸체를 그려
+            어느 끝을 감지하는지 보여 준다. 표시 전용이라 클릭·선택 대상이 아니다 */}
+        {getLimitSwitchMarkers(doc).map((marker) => (
+          <g
+            key={`ls-${marker.switchId}`}
+            transform={`translate(${marker.position.x}, ${marker.position.y}) rotate(${marker.rotation})`}
+            color="var(--symbol)"
+            pointerEvents="none"
+          >
+            <LimitSwitchDeviceMarker
+              name={marker.name}
+              atRetracted={marker.atRetracted}
+              pressed={(() => {
+                if (!simRunning) return false;
+                const closed = simSnapshot?.components[marker.switchId]?.contactClosed ?? false;
+                return marker.isNC ? !closed : closed;
+              })()}
+            />
+          </g>
         ))}
 
         {marquee && (

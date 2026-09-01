@@ -1128,6 +1128,45 @@ function ElecLimitSwitch({ properties, runtime }: SymbolProps): ReactElement {
   );
 }
 
+/**
+ * 리밋 스위치 **장치 표시** (Phase 19-3) — 회로도에서 실린더 위에 덧그린다.
+ *
+ * 실기 도면은 같은 도면 안에서 배치도(실린더 + 리밋 스위치 몸체)와 사다리 회로를
+ * 함께 보여 준다. HYD의 회로도에도 실린더 위에 몸체를 그려 "이 리밋이 어느 실린더의
+ * 어느 끝에 달렸는지"를 그림으로 알 수 있게 한다. 표시 전용이라 선택·배선 대상이 아니며,
+ * 실제 접점은 사다리의 리밋 스위치 부품이다.
+ */
+export function LimitSwitchDeviceMarker({
+  name,
+  atRetracted,
+  pressed,
+}: {
+  name: string;
+  atRetracted: boolean;
+  pressed: boolean;
+}): ReactElement {
+  return (
+    <g opacity={0.85}>
+      {/* 몸체 + 대각선 분할 (도면 표기) */}
+      <rect x={-13} y={-13} width={26} height={26} {...Sthin} fill="none" />
+      <line x1={-13} y1={13} x2={13} y2={-13} {...Sthin} />
+      {/* 위 칸 접점 — 눌리면 수평으로 붙는다 */}
+      <circle cx={-1} cy={-6} r={1.3} fill="currentColor" stroke="none" />
+      <line x1={9} y1={-6} x2={12} y2={-6} {...Sthin} />
+      <line x1={-1} y1={-6} x2={9} y2={pressed ? -6 : -11} {...Sthin} />
+      {/* 좌상단 복귀 스프링 */}
+      <polyline points="-9,-13 -13,-17 -7,-20 -14,-23 -9,-26" {...Sthin} />
+      {/* 플런저 + 롤러 — 실린더 로드 끝이 밀어 올린다 */}
+      <line x1={0} y1={13} x2={0} y2={pressed ? 18 : 22} {...Sthin} />
+      <circle cx={0} cy={pressed ? 21 : 25} r={3} {...Sthin} fill={pressed ? "currentColor" : "none"} />
+      <text x={0} y={-30} fontSize={9} textAnchor="middle" fill="currentColor" stroke="none">
+        {name}
+        {atRetracted ? "↓" : "↑"}
+      </text>
+    </g>
+  );
+}
+
 function ElecRelayContact({ properties, runtime }: SymbolProps): ReactElement {
   const closed = contactClosedNow(properties, runtime);
   const isNC = properties.contactType === "NC";

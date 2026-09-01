@@ -6,6 +6,7 @@ import { examples, getExample } from "../../core/examples";
 import { createBrowserStorage } from "../../core/storage";
 import { prepareDocumentForPersistence } from "../../core/model/schema";
 import { useI18nStore, useT } from "../i18n";
+import { APP_VERSION, forceRefreshToLatest } from "../../app/refresh";
 
 const browserStorage = createBrowserStorage();
 
@@ -279,6 +280,14 @@ export function Toolbar(): ReactElement {
         </button>
         <button onClick={() => useI18nStore.getState().toggle()} title="한국어 / English">
           {lang === "ko" ? "EN" : "한"}
+        </button>
+        {/* 브라우저마다 강력 새로고침 동작이 달라(특히 Safari) 확실한 탈출구를 버튼으로
+            제공한다 — 워커 해제 + 캐시 삭제 + 캐시 무효화 재접속 (Phase 19-3) */}
+        <button
+          onClick={() => void forceRefreshToLatest()}
+          title={`현재 버전 ${APP_VERSION} — 저장된 캐시를 지우고 최신 버전을 새로 받습니다`}
+        >
+          {t("forceRefresh")}
         </button>
       </div>
     </div>

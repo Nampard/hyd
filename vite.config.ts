@@ -1,8 +1,25 @@
+import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+
+/**
+ * 화면에 표시할 빌드 식별자 (Phase 19-3).
+ * "지금 보고 있는 화면이 어느 버전인지"를 사용자가 바로 확인할 수 있어야
+ * PC·브라우저마다 다르게 보이는 문제를 진단할 수 있다. CI에는 .git이 있으므로
+ * 커밋 해시를 쓰고, 없으면 시각으로 대체한다.
+ */
+function resolveBuildVersion(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch {
+    return new Date().toISOString().slice(0, 16).replace("T", " ");
+  }
+}
 
 /**
  * 서비스 워커 버전 스탬프 (Phase 19).
@@ -38,5 +55,6 @@ export default defineConfig({
   // 상대 경로 빌드 — GitHub Pages(/hyd/) 등 서브패스 배포 대응
   base: "./",
   plugins: [react(), swVersionStamp()],
+  define: { __APP_VERSION__: JSON.stringify(resolveBuildVersion()) },
   server: { port: 5173 },
 });

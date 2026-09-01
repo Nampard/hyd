@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { useEditorStore } from "./store";
 import { useSimStore } from "../sim/simStore";
 import { useT } from "../i18n";
+import { APP_VERSION } from "../../app/refresh";
 
 export function StatusBar(): ReactElement {
   const message = useEditorStore((s) => s.statusMessage);
@@ -50,6 +51,10 @@ export function StatusBar(): ReactElement {
       <span className="status-right">
         {running && <span className="sim-time">t = {simTime.toFixed(1)}s · </span>}
         {t("countParts")} {componentCount} · {t("countWires")} {wireCount} · {Math.round(zoom * 100)}%
+        {" · "}
+        <span className="build-version" title="현재 보고 있는 화면의 빌드 버전">
+          v{APP_VERSION}
+        </span>
       </span>
     </div>
   );
