@@ -209,8 +209,10 @@ function LimitSwitchSprite({ properties, runtime }: SymbolProps): ReactElement {
       <rect x={-12} y={-14} width={24} height={28} rx={3} fill="#fbbf24" stroke="#92400e" strokeWidth={1.5} />
       <line x1={-12} y1={-6} x2={-24} y2={active ? 2 : -14} stroke="#92400e" strokeWidth={3} strokeLinecap="round" />
       <circle cx={-25} cy={active ? 3 : -15} r={4} fill="#e5e7eb" stroke="#92400e" strokeWidth={1.5} />
+      {/* 어느 실린더의 어느 끝을 감지하는지 함께 표시 (Phase 16-5, 롤러 밸브 표기와 통일) */}
       <text x={-12} y={24} fontSize={8} fill="#1f2937" stroke="none">
-        {String(properties.name ?? "")}
+        {String(properties.name ?? "")} {String(properties.cylinderLabel ?? "")}
+        {properties.triggerAt === "retracted" ? "▾" : "▴"}
       </text>
     </g>
   );

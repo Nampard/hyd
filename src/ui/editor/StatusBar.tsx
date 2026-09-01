@@ -21,6 +21,8 @@ export function StatusBar(): ReactElement {
   // 솔버 미수렴 = 자기모순 회로(NC 자기 궤환 등) 가능성 — 최우선 경고 (review-2 P0)
   const unstable =
     running && diagnostics && (!diagnostics.electricConverged || !diagnostics.fluidConverged);
+  // 양측 솔레노이드 동시 통전 — 실물 금지 상태, 인터록 설계 유도 (Phase 16-4)
+  const valveConflict = running && (diagnostics?.conflictingValves?.length ?? 0) > 0;
 
   // 우선순위: 미수렴 경고 > 구분동작 일시정지 안내 > 일반 메시지 > 모드별 기본 안내
   // (경고 메시지가 다음 동작 진행법을 가리지 않도록, review-3 P1)
@@ -31,7 +33,8 @@ export function StatusBar(): ReactElement {
       String(lastStep.step),
     );
   }
-  if (unstable) hint = t("statusUnstable");
+  if (valveConflict) hint = t("statusValveConflict");
+  if (unstable) hint = t("statusUnstable"); // 미수렴이 더 근본적인 문제 — 최우선
   if (!hint) {
     if (running && mode === "step") {
       hint = t("statusStepRunning");

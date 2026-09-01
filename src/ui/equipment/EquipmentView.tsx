@@ -4,6 +4,7 @@ import { useSimStore } from "../sim/simStore";
 import { getComponentDefinition } from "../../core/library/registry";
 import {
   getComponent,
+  getEquipmentAttachment,
   getEquipmentPosition,
   getPortDefinition,
   moveEquipment,
@@ -183,6 +184,8 @@ export function EquipmentView(): ReactElement {
               ? comp.properties.actuation === "lever"
               : comp.properties.actuation === "maintained";
             const pos = eqPosition(comp.id);
+            /** 대상 실린더에 부착돼 위치가 계산되는 부품 (Phase 16-5) */
+            const attached = getEquipmentAttachment(doc, comp) !== null;
 
             return (
               <g
@@ -207,6 +210,9 @@ export function EquipmentView(): ReactElement {
                     }
                   } else if (!simRunning) {
                     useEditorStore.getState().select({ type: "component", id: comp.id });
+                    // 부착 부품(리밋 스위치)은 위치가 대상 실린더에서 계산되므로
+                    // 드래그를 받지 않는다 — 옮겨도 되돌아오는 혼란 방지 (Phase 16-5)
+                    if (attached) return;
                     const world = screenToWorld(e.clientX, e.clientY);
                     dragRef.current = {
                       id: comp.id,

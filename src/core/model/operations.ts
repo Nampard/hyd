@@ -34,6 +34,25 @@ export function addComponent(
   return { doc: { ...doc, components: [...doc.components, component] }, component };
 }
 
+/**
+ * 부품 복제 (Phase 16-3). 타입·회전·속성을 그대로 옮기고 새 id와 위치를 부여한다.
+ * 배선은 복제하지 않는다 — 어느 포트로 이어야 할지는 회로마다 다르므로 사용자가 잇는다.
+ */
+export function duplicateComponent(
+  doc: CircuitDocument,
+  source: ComponentInstance,
+  position: Point,
+): { doc: CircuitDocument; component: ComponentInstance } {
+  const component: ComponentInstance = {
+    id: generateId("c"),
+    type: source.type,
+    position: snapPoint(position),
+    rotation: source.rotation,
+    properties: { ...source.properties },
+  };
+  return { doc: { ...doc, components: [...doc.components, component] }, component };
+}
+
 export function moveComponent(
   doc: CircuitDocument,
   componentId: string,
@@ -90,7 +109,51 @@ export function moveEquipment(
 }
 
 /** 부품의 장비 뷰 표시 좌표 (자유 배치 없으면 회로도 좌표) */
+/**
+ * 리밋 스위치 부착 위치 (Phase 16-5). 실린더 스프라이트 로컬 좌표 기준.
+ * CylinderSprite의 로드 캠은 x=48(후진단)~88(전진단)을 왕복하고,
+ * LimitSwitchSprite의 롤러는 본체 기준 (-25, -15)에 있다(눌리면 아래로 내려감).
+ * 따라서 캠 x + 25에 본체를 두면 롤러가 캠 바로 아래에서 만난다.
+ */
+const LIMIT_SWITCH_MOUNT: Record<"retracted" | "extended", Point> = {
+  retracted: { x: 73, y: 18 },
+  extended: { x: 113, y: 18 },
+};
+
+/**
+ * 장비 뷰에서 다른 부품에 부착돼 위치가 계산되는 부품인지 판정한다 (Phase 16-5).
+ * 리밋 스위치는 `cylinderLabel`이 가리키는 실린더의 `triggerAt` 끝단에 붙는다 —
+ * 실기 장비처럼 "어느 실린더의 어느 끝을 감지하는지"가 그림에서 보이도록.
+ * 대상 실린더를 찾지 못하면 null을 돌려 기존 자유 배치로 폴백한다.
+ */
+export function getEquipmentAttachment(
+  doc: CircuitDocument,
+  comp: ComponentInstance,
+): { host: ComponentInstance; offset: Point } | null {
+  const behavior = getComponentDefinition(comp.type).behavior;
+  if (behavior?.role !== "elec-contact" || behavior.source !== "limit") return null;
+  const label = String(comp.properties.cylinderLabel ?? "");
+  if (!label) return null;
+  const host = doc.components.find(
+    (c) =>
+      getComponentDefinition(c.type).behavior?.role === "cylinder" &&
+      String(c.properties.label ?? "") === label,
+  );
+  if (!host) return null;
+  const offset =
+    comp.properties.triggerAt === "retracted"
+      ? LIMIT_SWITCH_MOUNT.retracted
+      : LIMIT_SWITCH_MOUNT.extended;
+  return { host, offset };
+}
+
 export function getEquipmentPosition(doc: CircuitDocument, comp: ComponentInstance): Point {
+  const attachment = getEquipmentAttachment(doc, comp);
+  if (attachment) {
+    const { host, offset } = attachment;
+    const hostPos = doc.equipmentLayout?.[host.id] ?? host.position;
+    return addPoints(hostPos, rotatePoint(offset, host.rotation));
+  }
   return doc.equipmentLayout?.[comp.id] ?? comp.position;
 }
 

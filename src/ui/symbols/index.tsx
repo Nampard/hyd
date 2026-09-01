@@ -529,7 +529,9 @@ function SolenoidGlyph({ x, dir, label, active }: { x: number; dir: 1 | -1; labe
   return (
     <g>
       {active && <ActiveGlow cx={x0 + w / 2} r={14} />}
-      <rect x={x0} y={-8} width={w} height={16} {...Sthin} fill={active ? "currentColor" : "none"} />
+      {/* 통전은 ActiveGlow(overlay)로만 표시한다 — 사각형을 채우면 규범 기호의
+          사선이 덮여 솔레노이드 기호로 읽히지 않는다 (Phase 16, review-3 원칙) */}
+      <rect x={x0} y={-8} width={w} height={16} {...Sthin} fill="none" />
       <line x1={x0} y1={8} x2={x0 + w} y2={-8} {...Sthin} />
       <text x={x0 - 2} y={dir === -1 ? -12 : 22} fontSize={9} fill="currentColor" stroke="none">
         {label}
@@ -1134,11 +1136,9 @@ function LoadBox({ energized, children, label }: { energized: boolean; children?
 }
 
 function ElecRelayCoil({ properties, runtime }: SymbolProps): ReactElement {
-  return (
-    <LoadBox energized={runtime?.energized ?? false} label={String(properties.label ?? "")}>
-      <text x={-5} y={4} fontSize={10} fill="currentColor" stroke="none">K</text>
-    </LoadBox>
-  );
+  // 코일은 빈 사각형으로 그린다 — 박스 안의 "K" 글자는 규범 기호에 없고
+  // 옆의 이름표(K1 등)와 중복이라 Phase 16에서 제거했다
+  return <LoadBox energized={runtime?.energized ?? false} label={String(properties.label ?? "")} />;
 }
 
 function ElecTimer({ properties, runtime }: SymbolProps): ReactElement {

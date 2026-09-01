@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { CircuitDocument, Point, PortRef } from "../../core/model/types";
+import type { CircuitDocument, ComponentInstance, Point, PortRef } from "../../core/model/types";
 import { createEmptyDocument } from "../../core/model/types";
 import {
   addComponent,
@@ -7,6 +7,7 @@ import {
   canConnect,
   deleteComponent,
   deleteWire,
+  duplicateComponent,
   moveComponent,
   rerouteAttachedWires,
   rotateComponent,
@@ -43,6 +44,10 @@ interface EditorState {
   equipmentViewOpen: boolean;
   /** 변위단계선도 패널 표시 여부 */
   diagramPanelOpen: boolean;
+  /** 복사한 부품 (Phase 16-3). 문서에 저장되지 않는 편집 세션 상태 */
+  clipboard: ComponentInstance | null;
+  /** 연속 붙여넣기 시 겹치지 않도록 직전 붙여넣기 위치를 기억한다 */
+  lastPastePosition: Point | null;
 
   // 문서 수명주기
   newDocument(): void;
@@ -65,6 +70,10 @@ interface EditorState {
   rotateSelection(): void;
   deleteSelection(): void;
   setProperty(componentId: string, key: string, value: unknown): void;
+  /** 선택한 부품을 클립보드에 복사 (Phase 16-3) */
+  copySelection(): void;
+  /** 클립보드의 부품을 조금 어긋난 위치에 붙여넣고 선택 상태로 만든다 */
+  pasteClipboard(): void;
 
   // 배선
   startWire(from: PortRef): void;
@@ -89,6 +98,9 @@ interface EditorState {
 /** 히스토리 최대 길이 (메모리 보호) */
 const MAX_HISTORY = 100;
 
+/** 붙여넣기 위치 오프셋 (그리드 10px 기준 2칸 — 원본과 겹치지 않으면서 가깝게) */
+const PASTE_OFFSET = 20;
+
 function pushHistory(state: EditorState, snapshot: CircuitDocument) {
   const past = [...state.past, snapshot];
   if (past.length > MAX_HISTORY) past.shift();
@@ -111,6 +123,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   plcPanelOpen: false,
   equipmentViewOpen: false,
   diagramPanelOpen: false,
+  clipboard: null,
+  lastPastePosition: null,
 
   newDocument() {
     const doc = createEmptyDocument();
@@ -216,6 +230,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let doc = rotateComponent(state.document, state.selection.id);
     doc = rerouteAttachedWires(doc, state.selection.id);
     set({ document: doc, ...pushHistory(state, state.document) });
+  },
+
+  copySelection() {
+    const state = get();
+    if (state.selection?.type !== "component") return;
+    const source = state.document.components.find((c) => c.id === state.selection!.id);
+    if (!source) return;
+    set({
+      // 속성 객체까지 복사해 원본 편집이 클립보드에 새지 않게 한다
+      clipboard: { ...source, properties: { ...source.properties } },
+      lastPastePosition: null,
+      statusMessage: "부품을 복사했습니다 — Ctrl+V로 붙여넣기",
+    });
+  },
+
+  pasteClipboard() {
+    const state = get();
+    const source = state.clipboard;
+    if (!source) return;
+    // 연속으로 붙여넣으면 직전 붙여넣기 위치에서 다시 어긋나게 쌓인다
+    const base = state.lastPastePosition ?? source.position;
+    const position = { x: base.x + PASTE_OFFSET, y: base.y + PASTE_OFFSET };
+    const { doc, component } = duplicateComponent(state.document, source, position);
+    set({
+      document: doc,
+      ...pushHistory(state, state.document),
+      selection: { type: "component", id: component.id },
+      lastPastePosition: component.position,
+      statusMessage: null,
+    });
   },
 
   deleteSelection() {

@@ -6,6 +6,7 @@ import {
   addWire,
   canConnect,
   deleteComponent,
+  duplicateComponent,
   getPortWorldPosition,
   getPortDefinition,
   moveComponent,
@@ -136,6 +137,41 @@ describe("문서 조작", () => {
     doc = deleteComponent(doc, a.component.id);
     expect(doc.components).toHaveLength(1);
     expect(doc.wires).toHaveLength(0);
+  });
+
+  it("부품 복제는 회전·속성을 옮기고 새 id를 부여한다 (Phase 16-3)", () => {
+    let doc = createEmptyDocument();
+    const { doc: d1, component } = addComponent(doc, "pneu.cylinder.double", { x: 100, y: 100 });
+    doc = rotateComponent(d1, component.id);
+    doc = updateComponentProperty(doc, component.id, "label", "B");
+    const source = doc.components[0];
+
+    const { doc: pasted, component: copy } = duplicateComponent(doc, source, { x: 123, y: 127 });
+
+    expect(pasted.components).toHaveLength(2);
+    expect(copy.id).not.toBe(source.id);
+    expect(copy.type).toBe(source.type);
+    expect(copy.rotation).toBe(90);
+    expect(copy.properties.label).toBe("B");
+    expect(copy.position).toEqual({ x: 120, y: 130 }); // 그리드 스냅
+    // 속성 객체가 공유되지 않아 원본 편집이 사본에 새지 않는다
+    expect(copy.properties).not.toBe(source.properties);
+  });
+
+  it("부품 복제는 배선을 복사하지 않는다 (Phase 16-3)", () => {
+    let doc = createEmptyDocument();
+    const a = addComponent(doc, "pneu.source", { x: 0, y: 0 });
+    const b = addComponent(a.doc, "pneu.cylinder.double", { x: 200, y: 0 });
+    doc = addWire(
+      b.doc,
+      { componentId: a.component.id, portId: "P" },
+      { componentId: b.component.id, portId: "HEAD" },
+      [],
+    );
+
+    const { doc: pasted } = duplicateComponent(doc, doc.components[0], { x: 0, y: 200 });
+    expect(pasted.components).toHaveLength(3);
+    expect(pasted.wires).toHaveLength(1);
   });
 });
 

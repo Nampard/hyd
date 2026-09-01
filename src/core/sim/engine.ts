@@ -49,6 +49,8 @@ export class SimulationEngine {
   /** 최근 솔브 수렴 여부 (발진 회로 진단, review-2 P0) */
   private electricConverged = true;
   private fluidConverged = true;
+  /** 이번 틱에 양측 조작 신호가 동시에 들어온 밸브 (Phase 16-4) */
+  private conflictingValves: string[] = [];
 
   constructor(doc: CircuitDocument) {
     this.doc = doc;
@@ -152,6 +154,7 @@ export class SimulationEngine {
     this.runPlcScan(dt);
 
     // 2. 밸브 전환 (솔레노이드: 이번 틱 전기 결과, 파일럿: 직전 유체 솔브 기준)
+    this.conflictingValves = [];
     for (const comp of this.doc.components) {
       const behavior = getComponentDefinition(comp.type).behavior;
       if (behavior?.role !== "valve") continue;
@@ -492,10 +495,24 @@ export class SimulationEngine {
 
     const leftActive = this.sideActive(comp, behavior.left, runtime);
     const rightActive = this.sideActive(comp, behavior.right, runtime);
+    const prev = runtime.valveSidePrev ?? { left: false, right: false };
+    runtime.valveSidePrev = { left: leftActive, right: rightActive };
 
     if (leftActive && !rightActive) return 0;
     if (rightActive && !leftActive) return last;
-    if (leftActive && rightActive) return current; // 임펄스 충돌 — 유지
+    if (leftActive && rightActive) {
+      // 양측 동시 신호 (Phase 16-4). 실물에서는 금지되는 상태이고 표준도 스풀 위치를
+      // 규정하지 않으므로(KS B 0054는 기호 표준, ISO 5599/12238도 미규정), HYD는
+      // **마지막 상승 에지 우선**이라는 결정적 교육 모델을 채택한다 — 이번 틱에 새로
+      // 켜진 쪽이 스풀을 가져가고, 이미 켜져 있던 신호는 에지가 아니므로 무시된다.
+      // 동시 통전 자체는 진단으로 보고해 인터록 설계를 유도한다.
+      this.conflictingValves.push(comp.id);
+      const leftRise = !prev.left;
+      const rightRise = !prev.right;
+      if (leftRise && !rightRise) return 0;
+      if (rightRise && !leftRise) return last;
+      return current; // 같은 틱에 동시에 켜졌거나 둘 다 유지 중 — 위치 유지
+    }
 
     // 무신호: 스프링 복귀
     if (behavior.springCentered) return Math.floor(behavior.positions.length / 2); // 5/3 중립
@@ -593,6 +610,7 @@ export class SimulationEngine {
       diagnostics: {
         electricConverged: this.electricConverged,
         fluidConverged: this.fluidConverged,
+        conflictingValves: [...this.conflictingValves],
       },
     };
   }

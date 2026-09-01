@@ -21,6 +21,7 @@ const ko = {
   delete: "삭제",
   undo: "↩ 실행 취소",
   redo: "↪ 다시 실행",
+  rotate: "⟳ 회전",
   resetView: "화면 초기화",
   plcLadder: "PLC 래더",
   equipmentView: "장비 뷰",
@@ -44,6 +45,8 @@ const ko = {
   statusStepRunning: "구분동작 진행 중 — 동작이 끝나면 자동으로 멈춥니다.",
   statusUnstable:
     "⚠ 회로가 안정되지 않습니다 — 접점이 자신의 코일을 반전 구동하는 등 자기모순 회로일 수 있습니다.",
+  statusValveConflict:
+    "⚠ 양측 솔레노이드에 동시에 신호가 들어왔습니다 — 실물에서는 금지되는 상태입니다. 인터록(b접점)으로 한쪽만 통전되게 설계하세요. (여기서는 나중에 켜진 쪽으로 전환됩니다)",
   countParts: "부품",
   countWires: "배선",
   equipmentHead: "장비 뷰 (일러스트)",
@@ -83,6 +86,7 @@ const en: Record<keyof typeof ko, string> = {
   delete: "Delete",
   undo: "↩ Undo",
   redo: "↪ Redo",
+  rotate: "⟳ Rotate",
   resetView: "Reset view",
   plcLadder: "PLC Ladder",
   equipmentView: "Equipment",
@@ -106,6 +110,8 @@ const en: Record<keyof typeof ko, string> = {
   statusStepRunning: "Step mode — running until the current motion completes.",
   statusUnstable:
     "⚠ Circuit is not settling — it may contradict itself (e.g. an NC contact driving its own coil).",
+  statusValveConflict:
+    "⚠ Both solenoids of a valve are energized — this is not allowed on real hardware. Add an interlock (NC contact) so only one is on at a time. (Here the spool follows the most recently switched side.)",
   countParts: "parts",
   countWires: "wires",
   equipmentHead: "Equipment view (illustrated)",

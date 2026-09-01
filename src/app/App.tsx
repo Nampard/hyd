@@ -34,6 +34,17 @@ export function App(): ReactElement {
         s.redo();
         return;
       }
+      // 부품 복사·붙여넣기 (Phase 16-3). 입력란 포커스·시뮬레이션 중에는 위에서 이미 제외된다
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        s.copySelection();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        s.pasteClipboard();
+        return;
+      }
 
       switch (e.key) {
         case "Delete":

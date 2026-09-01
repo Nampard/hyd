@@ -13,6 +13,7 @@ export function Toolbar(): ReactElement {
   const title = useEditorStore((s) => s.document.meta.title);
   const canUndo = useEditorStore((s) => s.past.length > 0);
   const canRedo = useEditorStore((s) => s.future.length > 0);
+  const hasComponentSelection = useEditorStore((s) => s.selection?.type === "component");
   const hasComponents = useEditorStore((s) => s.document.components.length > 0);
   const plcOpen = useEditorStore((s) => s.plcPanelOpen);
   const equipmentOpen = useEditorStore((s) => s.equipmentViewOpen);
@@ -237,6 +238,14 @@ export function Toolbar(): ReactElement {
         </button>
         <button disabled={running || !canRedo} onClick={() => useEditorStore.getState().redo()}>
           {t("redo")}
+        </button>
+        {/* 회전은 단축키 R로도 되지만 버튼이 없으면 발견하기 어렵다 (Phase 16-2) */}
+        <button
+          disabled={running || !hasComponentSelection}
+          onClick={() => useEditorStore.getState().rotateSelection()}
+          title="선택한 부품을 90° 회전 (단축키: R)"
+        >
+          {t("rotate")}
         </button>
       </div>
       <div className="toolbar-group">

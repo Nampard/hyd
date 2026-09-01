@@ -5,6 +5,11 @@ export type PressureState = "pressurized" | "exhausted" | "blocked";
 export interface ComponentRuntime {
   /** 밸브: 현재 위치 index */
   valvePosition?: number;
+  /**
+   * 밸브 양측 조작 신호의 직전 틱 상태 (Phase 16-4).
+   * 양측 동시 신호일 때 "이번 틱에 새로 켜진 쪽"을 가리기 위한 에지 판정용.
+   */
+  valveSidePrev?: { left: boolean; right: boolean };
   /** 실린더: 0(후진)..1(전진) */
   cylinderPos?: number;
   /** 수동 조작 입력 (버튼 눌림/레버 위치, 전기 푸시버튼 포함) */
@@ -77,6 +82,11 @@ export interface SimulationSnapshot {
   diagnostics?: {
     electricConverged: boolean;
     fluidConverged: boolean;
+    /**
+     * 양측 조작 신호가 동시에 들어온 밸브 id 목록 (Phase 16-4).
+     * 실물에서는 금지되는 상태 — 인터록 설계를 유도하는 경고용.
+     */
+    conflictingValves: string[];
   };
 }
 
