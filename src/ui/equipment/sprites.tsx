@@ -31,6 +31,8 @@ function CylinderSprite({ properties, runtime }: SymbolProps): ReactElement {
       {/* 로드 */}
       <rect x={rodX} y={-3} width={72} height={6} rx={2} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
       <rect x={rodX + 66} y={-7} width={8} height={14} rx={2} fill="#475569" />
+      {/* 로드 끝 캠 — 리밋 스위치 롤러를 미는 부분 (도면 표기, Phase 19-2) */}
+      <circle cx={rodX + 70} cy={0} r={5} fill="#cbd5e1" stroke="#475569" strokeWidth={1.5} />
       {/* 바디 */}
       <rect x={-40} y={-13} width={62} height={26} rx={4} fill="#93b6d6" stroke="#33506b" strokeWidth={1.5} />
       <rect x={-40} y={-13} width={62} height={9} rx={4} fill="#b7d0e6" opacity={0.7} />
@@ -206,45 +208,58 @@ function LimitSwitchSprite({ properties, runtime }: SymbolProps): ReactElement {
   const active = properties.contactType === "NC" ? !closed : closed;
   return (
     <g>
-      <rect x={-12} y={-14} width={24} height={28} rx={3} fill="#fbbf24" stroke="#92400e" strokeWidth={1.5} />
-      {/* 접점 — 눌리면 세로로 붙고, 떨어지면 사선 */}
-      {active ? (
-        <line x1={0} y1={-9} x2={0} y2={9} stroke="#92400e" strokeWidth={2.5} strokeLinecap="round" />
-      ) : (
-        <line x1={0} y1={9} x2={-7} y2={-7} stroke="#92400e" strokeWidth={2.5} strokeLinecap="round" />
-      )}
-      {/* 복귀 스프링 (위) */}
+      {/* 몸체 — 도면의 배치도 표기: 사각 박스를 대각선으로 나누고 위 칸에 접점을 그린다 */}
+      <rect x={-15} y={-14} width={30} height={28} rx={2} fill="#fbbf24" stroke="#92400e" strokeWidth={1.5} />
+      <line x1={-15} y1={14} x2={15} y2={-14} stroke="#92400e" strokeWidth={1.2} />
+      {/* 접점 — 눌리면 붙고(수평), 떨어지면 사선 */}
+      <line x1={1} y1={-5} x2={12} y2={-5} stroke="#92400e" strokeWidth={1.6} />
+      <line
+        x1={1}
+        y1={-5}
+        x2={active ? 9 : 10}
+        y2={active ? -5 : -10}
+        stroke="#92400e"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+      />
+      {/* 복귀 스프링 — 도면처럼 좌상단 모서리에서 비스듬히 */}
       <polyline
-        points="0,-14 -5,-19 5,-25 -5,-31 0,-35"
+        points="-11,-14 -14,-19 -8,-22 -16,-26 -10,-29 -17,-33"
         fill="none"
         stroke="#92400e"
-        strokeWidth={1.8}
+        strokeWidth={1.6}
         strokeLinejoin="round"
       />
-      {/* 조작 플런저 (아래) — 눌리면 밀려 들어간다. 끝의 사각 발에 실린더 캠이 닿는다 */}
+      {/* 조작 플런저 + 롤러 — 눌리면 밀려 들어간다. 실린더 로드의 캠이 롤러를 민다 */}
       <line
         x1={0}
         y1={14}
         x2={0}
-        y2={active ? 22 : 26}
+        y2={active ? 20 : 24}
         stroke="#92400e"
         strokeWidth={3}
         strokeLinecap="round"
       />
-      <rect
-        x={-5}
-        y={active ? 22 : 26}
-        width={10}
-        height={6}
-        rx={1}
+      <circle
+        cx={0}
+        cy={active ? 23 : 27}
+        r={3.5}
         fill="#e5e7eb"
         stroke="#92400e"
         strokeWidth={1.5}
       />
-      {/* 어느 실린더의 어느 끝을 감지하는지 함께 표시 (Phase 16-5, 롤러 밸브 표기와 통일) */}
-      <text x={14} y={-24} fontSize={9} fontWeight={700} fill="#1f2937" stroke="none">
+      {/* 어느 실린더의 어느 끝을 감지하는지 함께 표시 */}
+      <text
+        x={2}
+        y={-38}
+        fontSize={8.5}
+        fontWeight={700}
+        textAnchor="middle"
+        fill="#1f2937"
+        stroke="none"
+      >
         {String(properties.name ?? "")} {String(properties.cylinderLabel ?? "")}
-        {properties.triggerAt === "retracted" ? "▾" : "▴"}
+        {properties.triggerAt === "retracted" ? "↓" : "↑"}
       </text>
     </g>
   );

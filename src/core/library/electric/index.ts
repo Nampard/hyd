@@ -98,8 +98,8 @@ export const limitSwitch: ComponentDefinition = {
     { key: "name", label: "이름", type: "text", default: "S1" },
   ],
   symbolId: "elec.limit-switch",
-  // 조작 플런저(왼쪽)와 복귀 스프링(오른쪽)을 포함한 몸체 폭 (Phase 19)
-  bounds: { x: -36, y: -28, width: 72, height: 48 },
+  // 롤러(⊙)와 감지 방향 화살표를 포함한 폭 (Phase 19-2)
+  bounds: { x: -36, y: -20, width: 61, height: 40 },
   behavior: { role: "elec-contact", portA: "T", portB: "B", source: "limit" },
 };
 
