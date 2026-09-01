@@ -37,14 +37,14 @@ describe("장비 뷰 부착 (Phase 16-5)", () => {
   it("리밋 스위치는 대상 실린더의 후진단/전진단에 각각 부착된다", () => {
     const back = rig("retracted");
     expect(getEquipmentPosition(back.doc, compOf(back.doc, back.switchId))).toEqual({
-      x: 373,
-      y: 218,
+      x: 348,
+      y: 170,
     });
 
     const front = rig("extended");
     expect(getEquipmentPosition(front.doc, compOf(front.doc, front.switchId))).toEqual({
-      x: 413,
-      y: 218,
+      x: 388,
+      y: 170,
     });
 
     // 두 끝단의 부착 위치는 서로 다르다 (같은 자리에 겹쳐 그려지지 않는다)
@@ -56,14 +56,14 @@ describe("장비 뷰 부착 (Phase 16-5)", () => {
   it("실린더를 장비 뷰에서 옮기면 부착된 스위치도 따라간다", () => {
     const { doc, cylinderId, switchId } = rig("retracted");
     const moved = moveEquipment(doc, cylinderId, { x: 500, y: 100 });
-    expect(getEquipmentPosition(moved, compOf(moved, switchId))).toEqual({ x: 573, y: 118 });
+    expect(getEquipmentPosition(moved, compOf(moved, switchId))).toEqual({ x: 548, y: 70 });
   });
 
   it("실린더가 회전하면 부착 오프셋도 함께 회전한다", () => {
     const { doc, cylinderId, switchId } = rig("retracted");
     const turned = rotateComponent(doc, cylinderId); // 90°
-    // (73, 18) 회전 90° → (-18, 73)
-    expect(getEquipmentPosition(turned, compOf(turned, switchId))).toEqual({ x: 282, y: 273 });
+    // (48, -30) 회전 90° → (30, 48)
+    expect(getEquipmentPosition(turned, compOf(turned, switchId))).toEqual({ x: 330, y: 248 });
   });
 
   it("대상 실린더를 찾지 못하면 기존 자유 배치로 폴백한다", () => {

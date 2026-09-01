@@ -207,10 +207,42 @@ function LimitSwitchSprite({ properties, runtime }: SymbolProps): ReactElement {
   return (
     <g>
       <rect x={-12} y={-14} width={24} height={28} rx={3} fill="#fbbf24" stroke="#92400e" strokeWidth={1.5} />
-      <line x1={-12} y1={-6} x2={-24} y2={active ? 2 : -14} stroke="#92400e" strokeWidth={3} strokeLinecap="round" />
-      <circle cx={-25} cy={active ? 3 : -15} r={4} fill="#e5e7eb" stroke="#92400e" strokeWidth={1.5} />
+      {/* 접점 — 눌리면 세로로 붙고, 떨어지면 사선 */}
+      {active ? (
+        <line x1={0} y1={-9} x2={0} y2={9} stroke="#92400e" strokeWidth={2.5} strokeLinecap="round" />
+      ) : (
+        <line x1={0} y1={9} x2={-7} y2={-7} stroke="#92400e" strokeWidth={2.5} strokeLinecap="round" />
+      )}
+      {/* 복귀 스프링 (위) */}
+      <polyline
+        points="0,-14 -5,-19 5,-25 -5,-31 0,-35"
+        fill="none"
+        stroke="#92400e"
+        strokeWidth={1.8}
+        strokeLinejoin="round"
+      />
+      {/* 조작 플런저 (아래) — 눌리면 밀려 들어간다. 끝의 사각 발에 실린더 캠이 닿는다 */}
+      <line
+        x1={0}
+        y1={14}
+        x2={0}
+        y2={active ? 22 : 26}
+        stroke="#92400e"
+        strokeWidth={3}
+        strokeLinecap="round"
+      />
+      <rect
+        x={-5}
+        y={active ? 22 : 26}
+        width={10}
+        height={6}
+        rx={1}
+        fill="#e5e7eb"
+        stroke="#92400e"
+        strokeWidth={1.5}
+      />
       {/* 어느 실린더의 어느 끝을 감지하는지 함께 표시 (Phase 16-5, 롤러 밸브 표기와 통일) */}
-      <text x={-12} y={24} fontSize={8} fill="#1f2937" stroke="none">
+      <text x={14} y={-24} fontSize={9} fontWeight={700} fill="#1f2937" stroke="none">
         {String(properties.name ?? "")} {String(properties.cylinderLabel ?? "")}
         {properties.triggerAt === "retracted" ? "▾" : "▴"}
       </text>

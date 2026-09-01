@@ -1080,18 +1080,47 @@ function ElecPushbutton({ properties, runtime }: SymbolProps): ReactElement {
   );
 }
 
+/**
+ * 리밋 스위치 (Phase 19 재작도) — 실기 도면의 표기를 따른다.
+ * 스위치 몸체를 사각 박스로 그리고, 그 안에 접점을, 한쪽에 **조작 플런저**(끝에
+ * 캠이 닿는 사각 발), 반대쪽에 **복귀 스프링**을 붙인다.
+ *
+ * 도면의 플런저는 아래를 향하지만, HYD의 전기 회로는 세로 사다리라 위·아래가
+ * 배선 단자다. 그래서 조작 축을 가로로 눕혀 **왼쪽 플런저 / 오른쪽 스프링**으로
+ * 그린다 — 밸브 기호의 조작부 표기(수동 왼쪽·스프링 오른쪽)와 같은 방향이다.
+ */
 function ElecLimitSwitch({ properties, runtime }: SymbolProps): ReactElement {
   const closed = contactClosedNow(properties, runtime);
   const isNC = properties.contactType === "NC";
+  // 캠에 눌리면 플런저가 밀려 들어간다 (동작 중에만 표시)
+  const pressed = isNC ? !closed : closed;
+  const push = pressed ? 4 : 0;
   return (
     <g>
-      <ContactGlyph closed={closed} />
-      {isNC && <NcBar />}
-      <line x1={-16} y1={0} x2={-6} y2={0} {...Sthin} strokeDasharray="2 2" />
-      <circle cx={-19} cy={0} r={4} {...Sthin} />
-      <text x={6} y={4} fontSize={9} fill="currentColor" stroke="none">
-        {String(properties.name ?? "")} ({String(properties.cylinderLabel ?? "")}
-        {properties.triggerAt === "retracted" ? "▾" : "▴"})
+      {/* 배선 단자 스텁 */}
+      <line x1={0} y1={-20} x2={0} y2={-14} {...S} />
+      <line x1={0} y1={14} x2={0} y2={20} {...S} />
+      {/* 스위치 몸체 */}
+      <rect x={-15} y={-14} width={30} height={28} {...S} fill="none" />
+      {/* 접점 — 닫히면 세로 직선, 열리면 사선 */}
+      {closed ? (
+        <line x1={0} y1={-10} x2={0} y2={10} {...S} />
+      ) : (
+        <line x1={0} y1={10} x2={-9} y2={-6} {...S} />
+      )}
+      {isNC && <line x1={-3} y1={-10} x2={7} y2={-10} {...S} />}
+      {/* 조작 플런저 (왼쪽) — 끝의 사각 발에 실린더 캠이 닿는다 */}
+      {pressed && <ActiveGlow cx={-26} r={11} />}
+      <line x1={-15} y1={0} x2={-28 + push} y2={0} {...Sthin} />
+      <rect x={-34 + push} y={-5} width={6} height={10} {...S} fill="none" />
+      {/* 복귀 스프링 (오른쪽) */}
+      <polyline
+        points={`15,0 19,-6 23,6 27,-6 31,0`}
+        {...Sthin}
+      />
+      <text x={13} y={-19} fontSize={9} fill="currentColor" stroke="none">
+        {String(properties.name ?? "")} {String(properties.cylinderLabel ?? "")}
+        {properties.triggerAt === "retracted" ? "▾" : "▴"}
       </text>
     </g>
   );

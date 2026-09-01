@@ -198,14 +198,14 @@ export function moveEquipment(
 
 /** 부품의 장비 뷰 표시 좌표 (자유 배치 없으면 회로도 좌표) */
 /**
- * 리밋 스위치 부착 위치 (Phase 16-5). 실린더 스프라이트 로컬 좌표 기준.
- * CylinderSprite의 로드 캠은 x=48(후진단)~88(전진단)을 왕복하고,
- * LimitSwitchSprite의 롤러는 본체 기준 (-25, -15)에 있다(눌리면 아래로 내려감).
- * 따라서 캠 x + 25에 본체를 두면 롤러가 캠 바로 아래에서 만난다.
+ * 리밋 스위치 부착 위치 (Phase 16-5, 좌표 정정 Phase 19).
+ * CylinderSprite의 로드 캠은 x=48(후진단)~88(전진단)을 왕복한다.
+ * LimitSwitchSprite는 실기 도면처럼 몸체 아래로 플런저가 내려오므로(발 끝 y≈+28),
+ * 캠 바로 **위쪽**에 본체를 두어 로드가 끝에 닿을 때 플런저를 누르게 한다.
  */
 const LIMIT_SWITCH_MOUNT: Record<"retracted" | "extended", Point> = {
-  retracted: { x: 73, y: 18 },
-  extended: { x: 113, y: 18 },
+  retracted: { x: 48, y: -30 },
+  extended: { x: 88, y: -30 },
 };
 
 /**
