@@ -4,8 +4,8 @@ import { useSimStore } from "../sim/simStore";
 import { getComponentDefinition } from "../../core/library/registry";
 import {
   getComponent,
-  getEquipmentAttachment,
   getEquipmentPosition,
+  getLimitSwitchMarkers,
   getPortDefinition,
   moveEquipment,
 } from "../../core/model/operations";
@@ -15,6 +15,7 @@ import { computeOrthogonalRoute } from "../../core/routing";
 import { getSymbol } from "../symbols";
 import { getSprite } from "./sprites";
 import { AutomationStationSprite } from "./AutomationStationSprite";
+import { LimitSwitchDeviceSprite } from "./sprites";
 import { useT } from "../i18n";
 
 /**
@@ -167,6 +168,30 @@ export function EquipmentView(): ReactElement {
             );
           })}
 
+          {/* 리밋 스위치 장치 표시 (Phase 19-4) — 실기 도면처럼 실린더 옆에 몸체를 덧그린다.
+              스위치 부품 자체는 전기 배선 자리에 그대로 있고, 여기 마커는 표시 전용이라
+              배선이 패널을 가로지르거나 같은 자리에 겹쳐 쌓이지 않는다 */}
+          {getLimitSwitchMarkers(doc).map((marker) => (
+            <g
+              key={`ls-${marker.key}`}
+              transform={`translate(${marker.equipmentPosition.x}, ${marker.equipmentPosition.y}) rotate(${marker.rotation})`}
+              pointerEvents="none"
+            >
+              <LimitSwitchDeviceSprite
+                names={marker.names}
+                atRetracted={marker.atRetracted}
+                pressed={
+                  simRunning
+                    ? marker.switchIds.some((id) => {
+                        const closed = snapshot?.components[id]?.contactClosed ?? false;
+                        return marker.isNC ? !closed : closed;
+                      })
+                    : false
+                }
+              />
+            </g>
+          ))}
+
           {doc.components.map((comp) => {
             const def = getComponentDefinition(comp.type);
             const Sprite = getSprite(comp.type);
@@ -184,8 +209,6 @@ export function EquipmentView(): ReactElement {
               ? comp.properties.actuation === "lever"
               : comp.properties.actuation === "maintained";
             const pos = eqPosition(comp.id);
-            /** 대상 실린더에 부착돼 위치가 계산되는 부품 (Phase 16-5) */
-            const attached = getEquipmentAttachment(doc, comp) !== null;
 
             return (
               <g
@@ -210,9 +233,6 @@ export function EquipmentView(): ReactElement {
                     }
                   } else if (!simRunning) {
                     useEditorStore.getState().select({ type: "component", id: comp.id });
-                    // 부착 부품(리밋 스위치)은 위치가 대상 실린더에서 계산되므로
-                    // 드래그를 받지 않는다 — 옮겨도 되돌아오는 혼란 방지 (Phase 16-5)
-                    if (attached) return;
                     const world = screenToWorld(e.clientX, e.clientY);
                     dragRef.current = {
                       id: comp.id,

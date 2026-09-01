@@ -203,28 +203,68 @@ function PushbuttonSprite({ properties, runtime }: SymbolProps): ReactElement {
 }
 
 /** 리밋 스위치: 롤러 레버 본체 */
+/**
+ * 리밋 스위치 — **전기 배선 자리**의 패널 부품 (Phase 19-4).
+ * 실린더 옆 몸체 그림은 LimitSwitchDeviceSprite가 따로 담당하므로, 여기서는 배선이
+ * 붙는 접점 블록만 간결하게 그린다. 예전에는 몸체 전체를 여기 그린 데다 부품이
+ * 실린더에 부착돼 배선이 패널을 가로질렀다.
+ */
 function LimitSwitchSprite({ properties, runtime }: SymbolProps): ReactElement {
   const closed = runtime?.contactClosed ?? false;
   const active = properties.contactType === "NC" ? !closed : closed;
   return (
     <g>
-      {/* 몸체 — 도면의 배치도 표기: 사각 박스를 대각선으로 나누고 위 칸에 접점을 그린다.
-          두 스위치가 행정 길이(40px)만큼만 떨어져 있어 몸체는 좁게 유지한다 */}
-      <rect x={-13} y={-13} width={26} height={26} rx={2} fill="#fde68a" stroke="#92400e" strokeWidth={1.6} />
-      <line x1={-13} y1={13} x2={13} y2={-13} stroke="#b45309" strokeWidth={1} opacity={0.7} />
-      {/* 접점 — 눌리면 수평으로 붙고, 떨어지면 사선 (도면의 위 칸 접점) */}
-      <line x1={9} y1={-6} x2={12} y2={-6} stroke="#92400e" strokeWidth={1.6} />
-      <circle cx={-1} cy={-6} r={1.4} fill="#92400e" />
+      <rect x={-13} y={-11} width={26} height={22} rx={3} fill="#fde68a" stroke="#92400e" strokeWidth={1.5} />
+      {/* 접점 — 붙으면 수평, 떨어지면 사선 */}
+      <circle cx={-7} cy={2} r={1.6} fill="#92400e" />
+      <circle cx={7} cy={2} r={1.6} fill="#92400e" />
       <line
-        x1={-1}
-        y1={-6}
-        x2={9}
-        y2={active ? -6 : -11}
+        x1={-7}
+        y1={2}
+        x2={7}
+        y2={active ? 2 : -6}
         stroke="#92400e"
         strokeWidth={2.2}
         strokeLinecap="round"
       />
-      {/* 복귀 스프링 — 도면처럼 좌상단 모서리에서 비스듬히 (짧고 굵게 정리) */}
+      <text x={0} y={-15} fontSize={8} fontWeight={700} textAnchor="middle" fill="#1f2937" stroke="none">
+        {String(properties.name ?? "")}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * 리밋 스위치 **장치 몸체** (Phase 19-4) — 장비 뷰에서 실린더 옆에 덧그리는 표시.
+ * 실기 도면의 배치도 표기를 따른다: 사각 몸체를 대각선으로 나누고 위 칸에 접점,
+ * 좌상단에 복귀 스프링, 아래로 플런저와 롤러. 실린더 로드의 캠이 롤러를 민다.
+ */
+export function LimitSwitchDeviceSprite({
+  names,
+  atRetracted,
+  pressed,
+}: {
+  names: string;
+  atRetracted: boolean;
+  pressed: boolean;
+}): ReactElement {
+  return (
+    <g>
+      <rect x={-13} y={-13} width={26} height={26} rx={2} fill="#fde68a" stroke="#92400e" strokeWidth={1.6} />
+      <line x1={-13} y1={13} x2={13} y2={-13} stroke="#b45309" strokeWidth={1} opacity={0.7} />
+      {/* 위 칸 접점 */}
+      <circle cx={-1} cy={-6} r={1.4} fill="#92400e" />
+      <line x1={9} y1={-6} x2={12} y2={-6} stroke="#92400e" strokeWidth={1.6} />
+      <line
+        x1={-1}
+        y1={-6}
+        x2={9}
+        y2={pressed ? -6 : -11}
+        stroke="#92400e"
+        strokeWidth={2.2}
+        strokeLinecap="round"
+      />
+      {/* 좌상단 복귀 스프링 */}
       <polyline
         points="-9,-13 -13,-17 -7,-20 -14,-23 -9,-26"
         fill="none"
@@ -233,36 +273,27 @@ function LimitSwitchSprite({ properties, runtime }: SymbolProps): ReactElement {
         strokeLinejoin="round"
         strokeLinecap="round"
       />
-      {/* 조작 플런저 + 롤러 — 눌리면 밀려 들어간다. 실린더 로드의 캠이 롤러를 민다 */}
+      {/* 플런저 + 롤러 — 캠에 눌리면 밀려 들어간다 */}
       <line
         x1={0}
         y1={13}
         x2={0}
-        y2={active ? 18 : 22}
+        y2={pressed ? 18 : 22}
         stroke="#92400e"
         strokeWidth={2.6}
         strokeLinecap="round"
       />
       <circle
         cx={0}
-        cy={active ? 21 : 25}
+        cy={pressed ? 21 : 25}
         r={3.2}
-        fill={active ? "#fbbf24" : "#e5e7eb"}
+        fill={pressed ? "#fbbf24" : "#e5e7eb"}
         stroke="#92400e"
         strokeWidth={1.5}
       />
-      {/* 어느 실린더의 어느 끝을 감지하는지 표시 — 옆 스위치와 겹치지 않게 박스 위 중앙 */}
-      <text
-        x={0}
-        y={-30}
-        fontSize={8}
-        fontWeight={700}
-        textAnchor="middle"
-        fill="#1f2937"
-        stroke="none"
-      >
-        {String(properties.name ?? "")}
-        {properties.triggerAt === "retracted" ? "↓" : "↑"}
+      <text x={0} y={-30} fontSize={8} fontWeight={700} textAnchor="middle" fill="#1f2937" stroke="none">
+        {names}
+        {atRetracted ? "↓" : "↑"}
       </text>
     </g>
   );

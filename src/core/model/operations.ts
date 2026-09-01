@@ -198,38 +198,31 @@ export function moveEquipment(
 
 /** 부품의 장비 뷰 표시 좌표 (자유 배치 없으면 회로도 좌표) */
 /**
- * 리밋 스위치 부착 위치 (Phase 16-5, 좌표 정정 Phase 19).
- * CylinderSprite의 로드 캠은 x=48(후진단)~88(전진단)을 왕복한다.
- * LimitSwitchSprite는 실기 도면처럼 몸체 아래로 플런저가 내려오므로(발 끝 y≈+28),
- * 캠 바로 **위쪽**에 본체를 두어 로드가 끝에 닿을 때 플런저를 누르게 한다.
+ * 리밋 스위치 장치 표시 오프셋 (Phase 19-4).
+ *
+ * 실기 도면은 리밋 스위치를 **두 자리에 나눠** 그린다 — 전기 배선 자리(사다리)의 접점과,
+ * 실린더 옆의 장치 몸체. 이전에는 장비 뷰에서 스위치 부품 자체를 실린더에 부착했는데,
+ * 그러면 (1) 전기 배선이 패널에서 실린더까지 길게 가로지르고 (2) 같은 끝단을 감지하는
+ * 스위치 여러 개가 한 점에 겹쳐 쌓여 화면이 뭉개졌다. 이제 부품은 제자리에 두고,
+ * 실린더 옆에는 **표시 전용 장치 마커**만 덧그린다.
+ *
+ * 좌표 기준: 회로도 실린더 기호의 로드 끝은 후진 x=44 · 전진 x=84,
+ * 장비 뷰 실린더 스프라이트의 로드 캠은 후진 x=48 · 전진 x=88을 왕복한다.
  */
-const LIMIT_SWITCH_MOUNT: Record<"retracted" | "extended", Point> = {
+const LIMIT_MARKER_SCHEMATIC: Record<"retracted" | "extended", Point> = {
+  retracted: { x: 44, y: -42 },
+  extended: { x: 84, y: -42 },
+};
+const LIMIT_MARKER_EQUIPMENT: Record<"retracted" | "extended", Point> = {
   retracted: { x: 48, y: -30 },
   extended: { x: 88, y: -30 },
 };
 
-/**
- * 장비 뷰에서 다른 부품에 부착돼 위치가 계산되는 부품인지 판정한다 (Phase 16-5).
- * 리밋 스위치는 `cylinderLabel`이 가리키는 실린더의 `triggerAt` 끝단에 붙는다 —
- * 실기 장비처럼 "어느 실린더의 어느 끝을 감지하는지"가 그림에서 보이도록.
- * 대상 실린더를 찾지 못하면 null을 돌려 기존 자유 배치로 폴백한다.
- */
-export function getEquipmentAttachment(
-  doc: CircuitDocument,
-  comp: ComponentInstance,
-): { host: ComponentInstance; offset: Point } | null {
-  const behavior = getComponentDefinition(comp.type).behavior;
-  if (behavior?.role !== "elec-contact" || behavior.source !== "limit") return null;
-  const host = findCylinderByLabel(doc, String(comp.properties.cylinderLabel ?? ""));
-  if (!host) return null;
-  const offset =
-    comp.properties.triggerAt === "retracted"
-      ? LIMIT_SWITCH_MOUNT.retracted
-      : LIMIT_SWITCH_MOUNT.extended;
-  return { host, offset };
+export function getEquipmentPosition(doc: CircuitDocument, comp: ComponentInstance): Point {
+  return doc.equipmentLayout?.[comp.id] ?? comp.position;
 }
 
-/** 이름표로 실린더를 찾는다 (리밋 스위치·롤러 밸브의 감지 대상 매칭) */
+/** 이름표로 실린더를 찾는다 (리밋 스위치의 감지 대상 매칭) */
 function findCylinderByLabel(doc: CircuitDocument, label: string): ComponentInstance | undefined {
   if (!label) return undefined;
   return doc.components.find(
@@ -239,59 +232,72 @@ function findCylinderByLabel(doc: CircuitDocument, label: string): ComponentInst
   );
 }
 
-/**
- * 회로도에 덧그릴 리밋 스위치 장치 표시 위치 (Phase 19-3).
- * 실기 도면은 회로도에서도 실린더 위에 리밋 스위치 몸체를 그려 "어디에 달렸는지"를
- * 보여준다. 회로도 실린더 기호의 로드 끝은 후진 x=44 · 전진 x=84이므로 그 위에 둔다.
- */
-const SCHEMATIC_LIMIT_MARKER: Record<"retracted" | "extended", Point> = {
-  retracted: { x: 44, y: -42 },
-  extended: { x: 84, y: -42 },
-};
-
 export interface LimitSwitchMarker {
-  /** 리밋 스위치 부품 id — 런타임 상태(눌림) 조회용 */
-  switchId: string;
+  /** 렌더 키 — 실린더 + 끝단 조합 */
+  key: string;
+  /** 이 자리를 공유하는 리밋 스위치 부품 id들 (같은 끝단을 여러 개가 감지할 수 있다) */
+  switchIds: string[];
+  /** 회로도 좌표 */
   position: Point;
+  /** 장비 뷰 좌표 (실린더의 장비 배치를 따른다) */
+  equipmentPosition: Point;
   rotation: Rotation;
-  name: string;
+  /** 표시할 이름 — 같은 자리에 여러 개면 쉼표로 잇는다 */
+  names: string;
   atRetracted: boolean;
-  /** b접점 여부 — 눌림 상태를 접점 상태에서 되짚는 데 쓴다 */
+  /** 대표 스위치의 b접점 여부 — 접점 상태에서 눌림을 되짚는 데 쓴다 */
   isNC: boolean;
 }
 
-/** 회로도용 리밋 스위치 장치 표시 목록 (감지 대상 실린더를 찾은 것만) */
+/**
+ * 리밋 스위치 장치 표시 목록 (Phase 19-3, 그룹화 19-4).
+ *
+ * 감지 대상 실린더를 찾은 스위치만 대상이며, **같은 실린더의 같은 끝단**을 감지하는
+ * 스위치들은 하나로 묶는다 — A+B+A−B− 예제처럼 같은 이름의 스위치가 여러 렁에 쓰이면
+ * 마커가 한 점에 겹쳐 쌓이기 때문이다.
+ */
 export function getLimitSwitchMarkers(doc: CircuitDocument): LimitSwitchMarker[] {
-  const markers: LimitSwitchMarker[] = [];
+  const groups = new Map<
+    string,
+    { host: ComponentInstance; atRetracted: boolean; ids: string[]; names: string[]; isNC: boolean }
+  >();
   for (const comp of doc.components) {
     const behavior = getComponentDefinition(comp.type).behavior;
     if (behavior?.role !== "elec-contact" || behavior.source !== "limit") continue;
     const host = findCylinderByLabel(doc, String(comp.properties.cylinderLabel ?? ""));
     if (!host) continue;
     const atRetracted = comp.properties.triggerAt === "retracted";
-    const offset = atRetracted
-      ? SCHEMATIC_LIMIT_MARKER.retracted
-      : SCHEMATIC_LIMIT_MARKER.extended;
-    markers.push({
-      switchId: comp.id,
-      position: addPoints(host.position, rotatePoint(offset, host.rotation)),
-      rotation: host.rotation,
-      name: String(comp.properties.name ?? ""),
-      atRetracted,
-      isNC: comp.properties.contactType === "NC",
-    });
+    const key = `${host.id}:${atRetracted ? "retracted" : "extended"}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { host, atRetracted, ids: [], names: [], isNC: comp.properties.contactType === "NC" };
+      groups.set(key, group);
+    }
+    group.ids.push(comp.id);
+    const name = String(comp.properties.name ?? "");
+    if (name && !group.names.includes(name)) group.names.push(name);
   }
-  return markers;
-}
 
-export function getEquipmentPosition(doc: CircuitDocument, comp: ComponentInstance): Point {
-  const attachment = getEquipmentAttachment(doc, comp);
-  if (attachment) {
-    const { host, offset } = attachment;
-    const hostPos = doc.equipmentLayout?.[host.id] ?? host.position;
-    return addPoints(hostPos, rotatePoint(offset, host.rotation));
-  }
-  return doc.equipmentLayout?.[comp.id] ?? comp.position;
+  return [...groups.entries()].map(([key, group]) => {
+    const end = group.atRetracted ? "retracted" : "extended";
+    const hostEquipment = doc.equipmentLayout?.[group.host.id] ?? group.host.position;
+    return {
+      key,
+      switchIds: group.ids,
+      position: addPoints(
+        group.host.position,
+        rotatePoint(LIMIT_MARKER_SCHEMATIC[end], group.host.rotation),
+      ),
+      equipmentPosition: addPoints(
+        hostEquipment,
+        rotatePoint(LIMIT_MARKER_EQUIPMENT[end], group.host.rotation),
+      ),
+      rotation: group.host.rotation,
+      names: group.names.join(","),
+      atRetracted: group.atRetracted,
+      isNC: group.isNC,
+    };
+  });
 }
 
 export function deleteWire(doc: CircuitDocument, wireId: string): CircuitDocument {

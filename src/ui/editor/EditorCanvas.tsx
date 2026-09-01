@@ -311,18 +311,21 @@ export function EditorCanvas(): ReactElement {
             어느 끝을 감지하는지 보여 준다. 표시 전용이라 클릭·선택 대상이 아니다 */}
         {getLimitSwitchMarkers(doc).map((marker) => (
           <g
-            key={`ls-${marker.switchId}`}
+            key={`ls-${marker.key}`}
             transform={`translate(${marker.position.x}, ${marker.position.y}) rotate(${marker.rotation})`}
             color="var(--symbol)"
             pointerEvents="none"
           >
             <LimitSwitchDeviceMarker
-              name={marker.name}
+              names={marker.names}
               atRetracted={marker.atRetracted}
               pressed={(() => {
                 if (!simRunning) return false;
-                const closed = simSnapshot?.components[marker.switchId]?.contactClosed ?? false;
-                return marker.isNC ? !closed : closed;
+                // 같은 자리를 공유하는 스위치 중 하나라도 눌렸으면 눌린 것으로 본다
+                return marker.switchIds.some((id) => {
+                  const closed = simSnapshot?.components[id]?.contactClosed ?? false;
+                  return marker.isNC ? !closed : closed;
+                });
               })()}
             />
           </g>

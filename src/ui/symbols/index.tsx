@@ -1137,11 +1137,11 @@ function ElecLimitSwitch({ properties, runtime }: SymbolProps): ReactElement {
  * 실제 접점은 사다리의 리밋 스위치 부품이다.
  */
 export function LimitSwitchDeviceMarker({
-  name,
+  names,
   atRetracted,
   pressed,
 }: {
-  name: string;
+  names: string;
   atRetracted: boolean;
   pressed: boolean;
 }): ReactElement {
@@ -1160,7 +1160,7 @@ export function LimitSwitchDeviceMarker({
       <line x1={0} y1={13} x2={0} y2={pressed ? 18 : 22} {...Sthin} />
       <circle cx={0} cy={pressed ? 21 : 25} r={3} {...Sthin} fill={pressed ? "currentColor" : "none"} />
       <text x={0} y={-30} fontSize={9} textAnchor="middle" fill="currentColor" stroke="none">
-        {name}
+        {names}
         {atRetracted ? "↓" : "↑"}
       </text>
     </g>
