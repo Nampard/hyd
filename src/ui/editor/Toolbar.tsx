@@ -16,6 +16,13 @@ export function Toolbar(): ReactElement {
   const canRedo = useEditorStore((s) => s.future.length > 0);
   const hasComponentSelection = useEditorStore((s) => s.selection?.type === "component");
   const hasComponents = useEditorStore((s) => s.document.components.length > 0);
+  // 부품이 하나라도 선택됐는지 (단일·다중) / 삭제할 것이 있는지 (배선 포함)
+  const hasPartSelection = useEditorStore(
+    (s) => s.selectedIds.length > 0 || s.selection?.type === "component",
+  );
+  const hasAnySelection = useEditorStore((s) => s.selectedIds.length > 0 || s.selection !== null);
+  const hasClipboard = useEditorStore((s) => (s.clipboard?.components.length ?? 0) > 0);
+  const multiSelectMode = useEditorStore((s) => s.multiSelectMode);
   const plcOpen = useEditorStore((s) => s.plcPanelOpen);
   const equipmentOpen = useEditorStore((s) => s.equipmentViewOpen);
   const diagramOpen = useEditorStore((s) => s.diagramPanelOpen);
@@ -123,6 +130,12 @@ export function Toolbar(): ReactElement {
     if (browserStorage.delete(name)) s.setStatus(`"${name}" 삭제 완료`);
     else s.setStatus(`"${name}" 삭제 실패 — 저장소에 접근할 수 없습니다.`);
     setStorageVersion((v) => v + 1);
+  };
+
+  /** 회로도 캔버스 중앙 기준 확대/축소 (Phase 24 — 휠이 없는 태블릿용) */
+  const zoomCanvas = (factor: number) => {
+    const rect = document.querySelector(".editor-canvas")?.getBoundingClientRect();
+    useEditorStore.getState().zoomAt(factor, rect ? { x: rect.width / 2, y: rect.height / 2 } : { x: 0, y: 0 });
   };
 
   const handleExample = (id: string) => {
@@ -249,7 +262,47 @@ export function Toolbar(): ReactElement {
           {t("rotate")}
         </button>
       </div>
+      {/* 선택 편집 (Phase 24) — 키보드 단축키(Delete·Ctrl+C/V·Shift)가 없는 태블릿에서도
+          같은 동작을 할 수 있게 버튼으로 노출한다 */}
       <div className="toolbar-group">
+        <button
+          className={multiSelectMode ? "plc-toggle-on" : undefined}
+          disabled={running}
+          onClick={() => useEditorStore.getState().toggleMultiSelectMode()}
+          title="켜면 부품 탭 = 선택 추가/제거, 빈 곳 드래그 = 영역 선택 (PC에서는 Shift와 같음)"
+        >
+          {t("multiSelect")}
+        </button>
+        <button
+          disabled={running || !hasPartSelection}
+          onClick={() => useEditorStore.getState().copySelection()}
+          title="선택한 부품과 그 사이 배선을 복사 (단축키: Ctrl+C)"
+        >
+          {t("copy")}
+        </button>
+        <button
+          disabled={running || !hasClipboard}
+          onClick={() => useEditorStore.getState().pasteClipboard()}
+          title="복사한 부품을 붙여넣기 (단축키: Ctrl+V)"
+        >
+          {t("paste")}
+        </button>
+        <button
+          className="delete-parts"
+          disabled={running || !hasAnySelection}
+          onClick={() => useEditorStore.getState().deleteSelection()}
+          title="선택한 부품(연결된 배선 포함) 또는 배선을 삭제 (단축키: Delete)"
+        >
+          {t("deleteParts")}
+        </button>
+      </div>
+      <div className="toolbar-group">
+        <button onClick={() => zoomCanvas(1 / 1.25)} title="축소">
+          {t("zoomOut")}
+        </button>
+        <button onClick={() => zoomCanvas(1.25)} title="확대">
+          {t("zoomIn")}
+        </button>
         <button onClick={() => useEditorStore.getState().setViewport({ x: 0, y: 0, zoom: 1 })}>
           {t("resetView")}
         </button>

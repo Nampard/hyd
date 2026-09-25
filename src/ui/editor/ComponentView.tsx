@@ -7,6 +7,12 @@ import { PORT_COLORS } from "./colors";
 import { useSimStore } from "../sim/simStore";
 import { useEditorStore } from "./store";
 
+/** 손가락 등 정밀하지 않은 포인터가 주 입력인 기기 (태블릿) — 포트 히트 영역 확대용 */
+const COARSE_POINTER =
+  typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia("(pointer: coarse)").matches
+    : false;
+
 /**
  * 실린더에 연결된 감지 부품(리밋 스위치·롤러 밸브)의 이름을
  * 후진단/전진단 위치별로 모아 마커로 표시할 데이터를 만든다.
@@ -90,11 +96,17 @@ export function ComponentView({
         sim.toggleManual(component.id);
       } else {
         sim.setManual(component.id, true);
-        const release = () => {
+        // 누른 그 손가락이 떨어질 때만 뗀다 — 태블릿에서 두 버튼을 동시에 누르는
+        // AND 회로 조작이 다른 손가락을 떼는 순간 풀리지 않게 (Phase 24)
+        const pointerId = e.pointerId;
+        const release = (up: PointerEvent) => {
+          if (up.pointerId !== pointerId) return;
           sim.setManual(component.id, false);
           window.removeEventListener("pointerup", release);
+          window.removeEventListener("pointercancel", release);
         };
         window.addEventListener("pointerup", release);
+        window.addEventListener("pointercancel", release);
       }
     } else {
       onSelect(false); // 실행 중에도 속성 열람은 허용
@@ -181,9 +193,18 @@ export function ComponentView({
             : portPressure === "exhausted"
               ? "var(--flow-exhaust)"
               : "var(--canvas-bg)";
+        const onPortDown = (e: React.PointerEvent) => {
+          if (e.button !== 0 || simRunning) return;
+          e.stopPropagation();
+          onPortClick({ componentId: component.id, portId: port.id });
+        };
         return (
+          <g key={port.id}>
+          {/* 터치 포인터(손가락)는 지름 8px 포트를 맞히기 어려워 보이지 않는 넓은 히트 영역을 둔다 */}
+          {COARSE_POINTER && !simRunning && (
+            <circle cx={pos.x} cy={pos.y} r={11} fill="transparent" stroke="none" onPointerDown={onPortDown} />
+          )}
           <circle
-            key={port.id}
             cx={pos.x}
             cy={pos.y}
             r={4}
@@ -192,16 +213,13 @@ export function ComponentView({
             strokeWidth={2}
             style={{ cursor: simRunning ? "default" : "crosshair" }}
             className="port"
-            onPointerDown={(e) => {
-              if (e.button !== 0 || simRunning) return;
-              e.stopPropagation();
-              onPortClick({ componentId: component.id, portId: port.id });
-            }}
+            onPointerDown={onPortDown}
           >
             <title>
               {def.name} — {port.label ?? port.id}
             </title>
           </circle>
+          </g>
         );
       })}
     </g>

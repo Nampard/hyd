@@ -52,6 +52,11 @@ interface EditorState {
   pasteSteps: number;
   /** 다중 선택된 부품 id 목록 (Phase 18). 단일 선택은 selection과 함께 유지된다 */
   selectedIds: string[];
+  /**
+   * 다중 선택 모드 (Phase 24) — Shift 키가 없는 태블릿용. 켜져 있으면 탭이 선택에
+   * 추가/제거, 빈 곳 드래그가 영역 선택이 된다 (Shift를 누른 것과 같다).
+   */
+  multiSelectMode: boolean;
 
   // 문서 수명주기
   newDocument(): void;
@@ -82,6 +87,7 @@ interface EditorState {
   selectArea(ids: string[]): void;
   /** Shift+클릭 — 다중 선택에 추가/제거 (Phase 18) */
   toggleSelected(id: string): void;
+  toggleMultiSelectMode(): void;
 
   // 배선
   startWire(from: PortRef): void;
@@ -91,6 +97,8 @@ interface EditorState {
   // 선택/뷰
   select(sel: Selection): void;
   setViewport(v: Viewport): void;
+  /** 화면 좌표(anchor, 캔버스 기준) 고정 확대/축소 — 버튼·두 손가락 확대 공용 (Phase 24) */
+  zoomAt(factor: number, anchor: Point): void;
   setStatus(msg: string | null): void;
 
   togglePlcPanel(): void;
@@ -102,6 +110,10 @@ interface EditorState {
   undo(): void;
   redo(): void;
 }
+
+/** 뷰 확대 범위 — 휠·버튼·두 손가락 확대 공용 */
+export const MIN_ZOOM = 0.25;
+export const MAX_ZOOM = 4;
 
 /** 히스토리 최대 길이 (메모리 보호) */
 const MAX_HISTORY = 100;
@@ -144,6 +156,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clipboard: null,
   pasteSteps: 0,
   selectedIds: [],
+  multiSelectMode: false,
 
   newDocument() {
     const doc = createEmptyDocument();
@@ -267,8 +280,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       pasteSteps: 0,
       statusMessage:
         group.components.length > 1
-          ? `부품 ${group.components.length}개와 그 사이 배선 ${group.wires.length}개를 복사했습니다 — Ctrl+V로 붙여넣기`
-          : "부품을 복사했습니다 — Ctrl+V로 붙여넣기",
+          ? `부품 ${group.components.length}개와 그 사이 배선 ${group.wires.length}개를 복사했습니다 — Ctrl+V 또는 붙여넣기 버튼`
+          : "부품을 복사했습니다 — Ctrl+V 또는 붙여넣기 버튼",
     });
   },
 
@@ -307,6 +320,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selection: next.length === 1 ? { type: "component", id: next[0] } : null,
       statusMessage: next.length > 1 ? `부품 ${next.length}개 선택됨` : null,
     });
+  },
+
+  toggleMultiSelectMode() {
+    set((s) => ({
+      multiSelectMode: !s.multiSelectMode,
+      statusMessage: s.multiSelectMode
+        ? null
+        : "다중 선택 모드 — 부품을 탭해 선택에 추가/제거, 빈 곳을 끌어 영역 선택",
+    }));
   },
 
   deleteSelection() {
@@ -373,6 +395,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setViewport(v) {
     set({ viewport: v });
+  },
+
+  zoomAt(factor, anchor) {
+    const v = get().viewport;
+    const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.zoom * factor));
+    const worldX = (anchor.x - v.x) / v.zoom;
+    const worldY = (anchor.y - v.y) / v.zoom;
+    set({ viewport: { x: anchor.x - worldX * zoom, y: anchor.y - worldY * zoom, zoom } });
   },
 
   setStatus(msg) {

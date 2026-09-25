@@ -17,6 +17,7 @@ import { EquipmentDefs, getSprite } from "./sprites";
 import { AutomationStationSprite } from "./AutomationStationSprite";
 import { LimitSwitchDeviceSprite } from "./sprites";
 import { useT } from "../i18n";
+import { usePinchZoom } from "../editor/usePinchZoom";
 
 /**
  * 일러스트 장비 뷰 (ARCHITECTURE 4.6 + Phase 8 자유 배치).
@@ -81,6 +82,12 @@ export function EquipmentView(): ReactElement {
     setDragPos(null);
   };
 
+  // 두 손가락 확대/이동 — 회로도와 같은 뷰포트를 움직인다 (Phase 24)
+  const pinchHandlers = usePinchZoom(() => {
+    dragRef.current = null;
+    setDragPos(null);
+  });
+
   const hasLayout = Object.keys(doc.equipmentLayout ?? {}).length > 0;
 
   return (
@@ -105,6 +112,7 @@ export function EquipmentView(): ReactElement {
       <svg
         ref={svgRef}
         className="equipment-canvas"
+        {...pinchHandlers}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerDown={(e) => {
@@ -229,11 +237,16 @@ export function EquipmentView(): ReactElement {
                     if (isToggle || e.shiftKey) sim.toggleManual(comp.id);
                     else {
                       sim.setManual(comp.id, true);
-                      const release = () => {
+                      // 누른 손가락이 떨어질 때만 뗀다 — 동시 누름(AND) 조작 보호 (Phase 24)
+                      const pointerId = e.pointerId;
+                      const release = (up: PointerEvent) => {
+                        if (up.pointerId !== pointerId) return;
                         sim.setManual(comp.id, false);
                         window.removeEventListener("pointerup", release);
+                        window.removeEventListener("pointercancel", release);
                       };
                       window.addEventListener("pointerup", release);
+                      window.addEventListener("pointercancel", release);
                     }
                   } else if (!simRunning) {
                     useEditorStore.getState().select({ type: "component", id: comp.id });

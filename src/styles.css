@@ -51,12 +51,29 @@ body,
   min-height: 0;
 }
 
-/* --- 좁은 화면 안내 (2차 판단: 완전 반응형 대신 안내로 대체) --- */
+/* --- 좁은 화면 안내 (2차 판단: 완전 반응형 대신 안내로 대체) ---
+   기준 1080px (Phase 23): 시중 태블릿의 가로 모드 CSS 폭은 iPad 9세대 1080, mini 1133,
+   10세대·Air 11 1180, Pro 11 1194~1210, 갤럭시 탭 S9·A9+ 1280이다. 예전 기준 1280px은
+   대부분의 iPad를 가로 모드에서도 막아 "태블릿(가로모드)에서 이용" 안내와 모순이었다.
+   세로 모드 태블릿(744~1032)과 스마트폰은 계속 안내 화면을 본다. */
 .narrow-screen-notice {
   display: none;
 }
 
-@media (max-width: 1279px) {
+.narrow-screen-hint-portrait {
+  display: none;
+}
+
+@media (max-width: 1079px) and (orientation: portrait) {
+  .narrow-screen-hint-portrait {
+    display: block;
+  }
+  .narrow-screen-hint-landscape {
+    display: none;
+  }
+}
+
+@media (max-width: 1079px) {
   .app-layout {
     display: none;
   }
@@ -79,6 +96,16 @@ body,
   .narrow-screen-notice-box p {
     line-height: 1.6;
     color: var(--text);
+  }
+  .narrow-screen-notice-box .narrow-screen-hint-portrait,
+  .narrow-screen-notice-box .narrow-screen-hint-landscape {
+    margin-top: 10px;
+    font-weight: 600;
+  }
+  .narrow-screen-notice-box .narrow-screen-width {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-dim);
   }
   .narrow-screen-notice-en {
     margin-top: 16px;
@@ -750,6 +777,19 @@ body,
 .plc-toggle-on {
   border-color: var(--accent) !important;
   background: #eef2ff !important;
+}
+
+/* 부품 삭제 버튼 (Phase 24) — 되돌릴 수 있지만 파괴적 동작이라 붉은 글자로 구분 */
+.toolbar button.delete-parts:not(:disabled) {
+  color: var(--err);
+}
+
+/* 터치 기기 (Phase 24): 손가락으로 누르기 쉽게 툴바 버튼 높이를 키운다 */
+@media (pointer: coarse) {
+  .toolbar button,
+  .toolbar select {
+    min-height: 34px;
+  }
 }
 
 /* --- 상태 표시줄 --- */

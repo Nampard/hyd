@@ -6,7 +6,7 @@
 
 ## 현재 상태
 
-- Phase 0~22 완료. 진행 기록과 다음 후보는 [docs/ROADMAP.md](docs/ROADMAP.md)의 마지막
+- Phase 0~24 완료. 진행 기록과 다음 후보는 [docs/ROADMAP.md](docs/ROADMAP.md)의 마지막
   Phase와 "후순위 후보"에 있다. 새 작업은 ROADMAP에 Phase를 추가하며 진행한다.
 - 문서 스키마 v5 (v4: ioMap channel, v5: `auto.automation-station` 리네임).
 - 작업 전 [docs/PRD.md](docs/PRD.md)(범위·non-goals)와

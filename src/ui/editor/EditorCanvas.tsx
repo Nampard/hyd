@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
-import { useEditorStore } from "./store";
+import { MAX_ZOOM, MIN_ZOOM, useEditorStore } from "./store";
+import { usePinchZoom } from "./usePinchZoom";
 import type { Point, PortRef } from "../../core/model/types";
 import {
   canConnect,
@@ -17,9 +18,6 @@ import { getSymbol, LimitSwitchDeviceMarker } from "../symbols";
 import { PORT_COLORS } from "./colors";
 import { useSimStore } from "../sim/simStore";
 import { useT } from "../i18n";
-
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 4;
 
 /** 포인터 제스처 상태 (렌더와 무관 — ref로 관리) */
 type Gesture =
@@ -42,6 +40,7 @@ export function EditorCanvas(): ReactElement {
   const pendingWireFrom = useEditorStore((s) => s.pendingWireFrom);
   const simRunning = useSimStore((s) => s.running);
   const simSnapshot = useSimStore((s) => s.snapshot);
+  const multiSelectMode = useEditorStore((s) => s.multiSelectMode);
   const t = useT();
   const isEmpty = doc.components.length === 0 && doc.wires.length === 0;
 
@@ -97,8 +96,9 @@ export function EditorCanvas(): ReactElement {
       s.cancelWire();
       return;
     }
-    // Shift + 좌드래그 = 영역 선택 (좌드래그 팬은 그대로 유지, Phase 18)
-    if (e.button === 0 && e.shiftKey) {
+    // Shift + 좌드래그 = 영역 선택 (좌드래그 팬은 그대로 유지, Phase 18).
+    // 태블릿은 Shift가 없으므로 다중 선택 모드가 같은 역할을 한다 (Phase 24)
+    if (e.button === 0 && (e.shiftKey || (multiSelectMode && !simRunning))) {
       const start = screenToWorld(e.clientX, e.clientY);
       gestureRef.current = { mode: "marquee", startWorld: start };
       setMarquee({ a: start, b: start });
@@ -161,7 +161,17 @@ export function EditorCanvas(): ReactElement {
     gestureRef.current = { mode: "idle" };
   };
 
+  /** 두 번째 손가락이 닿으면 한 손가락 제스처를 정리하고 두 손가락 확대로 넘긴다 */
+  const pinchHandlers = usePinchZoom(() => {
+    const g = gestureRef.current;
+    if (g.mode === "drag-component" && g.started) useEditorStore.getState().endDrag();
+    gestureRef.current = { mode: "idle" };
+    setMarquee(null);
+  });
+
   const startComponentDrag = (id: string) => (e: React.PointerEvent) => {
+    // 다중 선택 모드에서는 탭이 선택 토글이므로 끌어도 옮기지 않는다 (오이동 방지)
+    if (useEditorStore.getState().multiSelectMode) return;
     const comp = getComponent(useEditorStore.getState().document, id);
     if (!comp) return;
     const world = screenToWorld(e.clientX, e.clientY);
@@ -245,6 +255,7 @@ export function EditorCanvas(): ReactElement {
     <svg
       ref={svgRef}
       className="editor-canvas"
+      {...pinchHandlers}
       onPointerDown={onBackgroundPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -300,7 +311,7 @@ export function EditorCanvas(): ReactElement {
             onSelect={(additive) => {
               const s = useEditorStore.getState();
               // Shift+클릭이면 다중 선택에 추가/제거 (Phase 18)
-              if (additive) s.toggleSelected(comp.id);
+              if (additive || s.multiSelectMode) s.toggleSelected(comp.id);
               else s.select({ type: "component", id: comp.id });
             }}
             onDragStart={startComponentDrag(comp.id)}
