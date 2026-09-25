@@ -135,11 +135,15 @@ export function EquipmentView(): ReactElement {
 
             const pressure = simRunning ? snapshot?.wires[wire.id] : null;
             const hot = pressure === "pressurized";
+            // 귀로 전류(통전 부하 → 0V)는 파랑 — 회로도와 같은 규약 (Phase 20)
+            const returning = simRunning && snapshot?.electricReturn?.[wire.id] === true;
             const color =
               wire.kind === "electric"
                 ? hot
                   ? "#dc2626"
-                  : "#9ca3af"
+                  : returning
+                    ? "#2563eb"
+                    : "#9ca3af"
                 : hot
                   ? wire.kind === "hydraulic"
                     ? "#b45309"

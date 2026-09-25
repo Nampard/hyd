@@ -278,6 +278,7 @@ export function EditorCanvas(): ReactElement {
             wire={wire}
             selected={!simRunning && selection?.type === "wire" && selection.id === wire.id}
             pressure={simRunning ? (simSnapshot?.wires[wire.id] ?? "blocked") : null}
+            returnFlow={simRunning && simSnapshot?.electricReturn?.[wire.id] === true}
             onSelect={() => {
               if (!simRunning) useEditorStore.getState().select({ type: "wire", id: wire.id });
             }}

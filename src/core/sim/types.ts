@@ -71,6 +71,11 @@ export interface SimulationSnapshot {
    * 유체 배관: 압력 상태. 전기 배선: 활선(24V측)이면 "pressurized", 아니면 "blocked".
    */
   wires: Record<string, PressureState>;
+  /**
+   * 전기 배선 중 귀로 전류(통전 부하 → 0V)가 흐르는 배선 (Phase 20).
+   * `wires`의 활선(24V 전위) 표시와 짝을 이뤄 닫힌 회로 전체의 전류 흐름을 보여 준다.
+   */
+  electricReturn?: Record<string, boolean>;
   /** PLC 모니터링 (프로그램이 있을 때만) */
   plc?: {
     nodePower: Record<string, boolean[][]>;

@@ -270,6 +270,8 @@ export class SimulationEngine {
 
   private lastWireState = new Map<string, PressureState>();
   private lastElectricWireHot = new Map<string, boolean>();
+  /** 통전 부하 → 0V 귀로 전류가 흐르는 배선 (Phase 20) */
+  private lastElectricWireReturn = new Map<string, boolean>();
 
   /**
    * 전기 연결성 해석. 릴레이 접점이 회로 자신을 바꾸므로
@@ -331,6 +333,7 @@ export class SimulationEngine {
       }
 
       this.lastElectricWireHot = result.wireHot;
+      this.lastElectricWireReturn = result.wireReturn;
       if (!changed) {
         this.electricConverged = true;
         break;
@@ -602,10 +605,15 @@ export class SimulationEngine {
     for (const [wireId, hot] of this.lastElectricWireHot) {
       wires[wireId] = hot ? "pressurized" : "blocked";
     }
+    const electricReturn: Record<string, boolean> = {};
+    for (const [wireId, flowing] of this.lastElectricWireReturn) {
+      if (flowing) electricReturn[wireId] = true;
+    }
     return {
       time: this.time,
       components,
       wires,
+      electricReturn,
       plc: this.plcMonitor ?? undefined,
       diagnostics: {
         electricConverged: this.electricConverged,

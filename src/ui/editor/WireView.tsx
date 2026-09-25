@@ -12,10 +12,12 @@ interface Props {
   selected: boolean;
   /** 시뮬레이션 중 배관 압력 상태 (실행 중이 아니면 null) */
   pressure: PressureState | null;
+  /** 전기 배선에 귀로 전류(통전 부하 → 0V)가 흐르는 중인지 (Phase 20) */
+  returnFlow?: boolean;
   onSelect(): void;
 }
 
-export function WireView({ document, wire, selected, pressure, onSelect }: Props): ReactElement | null {
+export function WireView({ document, wire, selected, pressure, returnFlow, onSelect }: Props): ReactElement | null {
   const fromComp = getComponent(document, wire.from.componentId);
   const toComp = getComponent(document, wire.to.componentId);
   if (!fromComp || !toComp) return null;
@@ -35,6 +37,10 @@ export function WireView({ document, wire, selected, pressure, onSelect }: Props
   if (pressure === "pressurized") {
     // 가압 배관은 진한 파랑, 활선 전기 배선은 진한 빨강
     stroke = wire.kind === "electric" ? "var(--electric)" : "var(--flow-pressurized)";
+    width = 3.5;
+  } else if (wire.kind === "electric" && returnFlow) {
+    // 귀로 전류: 부하를 지난 전류가 0V로 돌아가는 길 — 활선(빨강)과 짝을 이룬다
+    stroke = "var(--electric-return)";
     width = 3.5;
   } else if (pressure === "exhausted") {
     stroke = "var(--flow-exhaust)";

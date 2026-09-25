@@ -13,6 +13,8 @@
   --pneumatic: #0284c7;
   --hydraulic: #b45309;
   --electric: #dc2626;
+  /* 귀로 전류 (통전 부하 → 0V) — 실기 도면의 − 모선 파랑 관례 (Phase 20) */
+  --electric-return: #2563eb;
   --flow-pressurized: #0369a1;
   --flow-exhaust: #93bcd9;
   --flow-blocked: #a3adba;

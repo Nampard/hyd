@@ -18,6 +18,12 @@ export interface ElectricSolveResult {
   energized: Map<string, boolean>;
   /** wireId → 활선(24V측) 여부 (배선 색상용) */
   wireHot: Map<string, boolean>;
+  /**
+   * wireId → 귀로 전류가 흐르는 배선인지 (통전 부하 → 0V). Phase 20.
+   * 활선(wireHot)은 24V 전위만 보여 주므로 부하를 지난 전류가 0V로 돌아가는 길이
+   * 보이지 않았다. 통전된 부하마다 0V까지의 최단 귀로를 표시한다.
+   */
+  wireReturn: Map<string, boolean>;
   /** portKey → 활선 여부 */
   portHot: Map<string, boolean>;
 }
@@ -125,5 +131,97 @@ export function solveElectric(
     wireHot.set(wire.id, portHot.get(portKey(wire.from.componentId, wire.from.portId)) ?? false);
   }
 
-  return { energized, wireHot, portHot };
+  const wireReturn = traceReturnPaths(doc, isContactClosed, netOfPort, inP, inN, energized);
+
+  return { energized, wireHot, wireReturn, portHot };
+}
+
+/**
+ * 귀로 전류 경로 (Phase 20).
+ *
+ * 0V 측 넷(0V에서 도달 가능하고 24V에서는 도달 불가)의 **포트 그래프**에서, 0V 단자로부터
+ * 다중 시작 BFS 트리를 만든 뒤 통전된 부하의 0V 측 단자마다 부모를 거슬러 올라가며
+ * 지나는 배선을 표시한다. 넷 단위로 칠하면 0V 모선 전체가 늘 칠해져 "어느 부하의
+ * 전류인지"가 보이지 않으므로, 실제로 전류가 지나는 배선만 고른다.
+ */
+function traceReturnPaths(
+  doc: CircuitDocument,
+  isContactClosed: (componentId: string) => boolean,
+  netOfPort: Map<string, number>,
+  inP: boolean[],
+  inN: boolean[],
+  energized: Map<string, boolean>,
+): Map<string, boolean> {
+  const wireReturn = new Map<string, boolean>();
+  for (const wire of doc.wires) if (wire.kind === "electric") wireReturn.set(wire.id, false);
+
+  const returnSide = (k: string): boolean => {
+    const n = netOfPort.get(k);
+    return n !== undefined && inN[n] && !inP[n];
+  };
+
+  // 포트 그래프: 배선(간선에 wireId) + 닫힌 접점 내부 연결(wireId 없음)
+  const adj = new Map<string, { to: string; wireId?: string }[]>();
+  const link = (a: string, b: string, wireId?: string) => {
+    if (!returnSide(a) || !returnSide(b)) return;
+    if (!adj.has(a)) adj.set(a, []);
+    if (!adj.has(b)) adj.set(b, []);
+    adj.get(a)!.push({ to: b, wireId });
+    adj.get(b)!.push({ to: a, wireId });
+  };
+  for (const wire of doc.wires) {
+    if (wire.kind !== "electric") continue;
+    link(
+      portKey(wire.from.componentId, wire.from.portId),
+      portKey(wire.to.componentId, wire.to.portId),
+      wire.id,
+    );
+  }
+
+  const sources: string[] = [];
+  const targets: string[] = [];
+  for (const comp of doc.components) {
+    const behavior = getComponentDefinition(comp.type).behavior;
+    if (!behavior) continue;
+    if (behavior.role === "elec-supply" && behavior.polarity === "negative") {
+      sources.push(portKey(comp.id, behavior.port));
+    } else if (behavior.role === "elec-contact" && isContactClosed(comp.id)) {
+      link(portKey(comp.id, behavior.portA), portKey(comp.id, behavior.portB));
+    } else if (behavior.role === "elec-load" && energized.get(comp.id)) {
+      for (const pid of [behavior.portA, behavior.portB]) {
+        const k = portKey(comp.id, pid);
+        if (returnSide(k)) targets.push(k);
+      }
+    }
+  }
+  if (targets.length === 0) return wireReturn;
+
+  // 0V 단자들에서 시작하는 BFS 트리 — 각 포트가 0V 쪽으로 어느 간선을 타고 가는지
+  const parent = new Map<string, { from: string; wireId?: string } | null>();
+  const queue: string[] = [];
+  for (const s of sources) {
+    if (!parent.has(s)) {
+      parent.set(s, null);
+      queue.push(s);
+    }
+  }
+  for (let i = 0; i < queue.length; i++) {
+    const node = queue[i];
+    for (const edge of adj.get(node) ?? []) {
+      if (parent.has(edge.to)) continue;
+      parent.set(edge.to, { from: node, wireId: edge.wireId });
+      queue.push(edge.to);
+    }
+  }
+
+  for (const target of targets) {
+    let node: string | undefined = target;
+    while (node !== undefined) {
+      const step = parent.get(node);
+      if (!step) break; // 0V 단자에 도달했거나 트리 밖
+      if (step.wireId) wireReturn.set(step.wireId, true);
+      node = step.from;
+    }
+  }
+  return wireReturn;
 }

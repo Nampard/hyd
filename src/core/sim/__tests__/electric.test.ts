@@ -161,3 +161,45 @@ describe("Phase 2 예제 검증", () => {
     }
   });
 });
+
+describe("귀로 전류 표시 (Phase 20)", () => {
+  it("통전된 부하의 0V 쪽 배선만 귀로로 표시되고, 꺼진 부하의 귀로는 표시되지 않는다", () => {
+    const doc = getExample("electro-reciprocate")!.build();
+    const engine = new SimulationEngine(doc);
+    const run1 = byName(doc, "elec.pushbutton", "name", "RUN");
+    engine.setManual(run1, true);
+    // 후진단 리밋(S1)이 닫힌 첫 순간 Y1이 통전된다 — 실린더가 출발하면 S1이 열리므로 짧게
+    const snap = run(engine, 0.02);
+
+    // 통전 중인 솔레노이드와 0V를 잇는 배선이 있어야 한다
+    const energizedLoads = doc.components.filter(
+      (c) => c.type === "elec.solenoid" && snap.components[c.id].energized,
+    );
+    expect(energizedLoads.length).toBeGreaterThan(0);
+    const zeroV = byType(doc, "elec.supply-0v")[0];
+    for (const load of energizedLoads) {
+      const returnWire = doc.wires.find(
+        (w) =>
+          (w.from.componentId === load.id && w.to.componentId === zeroV) ||
+          (w.to.componentId === load.id && w.from.componentId === zeroV),
+      )!;
+      expect(snap.electricReturn?.[returnWire.id]).toBe(true);
+    }
+    // 꺼진 솔레노이드의 0V 배선은 귀로가 아니다
+    const idleLoads = doc.components.filter(
+      (c) => c.type === "elec.solenoid" && !snap.components[c.id].energized,
+    );
+    for (const load of idleLoads) {
+      const wire = doc.wires.find(
+        (w) =>
+          (w.from.componentId === load.id && w.to.componentId === zeroV) ||
+          (w.to.componentId === load.id && w.from.componentId === zeroV),
+      )!;
+      expect(snap.electricReturn?.[wire.id] ?? false).toBe(false);
+    }
+    // 24V 활선 배선은 귀로로 칠하지 않는다 (색이 겹치지 않음)
+    for (const [wireId, flowing] of Object.entries(snap.electricReturn ?? {})) {
+      if (flowing) expect(snap.wires[wireId]).not.toBe("pressurized");
+    }
+  });
+});
