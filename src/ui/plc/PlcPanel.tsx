@@ -176,7 +176,13 @@ function CoilSymbol({
         {device}
       </text>
       <HLine x1={cx - half} x2={cx - r} y={cy} hot={enterHot} />
-      <circle cx={cx} cy={cy} r={r} stroke={segColor(enterHot)} strokeWidth={2} fill="none" />
+      {/* 코일 -( )- — IEC 61131-3 / XG5000 래더 표기는 원이 아니라 마주 보는 두 괄호 */}
+      <path
+        d={`M ${cx - 6} ${cy - r} A 14 14 0 0 0 ${cx - 6} ${cy + r} M ${cx + 6} ${cy - r} A 14 14 0 0 1 ${cx + 6} ${cy + r}`}
+        stroke={segColor(enterHot)}
+        strokeWidth={2}
+        fill="none"
+      />
       {glyph && (
         <text x={cx} y={cy + 3} textAnchor="middle" fontSize={9} fontWeight={700} fill={segColor(enterHot)}>
           {glyph}

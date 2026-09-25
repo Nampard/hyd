@@ -131,18 +131,23 @@ function Roller({ x, active }: { x: number; active?: boolean }) {
 }
 
 /**
- * 공압 파일럿 조작부 (측면 사각형 + 점선).
+ * 공압 파일럿 조작부 — KS B 0054 / ISO 1219-1 "압력 조작(직접 파일럿)":
+ * 밸브 쪽을 가리키는 **속이 빈 삼각형**(공압) + 바깥으로 나가는 파일럿 파선.
  * 조작부는 외부 파일럿 배관이 붙는 포트라 위치가 고정돼 본체처럼 슬라이드할 수 없다.
- * 대신 파일럿 신호가 들어오면(active) 사각형을 가압색으로 채워 동작을 시각화한다
+ * 파일럿 신호가 들어오면(active) 삼각형을 가압색으로 채워 동작을 시각화한다
  * — 포트 원이 가압 시 색이 바뀌는 규약과 동일.
  */
 function PilotGlyph({ x, dir, active }: { x: number; dir: 1 | -1; active?: boolean }) {
-  const w = 10;
-  const x0 = dir === -1 ? x - w : x;
+  // x = 밸브 끝면, dir = 바깥 방향. 삼각형 꼭짓점이 밸브 끝면에 닿는다.
+  const base = x + dir * 9;
   return (
     <g>
-      <rect x={x0} y={-7} width={w} height={14} {...Sthin} fill={active ? "var(--pneumatic)" : "none"} />
-      <line x1={x0 + (dir === -1 ? 0 : w)} y1={0} x2={x0 + (dir === -1 ? -6 : w + 6)} y2={0} {...Sthin} />
+      <polygon
+        points={`${x},0 ${base},-6 ${base},6`}
+        {...Sthin}
+        fill={active ? "var(--pneumatic)" : "none"}
+      />
+      <line x1={base} y1={0} x2={base + dir * 7} y2={0} {...Sthin} strokeDasharray="3 2" />
     </g>
   );
 }
@@ -191,25 +196,42 @@ function ValveBody({
 
 // ---------- 부품 기호 ----------
 
+/**
+ * 공압원 — KS B 0054 / ISO 1219-1: 원 + **속이 빈 삼각형**(공압, 유압은 검은 삼각형).
+ * 삼각형 꼭짓점이 원주에 닿아 출구(흐름 방향)를 가리킨다.
+ */
 function PneumaticSource(_: SymbolProps): ReactElement {
   return (
     <g>
       <circle cx={0} cy={0} r={15} {...S} />
-      <polygon points="-7,6 7,6 0,-8" fill="currentColor" stroke="none" />
+      <polygon points="0,-15 -6,-5 6,-5" {...Sthin} fill="none" />
       <line x1={0} y1={-15} x2={0} y2={-30} {...S} />
     </g>
   );
 }
 
+/**
+ * 서비스 유닛(필터·레귤레이터) 간략 기호 — KS B 0054 / ISO 1219-1 관례:
+ * 필터 = 유로에 놓인 마름모 + 흐름에 직각인 여과재 파선, 레귤레이터 = 가변 화살표,
+ * 압력계 = 원 + 바늘. 한 몸체이므로 일점쇄선으로 묶는다.
+ * (예전 "사각형 안 X"는 규격에 없는 표기라 교체 — Phase 21)
+ */
 function ServiceUnit(_: SymbolProps): ReactElement {
   return (
     <g>
-      <rect x={-20} y={-20} width={40} height={40} {...S} />
-      {/* 필터 + 드레인 (단순화 표기) */}
-      <line x1={-20} y1={-20} x2={20} y2={20} {...Sthin} />
-      <line x1={-20} y1={20} x2={20} y2={-20} {...Sthin} />
-      <line x1={-30} y1={0} x2={-20} y2={0} {...S} />
-      <line x1={20} y1={0} x2={30} y2={0} {...S} />
+      <rect x={-20} y={-20} width={40} height={40} {...Sthin} strokeDasharray="9 3 2 3" opacity={0.6} />
+      <line x1={-30} y1={0} x2={-18} y2={0} {...S} />
+      <line x1={2} y1={0} x2={30} y2={0} {...S} />
+      {/* 필터 */}
+      <polygon points="-18,0 -8,-10 2,0 -8,10" {...Sthin} />
+      <line x1={-8} y1={-10} x2={-8} y2={10} {...Sthin} strokeDasharray="2 2" />
+      {/* 레귤레이터 (가변 화살표) */}
+      <line x1={4} y1={10} x2={16} y2={-6} {...Sthin} />
+      <polygon points="16,-6 10.5,-4 14.5,-0.5" fill="currentColor" stroke="none" />
+      {/* 압력계 */}
+      <line x1={10} y1={0} x2={10} y2={-9} {...Sthin} />
+      <circle cx={10} cy={-14} r={5} {...Sthin} />
+      <line x1={7} y1={-11} x2={13} y2={-17} {...Sthin} />
     </g>
   );
 }
@@ -481,7 +503,10 @@ function Shuttle({ runtime }: SymbolProps): ReactElement {
   const ballX = x1On && !x2On ? 8 : x2On && !x1On ? -8 : 0;
   return (
     <g>
-      <rect x={-20} y={-10} width={40} height={20} rx={10} {...S} />
+      <rect x={-20} y={-10} width={40} height={20} {...S} />
+      {/* 양끝 시트 — 볼이 압력이 낮은 쪽 시트를 막는다 (ISO 1219-1 셔틀 밸브) */}
+      <polyline points="-14,-7 -17,0 -14,7" {...Sthin} />
+      <polyline points="14,-7 17,0 14,7" {...Sthin} />
       <circle cx={ballX} cy={0} r={6} fill="currentColor" stroke="none" />
       <line x1={-30} y1={0} x2={-20} y2={0} {...S} />
       <line x1={20} y1={0} x2={30} y2={0} {...S} />
@@ -677,11 +702,14 @@ function HydPowerUnit(_: SymbolProps): ReactElement {
   return (
     <g>
       {/* 펌프 (P 라인) */}
+      {/* 유압 펌프: 검은 삼각형 꼭짓점이 원주에 닿아 토출 방향을 가리킨다 */}
       <circle cx={-10} cy={-5} r={12} {...S} />
-      <polygon points="-16,-1 -4,-1 -10,-14" fill="currentColor" stroke="none" />
+      <polygon points="-10,-17 -15.5,-8 -4.5,-8" fill="currentColor" stroke="none" />
       <line x1={-10} y1={-17} x2={-10} y2={-30} {...S} />
-      {/* 탱크 (T 라인) */}
-      <line x1={20} y1={-30} x2={20} y2={12} {...S} />
+      {/* 흡입관 — 펌프는 탱크에서 흡입한다 */}
+      <polyline points="-10,7 -10,18 8,18" {...Sthin} />
+      {/* 탱크 (T 라인) — 복귀관은 유면 아래(탱크 바닥 근처)까지 들어간다 */}
+      <line x1={20} y1={-30} x2={20} y2={20} {...S} />
       <polyline points="8,12 8,24 32,24 32,12" {...S} />
       <text x={-16} y={-34} fontSize={9} fill="currentColor" stroke="none">P</text>
       <text x={16} y={-34} fontSize={9} fill="currentColor" stroke="none">T</text>
@@ -692,7 +720,8 @@ function HydPowerUnit(_: SymbolProps): ReactElement {
 function HydTank(_: SymbolProps): ReactElement {
   return (
     <g>
-      <line x1={0} y1={-20} x2={0} y2={4} {...S} />
+      {/* 개방형 탱크 — 관 끝이 유면 아래까지 들어간다 (KS B 0054) */}
+      <line x1={0} y1={-20} x2={0} y2={12} {...S} />
       <polyline points="-12,4 -12,16 12,16 12,4" {...S} />
     </g>
   );
@@ -729,11 +758,13 @@ function HydRelief({ properties, runtime }: SymbolProps): ReactElement {
       <rect x={-15} y={-20} width={30} height={40} {...S} fill={relieving ? "var(--energized)" : "none"} />
       <FlowArrow x1={-8} y1={-14} x2={-8} y2={14} />
       <SpringH x={15} dir={1} />
+      {/* 내부 파일럿 — 입구(P) 압력이 스프링 반대편에서 밀어 연다 (KS B 0054 릴리프 밸브) */}
+      <polyline points="0,-25 -22,-25 -22,0 -15,0" {...Sthin} strokeDasharray="3 2" />
       <line x1={0} y1={-30} x2={0} y2={-20} {...S} />
       <line x1={0} y1={20} x2={0} y2={30} {...S} />
       <text x={4} y={-33} fontSize={9} fill="currentColor" stroke="none">P</text>
       <text x={4} y={39} fontSize={9} fill="currentColor" stroke="none">T</text>
-      <text x={-24} y={-24} fontSize={8} fill="currentColor" stroke="none">{setpoint} bar</text>
+      <text x={14} y={-12} fontSize={8} fill="currentColor" stroke="none">{setpoint} bar</text>
     </g>
   );
 }
@@ -815,11 +846,12 @@ function HydValve43({ properties, runtime, center }: SymbolProps & { center: "cl
       </g>
     ) : (
       <g key="1">
-        {/* 오픈: 네 포트 상통 (십자 연결) */}
-        <line x1={20} y1={-20} x2={20} y2={20} {...Sthin} />
-        <line x1={40} y1={-20} x2={40} y2={20} {...Sthin} />
-        <line x1={20} y1={0} x2={40} y2={0} {...Sthin} />
-        <FlowArrow x1={30} y1={0} x2={40} y2={16} />
+        {/* 오픈: 네 포트 상통 (H 연결 + 연결점) — 방향이 정해지지 않으므로 화살표를 쓰지 않는다 */}
+        <line x1={20} y1={-20} x2={20} y2={20} {...S} />
+        <line x1={40} y1={-20} x2={40} y2={20} {...S} />
+        <line x1={20} y1={0} x2={40} y2={0} {...S} />
+        <circle cx={20} cy={0} r={2.5} fill="currentColor" stroke="none" />
+        <circle cx={40} cy={0} r={2.5} fill="currentColor" stroke="none" />
       </g>
     ),
     <g key="2">
@@ -1002,25 +1034,28 @@ function PressureSwitchSymbol({ properties, runtime }: SymbolProps): ReactElemen
   const isNC = properties.contactType === "NC";
   return (
     <g>
-      <ContactGlyph closed={closed} />
-      {isNC && <NcBar />}
+      <ContactGlyph closed={closed} nc={isNC} />
       {/* 압력 파일럿 (왼쪽 아래 유체 포트에서 점선) */}
       <line x1={-20} y1={10} x2={-6} y2={4} {...Sthin} strokeDasharray="3 2" />
       <polygon points="-8,2 -3,7 -9,8" fill="currentColor" stroke="none" />
-      <text x={6} y={4} fontSize={9} fill="currentColor" stroke="none">
+      <text x={isNC ? 14 : 6} y={4} fontSize={9} fill="currentColor" stroke="none">
         {String(properties.name ?? "")} ≥{Number(properties.threshold ?? 0)}
       </text>
     </g>
   );
 }
 
-/** 유압 모터: 원 + 채운 삼각형, 축 표시선이 motorAngle만큼 회전 */
+/**
+ * 양방향 유압 모터 — KS B 0054 / ISO 1219-1: 원 + 원주에서 **안쪽을 가리키는** 검은 삼각형
+ * (펌프는 바깥쪽). 양방향이라 두 개. 축 표시선은 motorAngle만큼 회전하는 시뮬레이션 overlay.
+ */
 function HydMotor({ runtime }: SymbolProps): ReactElement {
   const angle = runtime?.motorAngle ?? 0;
   return (
     <g>
       <circle cx={0} cy={0} r={16} {...S} />
-      <polygon points="-6,10 6,10 0,-2" fill="currentColor" stroke="none" />
+      <polygon points="-11.3,11.3 -3,7 -7,3" fill="currentColor" stroke="none" />
+      <polygon points="11.3,11.3 3,7 7,3" fill="currentColor" stroke="none" />
       <g transform={`rotate(${angle})`}>
         <line x1={0} y1={0} x2={0} y2={-13} {...Sthin} />
         <circle cx={0} cy={-13} r={2} fill="currentColor" stroke="none" />
@@ -1035,24 +1070,31 @@ function HydMotor({ runtime }: SymbolProps): ReactElement {
 
 // ---------- 전기 기호 (세로 배치: T 위, B 아래) ----------
 
-/** 접점 공용: 열림/닫힘 상태로 작도. 세로 단자 (0,-20)-(0,20) */
-function ContactGlyph({ closed }: { closed: boolean }) {
+/**
+ * 접점 공용 — KS C IEC 60617 세로 표기. 세로 단자 (0,-20)-(0,20).
+ * a접점(NO): 가동편이 왼쪽으로 벌어져 있다가, 닫히면 세로로 붙는다.
+ * b접점(NC): 고정 접점에서 오른쪽으로 짧은 턱이 나오고 가동편이 턱에 걸려 있다가,
+ *   동작하면 가동편이 턱에서 떨어진다. 동작 상태에 따라 가동편만 움직인다.
+ */
+function ContactGlyph({ closed, nc = false }: { closed: boolean; nc?: boolean }) {
   return (
     <g>
       <line x1={0} y1={-20} x2={0} y2={-8} {...S} />
       <line x1={0} y1={8} x2={0} y2={20} {...S} />
-      {closed ? (
+      {nc && <line x1={0} y1={-8} x2={11} y2={-8} {...S} />}
+      {nc ? (
+        closed ? (
+          <line x1={0} y1={8} x2={10} y2={-10} {...S} />
+        ) : (
+          <line x1={0} y1={8} x2={-9} y2={-7} {...S} />
+        )
+      ) : closed ? (
         <line x1={0} y1={-8} x2={0} y2={8} {...S} />
       ) : (
         <line x1={0} y1={8} x2={-9} y2={-7} {...S} />
       )}
     </g>
   );
-}
-
-/** NC 표시용 가로 막대 */
-function NcBar() {
-  return <line x1={-2} y1={-8} x2={7} y2={-8} {...S} />;
 }
 
 function contactClosedNow(properties: Record<string, unknown>, runtime?: SymbolRuntime): boolean {
@@ -1066,14 +1108,15 @@ function ElecPushbutton({ properties, runtime }: SymbolProps): ReactElement {
   const isNC = properties.contactType === "NC";
   return (
     <g>
-      <ContactGlyph closed={closed} />
-      {isNC && <NcBar />}
-      {/* 조작부 (왼쪽): 버튼 캡 + 점선 연결 */}
+      <ContactGlyph closed={closed} nc={isNC} />
+      {/* 누름 조작부 (KS C IEC 60617): "E" 모양 — 버튼 면 + 위아래 턱이 접점을 향하고,
+          가운데 파선이 가동편과 기계적으로 연결된다. 눌리면 전체가 접점 쪽으로 들어간다 */}
       {pressed && <ActiveGlow cx={-20} r={12} />}
-      <line x1={-18 + (pressed ? 5 : 0)} y1={0} x2={-6} y2={0} {...Sthin} strokeDasharray="2 2" />
-      <line x1={-18 + (pressed ? 5 : 0)} y1={-6} x2={-18 + (pressed ? 5 : 0)} y2={6} {...S} />
-      <line x1={-24 + (pressed ? 5 : 0)} y1={-6} x2={-24 + (pressed ? 5 : 0)} y2={6} {...S} />
-      <text x={6} y={4} fontSize={9} fill="currentColor" stroke="none">
+      <g transform={`translate(${pressed ? 5 : 0}, 0)`}>
+        <line x1={-22} y1={0} x2={-6 - (pressed ? 5 : 0)} y2={0} {...Sthin} strokeDasharray="2 2" />
+        <polyline points="-18,-6 -22,-6 -22,6 -18,6" {...S} />
+      </g>
+      <text x={isNC ? 14 : 6} y={4} fontSize={9} fill="currentColor" stroke="none">
         {String(properties.name ?? "")}
       </text>
     </g>
@@ -1099,8 +1142,7 @@ function ElecLimitSwitch({ properties, runtime }: SymbolProps): ReactElement {
   const pressed = isNC ? !closed : closed;
   return (
     <g>
-      <ContactGlyph closed={closed} />
-      {isNC && <NcBar />}
+      <ContactGlyph closed={closed} nc={isNC} />
       {/* 기계적 연결 (파선) + 롤러 — 도면의 ⊙- - - 접점 표기 */}
       {pressed && <ActiveGlow cx={-19} r={11} />}
       <line x1={-15} y1={0} x2={-6} y2={0} {...Sthin} strokeDasharray="2 2" />
@@ -1120,7 +1162,7 @@ function ElecLimitSwitch({ properties, runtime }: SymbolProps): ReactElement {
           </>
         )}
       </g>
-      <text x={6} y={4} fontSize={9} fill="currentColor" stroke="none">
+      <text x={isNC ? 14 : 6} y={4} fontSize={9} fill="currentColor" stroke="none">
         {String(properties.name ?? "")} ({String(properties.cylinderLabel ?? "")}
         {atRetracted ? "↓" : "↑"})
       </text>
@@ -1172,9 +1214,8 @@ function ElecRelayContact({ properties, runtime }: SymbolProps): ReactElement {
   const isNC = properties.contactType === "NC";
   return (
     <g>
-      <ContactGlyph closed={closed} />
-      {isNC && <NcBar />}
-      <text x={6} y={4} fontSize={9} fill="currentColor" stroke="none">
+      <ContactGlyph closed={closed} nc={isNC} />
+      <text x={isNC ? 14 : 6} y={4} fontSize={9} fill="currentColor" stroke="none">
         {String(properties.deviceLabel ?? "")}
       </text>
     </g>
