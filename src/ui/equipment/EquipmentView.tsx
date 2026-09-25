@@ -13,7 +13,7 @@ import type { Point } from "../../core/model/types";
 import { addPoints, rotatePoint, rotateDirection, snapPoint } from "../../core/geometry";
 import { computeOrthogonalRoute } from "../../core/routing";
 import { getSymbol } from "../symbols";
-import { getSprite } from "./sprites";
+import { EquipmentDefs, getSprite } from "./sprites";
 import { AutomationStationSprite } from "./AutomationStationSprite";
 import { LimitSwitchDeviceSprite } from "./sprites";
 import { useT } from "../i18n";
@@ -113,7 +113,10 @@ export function EquipmentView(): ReactElement {
           if (e.button === 0 && sim.running && sim.mode === "step" && sim.paused) sim.advanceStep();
         }}
       >
+        <EquipmentDefs />
         <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
+          {/* 알루미늄 프로파일 판 바닥 (Phase 22) — 뷰포트와 함께 이동해 부품이 판에 고정된 느낌 */}
+          <rect x={-5000} y={-5000} width={10000} height={10000} fill="url(#eq-slots)" />
           {/* 배관/배선 = 호스 (자유 배치 좌표 기준 재라우팅) */}
           {doc.wires.map((wire) => {
             const fromComp = getComponent(doc, wire.from.componentId);
@@ -137,37 +140,34 @@ export function EquipmentView(): ReactElement {
             const hot = pressure === "pressurized";
             // 귀로 전류(통전 부하 → 0V)는 파랑 — 회로도와 같은 규약 (Phase 20)
             const returning = simRunning && snapshot?.electricReturn?.[wire.id] === true;
-            const color =
-              wire.kind === "electric"
+            // 호스·전선 재질 (Phase 22): 공압 = 반투명 우레탄 튜브, 유압 = 검은 고무 호스,
+            // 전기 = 피복 전선. 상태 색 규약(가압·활선·귀로)은 회로도와 같다.
+            const electric = wire.kind === "electric";
+            const color = electric
+              ? hot
+                ? "#dc2626"
+                : returning
+                  ? "#2563eb"
+                  : "#94a3b8"
+              : wire.kind === "hydraulic"
                 ? hot
-                  ? "#dc2626"
-                  : returning
-                    ? "#2563eb"
-                    : "#9ca3af"
+                  ? "#ea580c"
+                  : "#3f4652"
                 : hot
-                  ? wire.kind === "hydraulic"
-                    ? "#b45309"
-                    : "#0369a1"
-                  : "#64748b";
+                  ? "#0284c7"
+                  : "#9bb4cc";
+            const width = electric ? 2.4 : wire.kind === "hydraulic" ? 5.5 : 4.5;
             return (
-              <g key={wire.id}>
-                <polyline
-                  points={points}
-                  fill="none"
-                  stroke="#1f2937"
-                  strokeWidth={wire.kind === "electric" ? 4 : 7}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  opacity={0.25}
-                />
-                <polyline
-                  points={points}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth={wire.kind === "electric" ? 2.5 : 5}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
+              <g key={wire.id} strokeLinejoin="round" strokeLinecap="round" fill="none">
+                {/* 바닥 그림자 */}
+                <polyline points={points} stroke="#0f172a" strokeWidth={width + 1} opacity={0.14} transform="translate(0, 2)" />
+                {/* 외곽선 */}
+                <polyline points={points} stroke={electric ? "#1e293b" : "#334155"} strokeWidth={width + 1.4} opacity={electric ? 0.55 : 0.6} />
+                <polyline points={points} stroke={color} strokeWidth={width} />
+                {/* 광택 하이라이트 */}
+                {!electric && (
+                  <polyline points={points} stroke="#ffffff" strokeWidth={1.1} opacity={wire.kind === "hydraulic" ? 0.18 : 0.45} transform="translate(-0.6, -0.9)" />
+                )}
               </g>
             );
           })}
