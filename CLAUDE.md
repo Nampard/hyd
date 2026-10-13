@@ -6,7 +6,7 @@
 
 ## 현재 상태
 
-- Phase 0~24 완료. 진행 기록과 다음 후보는 [docs/ROADMAP.md](docs/ROADMAP.md)의 마지막
+- Phase 0~25 완료. 진행 기록과 다음 후보는 [docs/ROADMAP.md](docs/ROADMAP.md)의 마지막
   Phase와 "후순위 후보"에 있다. 새 작업은 ROADMAP에 Phase를 추가하며 진행한다.
 - 문서 스키마 v5 (v4: ioMap channel, v5: `auto.automation-station` 리네임).
 - 작업 전 [docs/PRD.md](docs/PRD.md)(범위·non-goals)와
@@ -55,8 +55,12 @@
 
 ## 배포
 
-- `main`에 push하면 `.github/workflows/deploy.yml`이 test → build → GitHub Pages로 배포한다.
-  사용자가 "커밋 푸시 배포"라고 하면 이 push까지가 배포다.
-- 이 샌드박스에서는 github.io에 접속할 수 없다. 배포 확인은 api.github.com(Actions runs API)으로 한다 (`gh` CLI 없음).
+- `main`에 push하면 두 곳에 자동 배포된다. 사용자가 "커밋 푸시 배포"라고 하면 이 push까지가 배포다.
+  - **Netlify (기본 주소)** https://hyd-sim.netlify.app — 설정은 `netlify.toml`(빌드·캐시 헤더).
+  - **GitHub Pages (예비)** https://nampard.github.io/hyd/ — `.github/workflows/deploy.yml`이 test → build → 배포.
+  - Netlify를 둔 이유: 사용자 통신망(LG U+)에서 GitHub Pages IP 하나(185.199.110.153)로 가는 HTTPS가 막혀
+    크롬에서 "사이트에 연결할 수 없음"이 간헐적으로 났다 (Phase 25).
+- 샌드박스 안에서는 배포 사이트에 접속할 수 없다. Pages 배포는 api.github.com(Actions runs API)으로 확인하고
+  (`gh` CLI 없음), 실제 사이트 응답은 샌드박스 밖 `curl`로 확인한다. 배포 버전은 메인 JS에 박힌 커밋 해시로 대조한다.
 - 서비스 워커는 빌드마다 새 ID가 박혀 자동 갱신되고, 상태 표시줄에 커밋 해시 버전이, 툴바에 `⟳ 최신으로`
   버튼이 있다. 캐시 관련 문제를 고칠 때 이 구조를 유지한다.

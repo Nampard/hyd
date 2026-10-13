@@ -1,0 +1,39 @@
+# Netlify 배포 설정 (Phase 25) — GitHub Pages와 같은 빌드를 두 번째 주소로 낸다.
+# 일부 통신망에서 GitHub Pages 서버 IP 하나(185.199.110.153)로 가는 경로가 막혀
+# "사이트에 연결할 수 없음"이 나는 문제를 피하기 위한 미러: https://hyd-sim.netlify.app
+# main에 push하면 GitHub Actions(Pages)와 Netlify가 각각 자동 배포한다.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # GitHub Actions(deploy.yml)와 같은 Node 버전
+  NODE_VERSION = "20"
+
+# 캐시 규칙 — Phase 19의 "새로고침해도 옛 화면" 대책을 서버 쪽에서도 보장한다.
+# 셸·워커·매니페스트는 매번 서버에 확인하고, 내용 해시가 붙은 자산만 오래 보관한다.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
