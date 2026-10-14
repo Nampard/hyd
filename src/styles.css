@@ -285,15 +285,34 @@ body,
   user-select: none;
 }
 
-/* 빈 도면 안내 — 요소가 들어오면 페이드 아웃 */
+/* 캔버스 + 빈 도면 안내 레이어를 겹치는 틀 (Phase 26) */
+.editor-canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+/* 빈 도면 안내 — 요소가 들어오면 페이드 아웃.
+   opacity만으로는 일부 브라우저에서 남을 수 있어, 페이드가 끝난 뒤 visibility도 숨긴다 */
 .canvas-empty-hint {
+  position: absolute;
+  inset: 0;
   opacity: 1;
-  transition: opacity 420ms ease;
+  visibility: visible;
+  transition:
+    opacity 420ms ease,
+    visibility 0s linear 0s;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .canvas-empty-hint.is-hidden {
   opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 420ms ease,
+    visibility 0s linear 420ms;
 }
 
 .canvas-empty-inner {

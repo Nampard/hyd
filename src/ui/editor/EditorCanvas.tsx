@@ -252,6 +252,7 @@ export function EditorCanvas(): ReactElement {
   const gridH = (rect?.height ?? 2000) / viewport.zoom;
 
   return (
+    <div className="editor-canvas-wrap">
     <svg
       ref={svgRef}
       className="editor-canvas"
@@ -361,19 +362,13 @@ export function EditorCanvas(): ReactElement {
         {placingGhost}
       </g>
 
-      {/* 빈 도면 안내. 변환 <g> 밖에 화면 좌표(100%)로 두어 팬/줌과 무관하게 중앙 고정.
-          SVG <text>는 줄바꿈이 안 돼 좁은 캔버스(장비 뷰 동시 표시 등)에서 넘치므로
-          foreignObject 안의 HTML로 그린다. 부품·배선이 생기면 페이드 아웃 —
-          언마운트하면 전환이 안 보이므로 항상 렌더하고 opacity만 바꾼다.
-          내보내기(exportCircuitSvg)에서는 이 요소를 제거한다 */}
-      <foreignObject
-        x={0}
-        y={0}
-        width="100%"
-        height="100%"
-        className={`canvas-empty-hint${isEmpty ? "" : " is-hidden"}`}
-        aria-hidden={!isEmpty}
-      >
+    </svg>
+      {/* 빈 도면 안내 (Phase 26). 캔버스 위에 겹친 일반 HTML 레이어로 그린다.
+          예전에는 SVG <foreignObject> 안에 두었는데, WebKit(사파리·모든 iPad 브라우저)은
+          foreignObject 안 HTML에 opacity를 적용하지 않아 부품을 놓아도 안내가 사라지지
+          않았다. 부품·배선이 생기면 페이드 아웃 후 visibility까지 숨긴다 — 언마운트하면
+          전환이 안 보이므로 항상 렌더하고 클래스만 바꾼다. 포인터는 통과시킨다 */}
+      <div className={`canvas-empty-hint${isEmpty ? "" : " is-hidden"}`} aria-hidden={!isEmpty}>
         <div className="canvas-empty-inner">
           <p className="canvas-empty-title">HYD</p>
           <p className="canvas-empty-line">{t("emptyHint1")}</p>
@@ -389,7 +384,7 @@ export function EditorCanvas(): ReactElement {
             <p>{t("emptyNotice3")}</p>
           </div>
         </div>
-      </foreignObject>
-    </svg>
+      </div>
+    </div>
   );
 }
