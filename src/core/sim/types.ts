@@ -49,6 +49,12 @@ export interface SimulationSnapshot {
     string,
     {
       valvePosition?: number;
+      /**
+       * 밸브 양측 조작 신호가 지금 들어와 있는지 (Phase 27 — 기호·스프라이트 표시용).
+       * 스풀 위치와 다르다: 양솔·양파일럿(메모리) 밸브는 신호가 꺼져도 위치를 유지하므로,
+       * "솔레노이드가 켜져 있다"와 "밸브가 그 위치에 있다"를 구분해 보여 줘야 한다.
+       */
+      valveSignal?: { left: boolean; right: boolean };
       cylinderPos?: number;
       manualActive?: boolean;
       energized?: boolean;

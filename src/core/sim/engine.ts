@@ -587,6 +587,7 @@ export class SimulationEngine {
       }
       components[id] = {
         valvePosition: runtime.valvePosition,
+        valveSignal: runtime.valveSidePrev ? { ...runtime.valveSidePrev } : undefined,
         cylinderPos: runtime.cylinderPos,
         manualActive: runtime.manualActive,
         energized: runtime.energized,

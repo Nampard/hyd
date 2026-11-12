@@ -1,6 +1,11 @@
 import type { ReactElement } from "react";
 import type { Wire } from "../../core/model/types";
-import { getComponent, getPortDefinition, getPortWorldPosition } from "../../core/model/operations";
+import {
+  getComponent,
+  getPortDefinition,
+  getPortWorldPosition,
+  isPilotWire,
+} from "../../core/model/operations";
 import type { CircuitDocument } from "../../core/model/types";
 import type { PressureState } from "../../core/sim/types";
 import { wirePolyline } from "../../core/routing";
@@ -68,6 +73,8 @@ export function WireView({ document, wire, selected, pressure, returnFlow, onSel
         stroke={stroke}
         strokeWidth={width}
         strokeLinejoin="round"
+        // 파일럿 관로는 파선 (KS B 0054 / ISO 1219-1 선 종류, Phase 27)
+        strokeDasharray={isPilotWire(document, wire) ? "7 4" : undefined}
       />
     </g>
   );

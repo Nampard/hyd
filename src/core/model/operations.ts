@@ -453,3 +453,35 @@ export function addWire(
   };
   return { ...doc, wires: [...doc.wires, wire] };
 }
+
+/**
+ * 부품 정의에서 파일럿(조작 신호) 포트 id를 뽑는다 (Phase 27).
+ * 부품별 분기 없이 behavior 데이터의 pilotPort 필드만 읽는다.
+ */
+export function getPilotPortIds(type: string): string[] {
+  const behavior = getComponentDefinition(type).behavior;
+  if (!behavior) return [];
+  switch (behavior.role) {
+    case "valve":
+      return [behavior.left, behavior.right]
+        .filter((side) => side.kind === "pilot" && side.pilotPort)
+        .map((side) => side.pilotPort!);
+    case "pressure-pilot-valve":
+    case "pilot-check":
+      return behavior.pilotPort ? [behavior.pilotPort] : [];
+    default:
+      return [];
+  }
+}
+
+/**
+ * 파일럿 관로인지 — 한쪽 끝이 파일럿 포트에 닿은 유체 배관 (Phase 27).
+ * KS B 0054 / ISO 1219-1은 주관로를 실선, 파일럿(조작) 관로를 파선으로 구분한다.
+ */
+export function isPilotWire(doc: CircuitDocument, wire: Wire): boolean {
+  if (wire.kind === "electric") return false;
+  return [wire.from, wire.to].some((end) => {
+    const comp = getComponent(doc, end.componentId);
+    return comp !== undefined && getPilotPortIds(comp.type).includes(end.portId);
+  });
+}

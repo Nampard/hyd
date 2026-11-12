@@ -6,6 +6,7 @@ import {
   getComponent,
   getEquipmentPosition,
   getLimitSwitchMarkers,
+  isPilotWire,
   getPortDefinition,
   moveEquipment,
 } from "../../core/model/operations";
@@ -164,7 +165,8 @@ export function EquipmentView(): ReactElement {
                 : hot
                   ? "#0284c7"
                   : "#9bb4cc";
-            const width = electric ? 2.4 : wire.kind === "hydraulic" ? 5.5 : 4.5;
+            // 파일럿(신호) 배관은 주배관보다 가는 튜브 — 실물도 신호용은 가는 튜브를 쓴다 (Phase 27)
+            const width = electric ? 2.4 : isPilotWire(doc, wire) ? 3 : wire.kind === "hydraulic" ? 5.5 : 4.5;
             return (
               <g key={wire.id} strokeLinejoin="round" strokeLinecap="round" fill="none">
                 {/* 바닥 그림자 */}

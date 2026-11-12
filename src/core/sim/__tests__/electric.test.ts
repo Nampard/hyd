@@ -203,3 +203,22 @@ describe("귀로 전류 표시 (Phase 20)", () => {
     }
   });
 });
+
+describe("밸브 조작 신호 표시 (Phase 27)", () => {
+  it("양솔 밸브는 솔레노이드가 꺼진 뒤에도 위치를 유지하고, 신호 표시는 꺼진다", () => {
+    const doc = getExample("electro-reciprocate")!.build();
+    const engine = new SimulationEngine(doc);
+    const valve = byType(doc, "pneu.valve.5-2-double-solenoid")[0];
+    engine.setManual(byName(doc, "elec.pushbutton", "name", "RUN"), true);
+
+    // 출발 순간: Y1 통전 → 왼쪽 신호 켜짐
+    let snap = run(engine, 0.02);
+    expect(snap.components[valve].valveSignal).toEqual({ left: true, right: false });
+    const movedTo = snap.components[valve].valvePosition;
+
+    // 실린더가 S1을 떠나 전진 중: 두 솔레노이드 모두 꺼졌지만 스풀은 그대로 (메모리)
+    snap = run(engine, 0.2);
+    expect(snap.components[valve].valveSignal).toEqual({ left: false, right: false });
+    expect(snap.components[valve].valvePosition).toBe(movedTo);
+  });
+});

@@ -200,25 +200,25 @@ export function ComponentView({
         };
         return (
           <g key={port.id}>
-          {/* 터치 포인터(손가락)는 지름 8px 포트를 맞히기 어려워 보이지 않는 넓은 히트 영역을 둔다 */}
-          {COARSE_POINTER && !simRunning && (
-            <circle cx={pos.x} cy={pos.y} r={11} fill="transparent" stroke="none" onPointerDown={onPortDown} />
-          )}
-          <circle
-            cx={pos.x}
-            cy={pos.y}
-            r={4}
-            fill={fill}
-            stroke={stroke}
-            strokeWidth={2}
-            style={{ cursor: simRunning ? "default" : "crosshair" }}
-            className="port"
-            onPointerDown={onPortDown}
-          >
-            <title>
-              {def.name} — {port.label ?? port.id}
-            </title>
-          </circle>
+            {/* 터치 포인터(손가락)는 지름 8px 포트를 맞히기 어려워 보이지 않는 넓은 히트 영역을 둔다 */}
+            {COARSE_POINTER && !simRunning && (
+              <circle cx={pos.x} cy={pos.y} r={11} fill="transparent" stroke="none" onPointerDown={onPortDown} />
+            )}
+            <circle
+              cx={pos.x}
+              cy={pos.y}
+              r={4}
+              fill={fill}
+              stroke={stroke}
+              strokeWidth={2}
+              style={{ cursor: simRunning ? "default" : "crosshair" }}
+              className="port"
+              onPointerDown={onPortDown}
+            >
+              <title>
+                {def.name} — {port.label ?? port.id}
+              </title>
+            </circle>
           </g>
         );
       })}

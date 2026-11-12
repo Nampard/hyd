@@ -4,6 +4,8 @@ import type { PressureState } from "../../core/sim/types";
 /** 시뮬레이션 중 기호가 반영할 런타임 상태 (없으면 정지 상태로 작도) */
 export interface SymbolRuntime {
   valvePosition?: number;
+  /** 밸브 양측 조작 신호 (솔레노이드 통전·롤러 눌림 등) — 스풀 위치와 구분 (Phase 27) */
+  valveSignal?: { left: boolean; right: boolean };
   cylinderPos?: number;
   manualActive?: boolean;
   energized?: boolean;
@@ -283,7 +285,7 @@ function Valve32({ properties, runtime, leftKind }: SymbolProps & { leftKind: "m
         sliding={
           <>
             {leftKind === "roller" ? (
-              <Roller x={-40} active={current === 0} />
+              <Roller x={-40} active={runtime?.valveSignal?.left === true} />
             ) : isLever ? (
               <Lever x={-40} active={active} />
             ) : (
@@ -535,6 +537,11 @@ function QuickExhaust(_: SymbolProps): ReactElement {
   return (
     <g>
       <rect x={-20} y={-12} width={40} height={24} {...S} />
+      {/* 내부: 볼이 P쪽 시트와 배기(R)쪽 시트 사이를 오간다 (ISO 1219-1 급속배기밸브).
+          P 가압 → 볼이 R을 막고 P→A, P 무압 → 볼이 P를 막고 A→R로 바로 배기 */}
+      <polyline points="-13,-6 -17,0 -13,6" {...Sthin} />
+      <polyline points="-6,8 0,11 6,8" {...Sthin} />
+      <circle cx={-4} cy={2} r={5} fill="currentColor" stroke="none" />
       <line x1={-30} y1={0} x2={-20} y2={0} {...S} />
       <line x1={0} y1={-12} x2={0} y2={-20} {...S} />
       <line x1={0} y1={12} x2={0} y2={20} {...S} />
@@ -558,7 +565,7 @@ function SolenoidGlyph({ x, dir, label, active }: { x: number; dir: 1 | -1; labe
           사선이 덮여 솔레노이드 기호로 읽히지 않는다 (Phase 16, review-3 원칙) */}
       <rect x={x0} y={-8} width={w} height={16} {...Sthin} fill="none" />
       <line x1={x0} y1={8} x2={x0 + w} y2={-8} {...Sthin} />
-      <text x={x0 - 2} y={dir === -1 ? -12 : 22} fontSize={9} fill="currentColor" stroke="none">
+      <text x={x0 + w / 2} y={-12} fontSize={9} textAnchor="middle" fill="currentColor" stroke="none">
         {label}
       </text>
     </g>
@@ -586,7 +593,7 @@ function Valve32Solenoid({ properties, runtime }: SymbolProps): ReactElement {
         current={current}
         sliding={
           <>
-            <SolenoidGlyph x={-40} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
+            <SolenoidGlyph x={-40} dir={-1} label={String(properties.solenoidLeft ?? "")} active={runtime?.valveSignal?.left === true} />
             <SpringH x={40} dir={1} />
           </>
         }
@@ -613,7 +620,7 @@ function Valve52Solenoid({ properties, runtime }: SymbolProps): ReactElement {
         current={current}
         sliding={
           <>
-            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
+            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={runtime?.valveSignal?.left === true} />
             <SpringH x={60} dir={1} />
           </>
         }
@@ -636,8 +643,8 @@ function Valve52DoubleSolenoid({ properties, runtime }: SymbolProps): ReactEleme
         current={current}
         sliding={
           <>
-            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
-            <SolenoidGlyph x={60} dir={1} label={String(properties.solenoidRight ?? "")} active={current === 1} />
+            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={runtime?.valveSignal?.left === true} />
+            <SolenoidGlyph x={60} dir={1} label={String(properties.solenoidRight ?? "")} active={runtime?.valveSignal?.right === true} />
           </>
         }
       >
@@ -683,10 +690,15 @@ function Valve53DoubleSolenoid({ properties, runtime }: SymbolProps): ReactEleme
         current={current}
         sliding={
           <>
-            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
-            <SolenoidGlyph x={120} dir={1} label={String(properties.solenoidRight ?? "")} active={current === 2} />
-            <g transform="translate(-8,0)"><SpringH x={-60} dir={-1} /></g>
-            <g transform="translate(8,0)"><SpringH x={120} dir={1} /></g>
+            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={runtime?.valveSignal?.left === true} />
+            <SolenoidGlyph x={120} dir={1} label={String(properties.solenoidRight ?? "")} active={runtime?.valveSignal?.right === true} />
+            {/* 센터링 스프링 — 솔레노이드와 겹치지 않게 아래에 (유압 4/3과 같은 배치) */}
+            <g transform="translate(-60, 14) scale(0.7)">
+              <SpringH x={0} dir={-1} />
+            </g>
+            <g transform="translate(120, 14) scale(0.7)">
+              <SpringH x={0} dir={1} />
+            </g>
           </>
         }
       >
@@ -764,7 +776,7 @@ function HydRelief({ properties, runtime }: SymbolProps): ReactElement {
       <line x1={0} y1={20} x2={0} y2={30} {...S} />
       <text x={4} y={-33} fontSize={9} fill="currentColor" stroke="none">P</text>
       <text x={4} y={39} fontSize={9} fill="currentColor" stroke="none">T</text>
-      <text x={14} y={-12} fontSize={8} fill="currentColor" stroke="none">{setpoint} bar</text>
+      <text x={19} y={-9} fontSize={8} fill="currentColor" stroke="none">{setpoint} bar</text>
     </g>
   );
 }
@@ -868,8 +880,8 @@ function HydValve43({ properties, runtime, center }: SymbolProps & { center: "cl
         current={current}
         sliding={
           <>
-            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={current === 0} />
-            <SolenoidGlyph x={120} dir={1} label={String(properties.solenoidRight ?? "")} active={current === 2} />
+            <SolenoidGlyph x={-60} dir={-1} label={String(properties.solenoidLeft ?? "")} active={runtime?.valveSignal?.left === true} />
+            <SolenoidGlyph x={120} dir={1} label={String(properties.solenoidRight ?? "")} active={runtime?.valveSignal?.right === true} />
             {/* 센터링 스프링 — springCentered 동작과 기호 일치 (review-3 P0) */}
             <g transform="translate(-60, 14) scale(0.7)">
               <SpringH x={0} dir={-1} />
@@ -912,7 +924,7 @@ function HydReducing({ properties }: SymbolProps): ReactElement {
       {/* 출구압 파일럿 (점선) + 스프링 */}
       <polyline points="24,0 24,22 0,22 0,15" {...Sthin} strokeDasharray="4 3" />
       <g transform="translate(0,-15) rotate(90)"><SpringH x={0} dir={-1} /></g>
-      <text x={-14} y={28} fontSize={8} fill="currentColor" stroke="none">
+      <text x={10} y={-19} fontSize={8} fill="currentColor" stroke="none">
         {Number(properties.pressure ?? 20)} bar
       </text>
     </g>
@@ -983,7 +995,7 @@ function HydPressureValve({
       <circle cx={2} cy={18} r={5} {...S} />
       <polyline points="3,11 10,18 3,25" {...S} />
       <line x1={10} y1={18} x2={22} y2={18} {...S} />
-      <text x={6} y={-36} fontSize={7} fill="currentColor" stroke="none">
+      <text x={-26} y={-39} fontSize={7} fill="currentColor" stroke="none">
         {setpoint} bar
       </text>
     </g>

@@ -476,7 +476,7 @@ function Valve32RollerSprite({ properties, runtime }: SymbolProps): ReactElement
     <g>
       <ValveBlock width={70} topPorts={[20]} bottomPorts={[10, 30]} positions={2} current={current}>
         <>
-          <RollerLever side={-35} on={current === 0} />
+          <RollerLever side={-35} on={runtime?.valveSignal?.left === true} />
           <SpringCap side={35} dir={1} />
         </>
       </ValveBlock>
@@ -495,7 +495,7 @@ function Valve32SolenoidSprite({ properties, runtime }: SymbolProps): ReactEleme
   return (
     <ValveBlock width={70} topPorts={[20]} bottomPorts={[10, 30]} positions={2} current={current}>
       <>
-        <Coil side={-35} dir={-1} on={current === 0} label={String(properties.solenoidLeft ?? "")} />
+        <Coil side={-35} dir={-1} on={runtime?.valveSignal?.left === true} label={String(properties.solenoidLeft ?? "")} />
         <SpringCap side={35} dir={1} />
       </>
     </ValveBlock>
@@ -518,8 +518,8 @@ function makeValve52Sprite(kind: "manual" | "pilot-double" | "pilot-single" | "s
             ) : (
               <ValveButton side={-50} on={pressed} />
             ))}
-          {(kind === "sol-single" || kind === "sol-double") && <Coil side={-50} dir={-1} on={current === 0} label={left} />}
-          {kind === "sol-double" && <Coil side={50} dir={1} on={current === 1} label={right} />}
+          {(kind === "sol-single" || kind === "sol-double") && <Coil side={-50} dir={-1} on={runtime?.valveSignal?.left === true} label={left} />}
+          {kind === "sol-double" && <Coil side={50} dir={1} on={runtime?.valveSignal?.right === true} label={right} />}
           {(kind === "pilot-single" || kind === "pilot-double") && (
             <PilotCap side={-50} dir={-1} on={runtime?.portState?.X === "pressurized"} label="X" port={-70} />
           )}
@@ -539,8 +539,8 @@ function Valve53Sprite({ properties, runtime }: SymbolProps): ReactElement {
   return (
     <ValveBlock width={110} topPorts={[-10, 10]} bottomPorts={[-20, 0, 20]} positions={3} current={current}>
       <>
-        <Coil side={-55} dir={-1} on={current === 0} label={String(properties.solenoidLeft ?? "")} />
-        <Coil side={55} dir={1} on={current === 2} label={String(properties.solenoidRight ?? "")} />
+        <Coil side={-55} dir={-1} on={runtime?.valveSignal?.left === true} label={String(properties.solenoidLeft ?? "")} />
+        <Coil side={55} dir={1} on={runtime?.valveSignal?.right === true} label={String(properties.solenoidRight ?? "")} />
       </>
     </ValveBlock>
   );
@@ -566,8 +566,8 @@ function HydValve43Sprite({ properties, runtime }: SymbolProps): ReactElement {
   return (
     <ValveBlock width={110} topPorts={[-10, 10]} bottomPorts={[-10, 10]} positions={3} current={current} theme="hyd">
       <>
-        <Coil side={-55} dir={-1} on={current === 0} label={String(properties.solenoidLeft ?? "")} />
-        <Coil side={55} dir={1} on={current === 2} label={String(properties.solenoidRight ?? "")} />
+        <Coil side={-55} dir={-1} on={runtime?.valveSignal?.left === true} label={String(properties.solenoidLeft ?? "")} />
+        <Coil side={55} dir={1} on={runtime?.valveSignal?.right === true} label={String(properties.solenoidRight ?? "")} />
       </>
     </ValveBlock>
   );
