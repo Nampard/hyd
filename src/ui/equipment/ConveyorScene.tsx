@@ -59,35 +59,41 @@ function BracketProbe({ name, active, transform, steel }: {
 
 /**
  * 시그널 타워 (Phase 36) — 적(상)·황(중)·녹(하) 적층 램프. 자동화설비 배치도의 신호등으로,
- * 배경 사진에는 없어서 SVG로 덧그린다. 켜진 램프는 렌즈가 밝아지고 빛이 번진다.
+ * 배경 사진에는 없어서 SVG로 덧그린다. D 실린더 브래킷의 오른쪽 모서리 기둥 위에 볼트로
+ * 고정한 모습 — 벨트 위 분류 구간 바로 위라 공작물 흐름과 함께 눈에 들어온다.
+ * 켜진 램프는 렌즈가 밝아지고 빛이 번진다.
  */
-const TOWER = { x: 1638, top: 240, base: 628 };
+const TOWER = { x: 1388, base: 334 };
 function SignalTower({ lamps, glowId }: { lamps: AutomationStationState["lamps"]; glowId: string }) {
-  const seg = 46;
-  const w = 40;
+  const seg = 54;
+  const w = 48;
+  const neck = 22;
   const x0 = TOWER.x - w / 2;
+  const stackTop = TOWER.base - neck - seg * 3;
   const colors = [
     ["red", "#ef4444", "#7f1d1d"],
     ["yellow", "#facc15", "#78590a"],
     ["green", "#22c55e", "#14532d"],
   ] as const;
   return <g data-signal-tower>
-    {/* 기둥 + 받침 */}
-    <rect x={TOWER.x - 5} y={TOWER.top + seg * 3 + 22} width={10} height={TOWER.base - TOWER.top - seg * 3 - 22} fill="#b9c1c3" stroke="#454a4d"/>
-    <path d={`M${TOWER.x - 22} ${TOWER.base} h44 l-6 -9 h-32Z`} fill="#3a3f44"/>
-    {/* 램프 몸통 — 위 캡, 렌즈 3단, 아래 목 */}
-    <rect x={x0 + 4} y={TOWER.top - 10} width={w - 8} height={12} rx={4} fill="#2b2f33"/>
+    {/* 모서리 기둥 위 고정판 + 볼트 */}
+    <path d={`M${TOWER.x - 26} ${TOWER.base + 4} h52 l-4 -8 h-44Z`} fill="#a9b0b2" stroke="#4b5053"/>
+    {[-17, 17].map(dx => <circle key={dx} cx={TOWER.x + dx} cy={TOWER.base} r={2.6} fill="#505457"/>)}
+    {/* 목 */}
+    <rect x={TOWER.x - 12} y={TOWER.base - neck} width={24} height={neck - 4} rx={3} fill="#2b2f33"/>
+    {/* 램프 3단 */}
     {colors.map(([key, on, off], i) => {
       const lit = lamps[key];
-      const y = TOWER.top + i * seg;
+      const y = stackTop + i * seg;
       return <g key={key} data-lamp={key} data-on={lit}>
-        {lit && <ellipse cx={TOWER.x} cy={y + seg / 2} rx={58} ry={44} fill={on} opacity={.28} filter={`url(#${glowId})`}/>}
-        <rect x={x0} y={y} width={w} height={seg - 2} rx={5} fill={lit ? on : off} opacity={lit ? 1 : .55} stroke="#1b1e21" strokeWidth={2}/>
-        <rect x={x0 + 6} y={y + 5} width={7} height={seg - 14} rx={3} fill="#fff" opacity={lit ? .55 : .14}/>
-        {[0.33, 0.66].map(t => <line key={t} x1={x0 + 2} x2={x0 + w - 2} y1={y + (seg - 2) * t} y2={y + (seg - 2) * t} stroke="#000" opacity={.12}/>)}
+        {lit && <ellipse cx={TOWER.x} cy={y + seg / 2} rx={70} ry={52} fill={on} opacity={.3} filter={`url(#${glowId})`}/>}
+        <rect x={x0} y={y} width={w} height={seg - 3} rx={6} fill={lit ? on : off} opacity={lit ? 1 : .55} stroke="#1b1e21" strokeWidth={2.2}/>
+        <rect x={x0 + 7} y={y + 6} width={8} height={seg - 17} rx={4} fill="#fff" opacity={lit ? .55 : .14}/>
+        {[0.33, 0.66].map(t => <line key={t} x1={x0 + 2} x2={x0 + w - 2} y1={y + (seg - 3) * t} y2={y + (seg - 3) * t} stroke="#000" opacity={.12}/>)}
       </g>;
     })}
-    <rect x={x0 + 6} y={TOWER.top + seg * 3 - 2} width={w - 12} height={24} rx={3} fill="#2b2f33"/>
+    {/* 위 캡 */}
+    <rect x={x0 + 5} y={stackTop - 12} width={w - 10} height={14} rx={5} fill="#2b2f33"/>
   </g>;
 }
 
@@ -107,7 +113,7 @@ export type StationZone = "all" | "supply" | "belt" | "detect" | "sort";
 const ZONE_BOX: Record<StationZone, [number, number, number, number]> = {
   all: [0, 0, 1672, 941],
   /** 벨트 전 구간 (검출부 ~ 끝 저장함) — 자동 추적이 검출·분류를 한 시점으로 묶어 본다 */
-  belt: [470, 150, 1202, 676],
+  belt: [470, 80, 1202, 676],
   supply: [130, 170, 760, 428],
   detect: [500, 200, 640, 360],
   sort: [860, 210, 812, 457],
