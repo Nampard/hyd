@@ -827,15 +827,125 @@ body,
   margin-left: 16px;
 }
 
-/* Phase 29 — 조작 중에도 시뮬레이션을 유지하는 장비 확대창 */
-.toolbar .station-expand { background: #214654; color: white; border-color: #2d606c; }
-.station-monitor { box-sizing: border-box; width: min(96vw, 1500px); max-width: 96vw; max-height: 96dvh; padding: 0; border: 1px solid #526065; border-radius: 14px; background: #191e20; color: #f1f5f1; box-shadow: 0 24px 80px #0008; }
-.station-monitor::backdrop { background: #111a20bd; }
-.station-monitor header, .station-monitor footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px clamp(12px, 2vw, 30px); flex-wrap: wrap; }
-.station-monitor h2 { margin: 0; font-size: clamp(16px, 2vw, 25px); letter-spacing: -.035em; }
-.station-picture { height: min(67dvh, 52vw); background: #29292b; }
-.station-monitor dl, .station-actions { display: flex; align-items: center; gap: clamp(10px, 2vw, 32px); margin: 0; }
-.station-monitor dt { font-size: 12px; color: #bdc9c8; }
-.station-monitor dd { margin: 3px 0 0; font-size: 19px; font-variant-numeric: tabular-nums; }
-.toolbar .station-monitor button { min-height: 36px; border-radius: 6px; padding: 5px 12px; background: #384346; color: white; border-color: #536367; }
-.toolbar .station-actions button:first-child { background: #a5dfd0; border-color: #a5dfd0; color: #142c27; }
+/* --- 장비 모니터 (Phase 29 → Phase 35 정리) ---
+   배경 사진(남색 스튜디오 톤)과 창의 색을 맞춰 사진 가장자리가 창에 녹아들게 했다.
+   모니터 안의 버튼은 툴바 버튼 규칙(.toolbar button)을 물려받으므로 같은 특이도로 덮는다. */
+.station-monitor {
+  --sm-bg: #1b2030;
+  --sm-panel: #222839;
+  --sm-line: #39415a;
+  --sm-text: #eef2f8;
+  --sm-dim: #a7b1c6;
+  --sm-accent: #60a5fa;
+  box-sizing: border-box;
+  width: min(96vw, 1500px);
+  max-width: 96vw;
+  max-height: 96dvh;
+  padding: 0;
+  border: 1px solid var(--sm-line);
+  border-radius: 14px;
+  background: var(--sm-bg);
+  color: var(--sm-text);
+  box-shadow: 0 24px 80px #0009;
+  overflow: hidden;
+}
+.station-monitor::backdrop { background: #0f1420c4; }
+.station-monitor header,
+.station-monitor footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px clamp(12px, 2vw, 26px);
+  flex-wrap: wrap;
+  background: var(--sm-panel);
+}
+.station-monitor header { border-bottom: 1px solid var(--sm-line); }
+.station-monitor footer { border-top: 1px solid var(--sm-line); }
+.station-monitor h2 { margin: 0; font-size: clamp(15px, 1.6vw, 21px); letter-spacing: -0.03em; }
+.station-actions { display: flex; align-items: center; gap: 8px; }
+.station-monitor dl { display: flex; align-items: center; gap: clamp(10px, 2vw, 28px); margin: 0; }
+.station-monitor dt { font-size: 11px; color: var(--sm-dim); }
+.station-monitor dd { margin: 2px 0 0; font-size: 17px; font-variant-numeric: tabular-nums; }
+.station-monitor dd.hit { color: #6ee7b7; }
+
+.toolbar .station-monitor button {
+  min-height: 32px;
+  border-radius: 6px;
+  padding: 4px 12px;
+  background: #2c3348;
+  color: var(--sm-text);
+  border: 1px solid #47506b;
+}
+.toolbar .station-monitor button:hover:not(:disabled) { background: #36405a; border-color: var(--sm-accent); }
+.toolbar .station-monitor button[aria-pressed="true"] { background: #1e3a6b; border-color: var(--sm-accent); color: #fff; }
+.toolbar .station-monitor button.primary { background: var(--run); border-color: var(--run); color: #fff; font-weight: 700; }
+.toolbar .station-monitor button.primary:hover:not(:disabled) { background: #15803d; }
+
+/* 공정 단계 표시줄 — 화살표 칩이 왼쪽에서 오른쪽으로 공정 순서를 보여 준다 */
+.station-stages {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 8px clamp(12px, 2vw, 26px);
+  list-style: none;
+  background: var(--sm-bg);
+}
+.station-stages li { flex: 1; min-width: 0; }
+.toolbar .station-monitor .station-stages button {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: #242b3d;
+  border-color: #353d55;
+  color: var(--sm-dim);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%);
+  transition: background 160ms, color 160ms;
+}
+.station-stages .num { font-size: 11px; opacity: 0.7; }
+.station-stages .label { font-weight: 700; }
+.station-stages .device { font-size: 11px; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; }
+.toolbar .station-monitor .station-stages button.on { background: #1d6b4c; color: #fff; border-color: #34d399; }
+.toolbar .station-monitor .station-stages button.viewing { box-shadow: inset 0 -2px 0 var(--sm-accent); }
+
+/* 사진 영역 — 배경 사진 위→아래 색 변화(남색 → 밝은 회청)와 같은 그라디언트로 여백을 채운다 */
+.station-picture {
+  position: relative;
+  height: min(62dvh, 50vw);
+  background: linear-gradient(#2a2e3d 0%, #333a4c 55%, #575e72 100%);
+}
+.station-camera {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: #121725cc;
+  backdrop-filter: blur(4px);
+}
+.toolbar .station-monitor .station-camera button { min-height: 26px; padding: 2px 10px; font-size: 12px; border-color: transparent; background: transparent; }
+.toolbar .station-monitor .station-camera button[aria-pressed="true"] { background: #2f4f8a; border-color: transparent; }
+.station-speed { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: #161b28; }
+.toolbar .station-monitor .station-speed button { min-height: 28px; padding: 2px 8px; font-size: 12px; background: transparent; border-color: transparent; }
+.toolbar .station-monitor .station-speed button[aria-pressed="true"] { background: #2f4f8a; }
+
+/* 래더와 함께 보기 — 모달이 아닌 떠 있는 작은 창. 뒤의 래더·회로도를 그대로 조작할 수 있다 */
+.station-monitor.docked {
+  position: fixed;
+  inset: auto 16px 40px auto;
+  margin: 0;
+  width: min(640px, 50vw);
+  z-index: 50;
+  box-shadow: 0 12px 40px #0f172a66;
+}
+.station-monitor.docked .station-picture { height: auto; aspect-ratio: 16 / 9; }
+.station-monitor.docked h2 { font-size: 14px; }
+.station-monitor.docked .station-stages .device,
+.station-monitor.docked dl > div:nth-child(n + 5) { display: none; }
+.station-monitor.docked dd { font-size: 14px; }

@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { automationInputs, CONVEYOR_TRAVEL, GATE_WINDOW, type AutomationStationState, type WorkpieceMaterial } from "../../core/sim/automation-station";
 import plate from "./assets/automation-station.webp";
 
@@ -16,16 +16,24 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const aTip = (u: number) => mix(aRestY, nest.y + puckHalfDepth, easeStroke(u));
 const cTip = (u: number) => mix(cRestX, inlet.x - puckHalfWidth, easeStroke(u));
 
-function SensorFlag({ name, active, x, y, headX, headY }: {
+function SensorFlag({ name, active, x, y, headX, headY, k = 1 }: {
   name: string; active: boolean; x: number; y: number; headX: number; headY: number;
+  /** 카메라 확대 시 이름표가 화면에서 같은 크기로 보이도록 줄이는 배율 (Phase 35) */
+  k?: number;
 }) {
   const color = active ? "#8af6c6" : "#c3caca";
-  return <g data-sensor-label={name} data-on={active} transform={`translate(${x} ${y})`}>
-    <path d={`M78 44 v14 L${headX-x} ${headY-y}`} fill="none" stroke={color} strokeWidth={2}/>
+  // 확대 구역에서는 이름표를 센서 머리 쪽으로 당겨 붙이고 크기를 줄인다. 지시선은
+  // 배경 좌표에서 그려 센서 머리를 정확히 가리킨다.
+  const fx = headX + (x - headX) * k;
+  const fy = headY + (y - headY) * k;
+  return <g data-sensor-label={name} data-on={active}>
+    <path d={`M${fx + 78 * k} ${fy + 44 * k} v${14 * k} L${headX} ${headY}`} fill="none" stroke={color} strokeWidth={2 * k}/>
+    <g transform={`translate(${fx} ${fy}) scale(${k})`}>
     <rect width={156} height={44} rx={8} fill={active ? "#123b33" : "#252d32"} stroke={color} strokeWidth={2}/>
     <circle cx={15} cy={22} r={5} fill={active ? "#74ffc2" : "#81888d"}/>
     <text x={26} y={30} fontSize={22} fontWeight={650} fill="#fff">{name}</text>
     <text x={104} y={29} fontSize={19} fill={color}>{active ? "감지" : "대기"}</text>
+    </g>
   </g>;
 }
 
@@ -57,8 +65,86 @@ function ChromeRod({ x1,y1,x2,y2,width = 11 }: { x1:number; y1:number; x2:number
   </g>;
 }
 
-export function ConveyorScene({ station, supplyCloseup = false }: { station: AutomationStationState; supplyCloseup?: boolean }) {
+/**
+ * 카메라 구역 (Phase 35). 배경 그림 좌표(1672×941)에서 공정 단계별로 볼 영역.
+ * 가로세로비를 화면(16:9 근처)에 맞춰 확대해도 여백 없이 꽉 차게 잡았다.
+ */
+export type StationZone = "all" | "supply" | "detect" | "sort";
+const ZONE_BOX: Record<StationZone, [number, number, number, number]> = {
+  all: [0, 0, 1672, 941],
+  supply: [130, 170, 760, 428],
+  detect: [500, 200, 640, 360],
+  sort: [860, 210, 812, 457],
+};
+
+/** 공정 단계 (Phase 35) — 모니터의 단계 표시줄·자동 추적 카메라가 같은 판정을 쓴다 */
+export type StationStage = "supply" | "drill" | "send" | "detect" | "sort";
+export const STAGE_ZONE: Record<StationStage, StationZone> = {
+  supply: "supply",
+  drill: "supply",
+  send: "supply",
+  detect: "detect",
+  sort: "sort",
+};
+
+/** 지금 움직이고 있는 공정 단계들 (여러 공작물이 동시에 다른 단계에 있을 수 있다) */
+export function activeStages(station: AutomationStationState): Set<StationStage> {
+  const on = new Set<StationStage>();
+  const { A, B, C, D } = station.cyl;
+  if (A > 0.02 || station.feedStroke > 0) on.add("supply");
+  if (B > 0.02) on.add("drill");
+  if (C > 0.02 || station.sendStroke > 0) on.add("send");
+  if (station.belt.some((p) => p.progress < GATE_WINDOW[0])) on.add("detect");
+  if (D > 0.02 || station.falling.length > 0 || station.belt.some((p) => p.progress >= GATE_WINDOW[0])) on.add("sort");
+  return on;
+}
+
+/**
+ * 자동 추적 카메라가 볼 구역 — 가장 하류(나중) 단계를 우선한다. 공작물이 검출·분류
+ * 구간에 있으면 그쪽이 수업에서 놓치기 쉬운 장면이고, 공급부는 다음 사이클에 다시 온다.
+ */
+export function followZone(station: AutomationStationState): StationZone {
+  const on = activeStages(station);
+  if (on.has("sort")) return "sort";
+  if (on.has("detect")) return "detect";
+  if (on.has("supply") || on.has("drill") || on.has("send")) return "supply";
+  return "all";
+}
+
+/** viewBox를 목표 구역으로 부드럽게 옮긴다 (SVG viewBox는 CSS 전환이 안 돼 rAF로 보간) */
+function useAnimatedBox(target: [number, number, number, number]): [number, number, number, number] {
+  const [box, setBox] = useState(target);
+  const current = useRef(target);
+  useEffect(() => {
+    let frame = 0;
+    const tick = () => {
+      const next = current.current.map((v, i) => v + (target[i] - v) * 0.16) as [number, number, number, number];
+      const done = next.every((v, i) => Math.abs(v - target[i]) < 0.5);
+      current.current = done ? target : next;
+      setBox(current.current);
+      if (!done) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [target[0], target[1], target[2], target[3]]);
+  return box;
+}
+
+export function ConveyorScene({
+  station,
+  zone = "all",
+  compact = false,
+}: {
+  station: AutomationStationState;
+  /** 카메라 구역 (Phase 35 — 예전 supplyCloseup을 일반화) */
+  zone?: StationZone;
+  /** 장비 뷰 카드처럼 작게 그릴 때 — 센서 이름표를 숨긴다 */
+  compact?: boolean;
+}) {
   const id = useId();
+  const box = useAnimatedBox(ZONE_BOX[zone]);
+  // 이름표는 화면 기준으로 크기를 유지 — 확대할수록(보이는 폭이 좁을수록) 배경 좌표에서 작게
+  const flagScale = Math.max(0.45, Math.min(1, box[2] / 1672 * 1.25));
   const paint = (name: string) => `url(#${id}-${name})`;
   const { A, B, C, D } = station.cyl;
   const inputs = automationInputs(station);
@@ -78,7 +164,7 @@ export function ConveyorScene({ station, supplyCloseup = false }: { station: Aut
   const quill = easeStroke(B);
   const stackLift = station.aPushed ? Math.max(0, (A - .5) * 2) : 0;
   const bitPhase = station.drillAngle * Math.PI / 180;
-  return <svg viewBox={supplyCloseup ? "90 120 720 710" : "0 0 1672 941"} width="100%" height="100%" role="img" aria-label="매거진 공급, 드릴 가공, 컨베이어 송출과 재질별 분기 배출">
+  return <svg viewBox={box.join(" ")} width="100%" height="100%" role="img" aria-label="매거진 공급, 드릴 가공, 컨베이어 송출과 재질별 분기 배출">
     <defs>
       <linearGradient id={id+"-steel"}><stop stopColor="#565855"/><stop offset=".14" stopColor="#eeede8"/><stop offset=".35" stopColor="#a8aaa6"/><stop offset=".68" stopColor="#646765"/><stop offset=".9" stopColor="#cfd2cd"/><stop offset="1" stopColor="#5a5b56"/></linearGradient>
       <linearGradient id={id+"-cap"} x2=".8" y2="1"><stop stopColor="#898d89"/><stop offset=".45" stopColor="#f5f4ed"/><stop offset="1" stopColor="#929692"/></linearGradient>
@@ -161,10 +247,10 @@ export function ConveyorScene({ station, supplyCloseup = false }: { station: Aut
     </g>
     <BracketProbe name="포토" active={inputs.포토} transform="translate(709 540) rotate(-124)" steel={paint("steel")}/>
     <BracketProbe name="용량형" active={inputs.용량형} transform="translate(751 445)" steel={paint("steel")}/>
-    {!supplyCloseup && <>
-      <SensorFlag name="포토" active={inputs.포토} x={542} y={338} headX={704} headY={540}/>
-      <SensorFlag name="용량형" active={inputs.용량형} x={653} y={251} headX={751} headY={432}/>
-      <SensorFlag name="유도형" active={inputs.유도형} x={822} y={322} headX={800} headY={463}/>
+    {!compact && zone !== "supply" && <>
+      <SensorFlag name="포토" active={inputs.포토} x={542} y={338} headX={704} headY={540} k={flagScale}/>
+      <SensorFlag name="용량형" active={inputs.용량형} x={653} y={251} headX={751} headY={432} k={flagScale}/>
+      <SensorFlag name="유도형" active={inputs.유도형} x={822} y={322} headX={800} headY={463} k={flagScale}/>
     </>}
   </svg>;
 }

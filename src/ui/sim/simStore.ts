@@ -21,6 +21,13 @@ interface SimStore {
   lastStep: { step: number; cycleComplete: boolean } | null;
   snapshot: SimulationSnapshot | null;
   warnings: string[];
+  /**
+   * 재생 속도 배율 (Phase 35) — 1 = 실시간. 0.25·0.5로 늦추면 실린더 인계·센서 감지처럼
+   * 순간에 지나가는 동작을 눈으로 따라갈 수 있다. 엔진의 고정 틱(dt)은 그대로 두고
+   * 실제 시간을 쌓는 속도만 바꾸므로 시뮬레이션 결과는 배율과 무관하게 같다.
+   */
+  speed: number;
+  setSpeed(speed: number): void;
   start(mode?: RunMode): void;
   stop(): void;
   /** 구분동작: 다음 동작 진행 (빈 캔버스 클릭/버튼) */
@@ -66,6 +73,11 @@ export const useSimStore = create<SimStore>((set, get) => ({
   lastStep: null,
   snapshot: null,
   warnings: [],
+  speed: 1,
+
+  setSpeed(speed) {
+    set({ speed });
+  },
 
   start(mode = "continuous") {
     if (engine) return; // 이미 실행 중
@@ -101,7 +113,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
         acc = 0; // 일시정지 중에는 시간을 쌓지 않는다 (재개 시 폭주 방지)
         return;
       }
-      acc += elapsed;
+      acc += elapsed * get().speed;
       let snap: SimulationSnapshot | null = null;
       while (acc >= TICK) {
         snap = engine.tick(TICK);

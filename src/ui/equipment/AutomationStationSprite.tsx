@@ -2,6 +2,7 @@ import { ConveyorScene } from "./ConveyorScene";
 import type { ReactElement } from "react";
 import type { SymbolProps } from "../symbols";
 import { createAutomationState, type AutomationStationState } from "../../core/sim/automation-station";
+import { useStationMonitor } from "./StationMonitor";
 
 /**
  * 자동화설비 스테이션 장비 뷰 스프라이트 (Phase 14 — 모듈 분리).
@@ -28,19 +29,34 @@ export function AutomationStationSprite({
     : undefined;
   const sceneState = station ?? createAutomationState(properties);
   const lamps = sceneState.lamps;
+  const openMonitor = useStationMonitor((s) => s.setOpen);
 
+  // 장비 카드 (Phase 35) — 사진 배경(남색 스튜디오 톤)과 같은 색의 어두운 카드로 감싸
+  // 밝은 프로파일 판 위에서도 사진이 "모니터 화면"처럼 자연스럽게 읽히게 했다.
+  // 위: 제목·조작 패널(PB1~4)·시그널 램프 / 가운데: 장비 사진 / 아래: 집계·크게 보기
   return (
     <g>
-      {/* 베이스 플레이트 — 프로파일 판 + 테두리 */}
-      <rect x={-140} y={-85} width={280} height={170} rx={7} fill="url(#eq-slots)" stroke="#475569" strokeWidth={1.6} filter="url(#eq-shadow)" />
-      <rect x={-140} y={-85} width={280} height={170} rx={7} fill="none" stroke="#ffffff" strokeWidth={1} opacity={0.6} transform="translate(1,1)" />
-      {/* 제목은 맨 아래(마지막 자식)에서 그린다 — 아래 "제목 오버레이" 참고 */}
+      <defs>
+        <linearGradient id="station-card-photo" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#2a2e3d" />
+          <stop offset="0.55" stopColor="#333a4c" />
+          <stop offset="1" stopColor="#575e72" />
+        </linearGradient>
+      </defs>
+      <rect x={-140} y={-85} width={280} height={170} rx={8} fill="#1b2030" stroke="#39415a" strokeWidth={1.2} filter="url(#eq-shadow)" />
+      <rect x={-139} y={-62} width={278} height={124} fill="url(#station-card-photo)" />
+      <svg x={-139} y={-62} width={278} height={124}>
+        <ConveyorScene station={sceneState} compact />
+      </svg>
 
-      {/* 조작 패널: PB1~4 (램프는 우측 독립 타워 — 배치도 참고) */}
-      <rect x={44} y={-80} width={80} height={36} rx={5} fill="url(#eq-panel)" stroke="#64748b" strokeWidth={1} filter="url(#eq-shadow)" />
-      <rect x={44} y={-80} width={80} height={5} rx={2.5} fill="#334155" />
+      {/* 머리띠: 제목 + 조작 패널 + 시그널 램프 */}
+      <path d="M-140 -77 a8 8 0 0 1 8 -8 h264 a8 8 0 0 1 8 8 v15 h-280 Z" fill="#222839" />
+      <line x1={-140} y1={-62} x2={140} y2={-62} stroke="#39415a" strokeWidth={0.8} />
+      <text x={-131} y={-70} fontSize={8.5} fontWeight={700} fill="#eef2f8">
+        자동화설비 스테이션
+      </text>
       {([0, 1, 2, 3] as const).map((i) => {
-        const px = 56 + i * 20;
+        const px = 18 + i * 19;
         const pressed = station?.pb[i] ?? false;
         return (
           <g
@@ -83,72 +99,63 @@ export function AutomationStationSprite({
             }
             onBlur={onButton ? () => onButton(i, false) : undefined}
           >
-            <circle cx={px} cy={-64} r={7.5} fill="url(#eq-chrome)" stroke="#64748b" strokeWidth={0.8} />
-            <circle
-              cx={px}
-              cy={pressed ? -63.4 : -64}
-              r={pressed ? 5.4 : 6.2}
-              fill="url(#eq-cap-red)"
-              stroke="#7f1d1d"
-              strokeWidth={0.8}
-            />
-            {!pressed && <ellipse cx={px - 2} cy={-66.5} rx={2.2} ry={1.3} fill="#ffffff" opacity={0.5} />}
-            <text x={px} y={-49.5} fontSize={6.5} fontWeight={700} textAnchor="middle" fill="#1e293b" stroke="none">
+            <circle cx={px} cy={-75} r={6} fill="url(#eq-chrome)" stroke="#0f1420" strokeWidth={0.8} />
+            <circle cx={px} cy={pressed ? -74.6 : -75} r={pressed ? 4.2 : 4.8} fill="url(#eq-cap-red)" stroke="#7f1d1d" strokeWidth={0.6} />
+            {!pressed && <ellipse cx={px - 1.5} cy={-76.8} rx={1.7} ry={1} fill="#ffffff" opacity={0.55} />}
+            <text x={px} y={-65.2} fontSize={5} fontWeight={700} textAnchor="middle" fill="#a7b1c6">
               PB{i + 1}
             </text>
           </g>
         );
       })}
-
-      {/* 램프 타워: 우측 독립 기둥에 적(상)/황(중)/녹(하) — 배치도의 시그널 타워 */}
-      <rect x={131} y={-14} width={4} height={76} fill="url(#eq-chrome)" stroke="#64748b" strokeWidth={0.6} />
-      <rect x={125} y={61} width={16} height={6} rx={2} fill="#334155" />
-      <rect x={126} y={-62} width={14} height={50} rx={4} fill="#1e293b" />
+      {/* 시그널 램프 (적·황·녹) — 켜지면 빛 번짐 */}
       {(
         [
           ["red", "#ef4444"],
           ["yellow", "#facc15"],
           ["green", "#22c55e"],
         ] as const
-      ).map(([key, color], i) => (
-        <g key={key}>
-          {lamps[key] && <circle cx={133} cy={-53 + i * 16} r={13} fill={color} opacity={0.25} />}
-          <rect
-            x={127.5}
-            y={-60 + i * 16}
-            width={11}
-            height={14}
-            rx={3}
-            fill={color}
-            opacity={lamps[key] ? 1 : 0.28}
-            stroke="#0f172a"
-            strokeWidth={0.6}
-          />
-          <rect x={129} y={-58.5 + i * 16} width={3} height={10} rx={1.5} fill="#ffffff" opacity={lamps[key] ? 0.55 : 0.15} />
-        </g>
-      ))}
+      ).map(([key, color], i) => {
+        const cx = 103 + i * 11;
+        return (
+          <g key={key}>
+            {lamps[key] && <circle cx={cx} cy={-73.5} r={8} fill={color} opacity={0.3} />}
+            <circle cx={cx} cy={-73.5} r={4} fill={color} opacity={lamps[key] ? 1 : 0.22} stroke="#0f1420" strokeWidth={0.6} />
+          </g>
+        );
+      })}
 
-      <svg x={-138} y={-44} width={260} height={114}>
-        <ConveyorScene station={sceneState} />
-      </svg>
-      <g fontSize={7} fill="#26384b" fontWeight={700}>
-        <text x={34} y={75}>배출 {station?.eject.length ?? 0}</text>
-        <text x={90} y={75}>저장 {station?.store.length ?? 0}</text>
+      {/* 아랫단: 집계 + 크게 보기 */}
+      <path d="M-140 62 h280 v15 a8 8 0 0 1 -8 8 h-264 a8 8 0 0 1 -8 -8 Z" fill="#222839" />
+      <line x1={-140} y1={62} x2={140} y2={62} stroke="#39415a" strokeWidth={0.8} />
+      <g fontSize={7} fontWeight={700} fill="#eef2f8">
+        <text x={-131} y={76}>
+          <tspan fill="#a7b1c6">매거진</tspan> {sceneState.magazine.length}
+        </text>
+        <text x={-86} y={76}>
+          <tspan fill="#a7b1c6">배출</tspan> {station?.eject.length ?? 0}
+        </text>
+        <text x={-48} y={76}>
+          <tspan fill="#a7b1c6">저장</tspan> {station?.store.length ?? 0}
+        </text>
       </g>
-
-      {/* 제목 오버레이 — 모든 장비 도형보다 뒤에 그려 절대 가려지지 않게 한다.
-          2줄로 나누고 플레이트색 헤일로(paint-order)를 둘러, 폰트 폭이 넓은 환경
-          (윈도우 맑은 고딕 등)에서 글자가 번져도 B실린더 블록에 묻히지 않는다. */}
       <g
-        fontSize={8}
-        fontWeight={700}
-        fill="#1f2937"
-        stroke="#e8edf2"
-        strokeWidth={2.5}
-        paintOrder="stroke"
+        role="button"
+        tabIndex={0}
+        aria-label="장비 모니터 열기"
+        style={{ cursor: "pointer" }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          openMonitor(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") openMonitor(true);
+        }}
       >
-        <text x={-136} y={-77}>자동화설비</text>
-        <text x={-136} y={-68}>스테이션</text>
+        <rect x={74} y={66} width={60} height={14} rx={4} fill="#2f4f8a" stroke="#60a5fa" strokeWidth={0.6} />
+        <text x={104} y={75.6} fontSize={7} fontWeight={700} textAnchor="middle" fill="#ffffff">
+          ⛶ 크게 보기
+        </text>
       </g>
     </g>
   );

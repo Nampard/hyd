@@ -6,7 +6,7 @@
 
 ## 현재 상태
 
-- Phase 0~34 완료. 진행 기록과 다음 후보는 [docs/ROADMAP.md](docs/ROADMAP.md)의 마지막
+- Phase 0~35 완료. 진행 기록과 다음 후보는 [docs/ROADMAP.md](docs/ROADMAP.md)의 마지막
   Phase와 "후순위 후보"에 있다. 새 작업은 ROADMAP에 Phase를 추가하며 진행한다.
 - 문서 스키마 v5 (v4: ioMap channel, v5: `auto.automation-station` 리네임).
 - 작업 전 [docs/PRD.md](docs/PRD.md)(범위·non-goals)와
@@ -38,7 +38,7 @@
 | 문서 조작(이동·복사·리밋 스위치 마커) | `src/core/model/operations.ts` |
 | 내장 예제 (23개) | `src/core/examples/index.ts` |
 | 회로도 기호 / 장비 뷰 스프라이트 | `src/ui/symbols/index.tsx` / `src/ui/equipment/sprites.tsx` |
-| 자동화설비 스테이션 · PLC 래더 | `src/ui/equipment/AutomationStationSprite.tsx` · `src/ui/plc/PlcPanel.tsx` |
+| 자동화설비 스테이션 · 장비 모니터 · PLC 래더 | `src/ui/equipment/AutomationStationSprite.tsx` · `ConveyorScene.tsx`·`StationMonitor.tsx` · `src/ui/plc/PlcPanel.tsx` |
 | 색 토큰 | `src/styles.css` (`--electric`, `--electric-return` 등) |
 | 서비스 워커 · 버전 표시 | `public/sw.js`, `vite.config.ts`(`__APP_VERSION__`, 빌드 ID 스탬프), `src/app/refresh.ts` |
 
