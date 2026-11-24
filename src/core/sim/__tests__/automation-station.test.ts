@@ -332,12 +332,12 @@ describe("골든 시나리오: MPS 자동운전 (예제 19 — 수업자료 슬�
     return { mps: engine.snapshot().components[station.id].equipment as AutomationStationState, engine, stationId: station.id };
   }
 
-  it("PB1 기본동작 (Phase 40): 재료 없이 A+ A− B+ B− C+ C− D+ D− 1사이클 후 멈춘다", async () => {
+  it("PB1 기본동작 (Phase 40): 재료를 빼 두고 A+ A− B+ B− C+ C− D+ D− 1사이클 후 멈춘다", async () => {
     const { getExample } = await import("../../examples");
     const { SimulationEngine } = await import("../engine");
     const doc = getExample("automation-basic")!.build();
     const station = doc.components.find((c) => c.type === "auto.automation-station")!;
-    station.properties.workpieces = ""; // 기본동작은 재료 없이
+    station.properties.workpieces = "금,비"; // 재료가 있어도 PB1을 누르면 빼 두고 시작한다
     const engine = new SimulationEngine(doc);
     engine.setDiscreteInput(station.id, "PB1", true);
     for (let i = 0; i < 5; i++) engine.tick(0.02);
@@ -362,6 +362,21 @@ describe("골든 시나리오: MPS 자동운전 (예제 19 — 수업자료 슬�
     expect(drillDuringB).toBe(true);
     const end = engine.snapshot().components[station.id].equipment as AutomationStationState;
     expect(end.lamps.green).toBe(false); // 사이클 끝 — 녹램 꺼짐
+    // 재료는 빼 두었으므로 A가 아무것도 밀어내지 않았다
+    expect(end.magazine).toHaveLength(0);
+    expect(end.setAside).toEqual(["metal", "nonmetal"]);
+    expect(end.supply).toBeNull();
+    expect(end.belt).toHaveLength(0);
+
+    // PB2(응용동작)를 누르면 재료가 매거진에 돌아오고 자동운전이 시작된다
+    engine.setDiscreteInput(station.id, "PB2", true);
+    for (let i = 0; i < 5; i++) engine.tick(0.02);
+    engine.setDiscreteInput(station.id, "PB2", false);
+    for (let i = 0; i < Math.round(22 / 0.02); i++) engine.tick(0.02);
+    const applied = engine.snapshot().components[station.id].equipment as AutomationStationState;
+    expect(applied.setAside).toHaveLength(0);
+    expect(applied.eject).toEqual(["metal"]);
+    expect(applied.store).toEqual(["nonmetal"]);
   });
 
   it("금속: A공급 → 판별 → 가공 → 이송 → D실린더가 배출박스로 분류한다", async () => {

@@ -92,7 +92,9 @@ export function StationStage({ stationId, properties }: { stationId: string; pro
         <dl className="station-readouts">
           <div>
             <dt>매거진</dt>
-            <dd>{sceneState.magazine.length}개</dd>
+            <dd title={station?.setAside.length ? "기본동작(PB1) 중이라 재료를 빼 두었습니다. PB2를 누르면 다시 넣습니다." : undefined}>
+              {sceneState.magazine.length}개{station?.setAside.length ? ` (빼 둠 ${station.setAside.length})` : ""}
+            </dd>
           </div>
           <div>
             <dt>포토</dt>

@@ -57,6 +57,12 @@ export interface BeltPiece {
 export interface AutomationStationState {
   /** 남은 매거진 큐 — 앞이 다음 공급 물품 */
   magazine: WorkpieceMaterial[];
+  /**
+   * 기본동작 때 빼 둔 매거진 재료 (Phase 40). 실습에서 기본동작(PB1)은 재료를 빼고 하므로,
+   * 스테이션이 비어 있을 때 PB1을 누르면 매거진 재료가 순간 사라지고(여기로), PB2(응용동작)를
+   * 누르면 다시 매거진에 들어간다. 시뮬레이션을 멈췄다 다시 시작하면 속성대로 새로 채워진다.
+   */
+  setAside: WorkpieceMaterial[];
   /** 공급/가공 위치의 물품 (A 공급 후 B 드릴 가공 위치 — 재질 판별은 벨트 초입에서) */
   supply: WorkpieceMaterial | null;
   /** 재접근하는 푸셔가 닿을 때까지 공작물은 직전 위치를 유지한다. */
@@ -133,6 +139,7 @@ export function createAutomationState(properties: Record<string, unknown>): Auto
     properties.workpieces === undefined ? parseWorkpieceQueue("금,비,금") : parsed.items;
   return {
     magazine,
+    setAside: [],
     supply: null,
     feedStroke: 0,
     sendStroke: 0,
@@ -277,6 +284,7 @@ export function cloneAutomationState(s: AutomationStationState): AutomationStati
   return {
     ...s,
     magazine: [...s.magazine],
+    setAside: [...s.setAside],
     belt: s.belt.map((p) => ({ ...p })),
     store: [...s.store],
     eject: [...s.eject],
@@ -299,7 +307,21 @@ export const automationStationAdapter: EquipmentAdapter<AutomationStationState> 
   snapshot: (state) => cloneAutomationState(state),
   setDiscreteInput: (state, channel, active) => {
     const i = PB_CHANNELS.indexOf(channel as AutomationInputChannel);
-    if (i >= 0) state.pb[i] = active;
+    if (i < 0) return;
+    const rising = active && !state.pb[i];
+    state.pb[i] = active;
+    if (!rising) return;
+    // 기본동작(PB1)은 재료 없이 — 공정 중인 물품이 없을 때만 매거진을 빼 둔다 (Phase 40)
+    const idle = state.supply === null && state.belt.length === 0 && state.falling.length === 0;
+    if (i === 0 && idle && state.magazine.length > 0) {
+      state.setAside = [...state.magazine, ...state.setAside];
+      state.magazine = [];
+    }
+    // 응용동작(PB2)을 누르면 빼 둔 재료를 다시 넣는다 — 래더가 이 스캔에서 매거진 센서를 본다
+    if (i === 1 && state.setAside.length > 0) {
+      state.magazine = [...state.setAside, ...state.magazine];
+      state.setAside = [];
+    }
   },
 };
 
