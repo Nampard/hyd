@@ -798,7 +798,7 @@ export const examples: ExampleEntry[] = [
   {
     id: "automation-basic",
     category: "자동화설비",
-    name: "1. 스테이션 자동운전 (공급·가공·분류)",
+    name: "1. 스테이션 기본동작(PB1)과 자동운전(PB2)",
     build: () => buildAutomationStationExample(),
   },
   // ===== PLC 래더 모드 (Phase 38) — 부품 없이 래더만, 화면 입력 스위치·출력 램프로 확인 =====

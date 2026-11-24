@@ -332,6 +332,38 @@ describe("골든 시나리오: MPS 자동운전 (예제 19 — 수업자료 슬�
     return { mps: engine.snapshot().components[station.id].equipment as AutomationStationState, engine, stationId: station.id };
   }
 
+  it("PB1 기본동작 (Phase 40): 재료 없이 A+ A− B+ B− C+ C− D+ D− 1사이클 후 멈춘다", async () => {
+    const { getExample } = await import("../../examples");
+    const { SimulationEngine } = await import("../engine");
+    const doc = getExample("automation-basic")!.build();
+    const station = doc.components.find((c) => c.type === "auto.automation-station")!;
+    station.properties.workpieces = ""; // 기본동작은 재료 없이
+    const engine = new SimulationEngine(doc);
+    engine.setDiscreteInput(station.id, "PB1", true);
+    for (let i = 0; i < 5; i++) engine.tick(0.02);
+    engine.setDiscreteInput(station.id, "PB1", false);
+    // 실린더가 끝(≥0.99)에 닿거나 원위치(≤0.01)로 돌아온 순간을 차례로 기록
+    const order: string[] = [];
+    const ext: Record<string, boolean> = { A: false, B: false, C: false, D: false };
+    let drillDuringB = false;
+    let lastAngle = 0;
+    for (let i = 0; i < Math.round(15 / 0.02); i++) {
+      engine.tick(0.02);
+      const mps = engine.snapshot().components[station.id].equipment as AutomationStationState;
+      for (const k of ["A", "B", "C", "D"] as const) {
+        const v = mps.cyl[k];
+        if (!ext[k] && v >= 0.99) { ext[k] = true; order.push(`${k}+`); }
+        if (ext[k] && v <= 0.01) { ext[k] = false; order.push(`${k}-`); }
+      }
+      if (mps.cyl.B > 0.5 && mps.drillAngle !== lastAngle) drillDuringB = true;
+      lastAngle = mps.drillAngle;
+    }
+    expect(order).toEqual(["A+", "A-", "B+", "B-", "C+", "C-", "D+", "D-"]);
+    expect(drillDuringB).toBe(true);
+    const end = engine.snapshot().components[station.id].equipment as AutomationStationState;
+    expect(end.lamps.green).toBe(false); // 사이클 끝 — 녹램 꺼짐
+  });
+
   it("금속: A공급 → 판별 → 가공 → 이송 → D실린더가 배출박스로 분류한다", async () => {
     const { mps } = await runExample("금", 12);
     expect(mps.eject).toEqual(["metal"]);
@@ -390,13 +422,13 @@ describe("골든 시나리오: MPS 자동운전 (예제 19 — 수업자료 슬�
 });
 
 describe("예제 19 구조 계약 (codex-review-phase-14 P3)", () => {
-  it("래더 32렁 · ioMap 26점(입력16+출력10) · 채널 유일 · serialize→parse 왕복", async () => {
+  it("래더 41렁(응용 32 + 기본동작 9, Phase 40) · ioMap 26점(입력16+출력10) · 채널 유일 · serialize→parse 왕복", async () => {
     const { getExample } = await import("../../examples");
     const { parseDocument, serializeDocument } = await import("../../model/schema");
     const doc = getExample("automation-basic")!.build();
 
-    // 32렁
-    expect(doc.plcProgram?.rungs).toHaveLength(32);
+    // 41렁 = 응용 32 + 기본동작(PB1) 9
+    expect(doc.plcProgram?.rungs).toHaveLength(41);
 
     // I/O 26점: 입력 16 + 출력 10
     const inputs = doc.ioMap!.filter((e) => e.direction === "input");
