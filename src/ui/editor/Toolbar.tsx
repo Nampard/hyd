@@ -267,11 +267,26 @@ export function Toolbar(): ReactElement {
           )}
         </Menu>
         <div className="toolbar-end">
-          <button className="quiet" disabled={running || !canUndo} onClick={() => useEditorStore.getState().undo()}>
-            {t("undo")}
+          {/* 좁은 화면에서는 화살표만 남긴다 — 이름은 title·aria-label로 유지 */}
+          <button
+            className="quiet"
+            disabled={running || !canUndo}
+            onClick={() => useEditorStore.getState().undo()}
+            title={t("undo").replace(/^\S+\s/, "")}
+            aria-label={t("undo").replace(/^\S+\s/, "")}
+          >
+            <span aria-hidden="true">{t("undo").split(" ")[0]}</span>
+            <span className="tb-collapsible">{t("undo").replace(/^\S+\s/, "")}</span>
           </button>
-          <button className="quiet" disabled={running || !canRedo} onClick={() => useEditorStore.getState().redo()}>
-            {t("redo")}
+          <button
+            className="quiet"
+            disabled={running || !canRedo}
+            onClick={() => useEditorStore.getState().redo()}
+            title={t("redo").replace(/^\S+\s/, "")}
+            aria-label={t("redo").replace(/^\S+\s/, "")}
+          >
+            <span aria-hidden="true">{t("redo").split(" ")[0]}</span>
+            <span className="tb-collapsible">{t("redo").replace(/^\S+\s/, "")}</span>
           </button>
           <button className="quiet" onClick={() => useI18nStore.getState().toggle()} title="한국어 / English">
             {lang === "ko" ? "EN" : "한"}

@@ -192,6 +192,10 @@ body,
   display: flex;
   gap: 2px;
 }
+.tb-collapsible {
+  margin-left: 4px;
+}
+
 
 /* 펼침 메뉴 — 파일·브라우저 저장 */
 .tb-menu {
@@ -1671,5 +1675,22 @@ body,
 @media (prefers-reduced-motion: reduce) {
   .io-lever::after {
     transition: none;
+  }
+}
+
+/* 좁은 화면(1080~1279px) — 앱 막대가 한 줄에 들어가도록 (Phase 38). 같은 특이도의 앞선 규칙을
+   덮도록 파일 끝에 둔다. */
+@media (max-width: 1279px) {
+  .tb-collapsible {
+    display: none;
+  }
+  .title-input {
+    width: 150px;
+  }
+  .example-select {
+    max-width: 170px;
+  }
+  .toolbar .mode-chip-action {
+    display: none;
   }
 }
