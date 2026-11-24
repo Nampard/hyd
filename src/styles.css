@@ -826,3 +826,16 @@ body,
   flex-shrink: 0;
   margin-left: 16px;
 }
+
+/* Phase 29 — 조작 중에도 시뮬레이션을 유지하는 장비 확대창 */
+.toolbar .station-expand { background: #214654; color: white; border-color: #2d606c; }
+.station-monitor { box-sizing: border-box; width: min(96vw, 1500px); max-width: 96vw; max-height: 96dvh; padding: 0; border: 1px solid #526065; border-radius: 14px; background: #191e20; color: #f1f5f1; box-shadow: 0 24px 80px #0008; }
+.station-monitor::backdrop { background: #111a20bd; }
+.station-monitor header, .station-monitor footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px clamp(12px, 2vw, 30px); flex-wrap: wrap; }
+.station-monitor h2 { margin: 0; font-size: clamp(16px, 2vw, 25px); letter-spacing: -.035em; }
+.station-picture { height: min(67dvh, 52vw); background: #29292b; }
+.station-monitor dl, .station-actions { display: flex; align-items: center; gap: clamp(10px, 2vw, 32px); margin: 0; }
+.station-monitor dt { font-size: 12px; color: #bdc9c8; }
+.station-monitor dd { margin: 3px 0 0; font-size: 19px; font-variant-numeric: tabular-nums; }
+.toolbar .station-monitor button { min-height: 36px; border-radius: 6px; padding: 5px 12px; background: #384346; color: white; border-color: #536367; }
+.toolbar .station-actions button:first-child { background: #a5dfd0; border-color: #a5dfd0; color: #142c27; }

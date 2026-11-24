@@ -1,3 +1,4 @@
+import { StationMonitorButton } from "../equipment/StationMonitor";
 import { useState, type ReactElement } from "react";
 import { useEditorStore } from "./store";
 import { clearSimHistory, useSimStore } from "../sim/simStore";
@@ -318,6 +319,7 @@ export function Toolbar(): ReactElement {
         >
           {t("equipmentView")}
         </button>
+        <StationMonitorButton />
         <button
           className={diagramOpen ? "plc-toggle-on" : undefined}
           onClick={() => useEditorStore.getState().toggleDiagramPanel()}

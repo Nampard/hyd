@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { registerLibraries } from "../../library";
 import {
   createAutomationState,
+  cloneAutomationState,
   automationInputs,
   parseWorkpieceQueue,
   stepAutomationStation,
@@ -162,6 +163,26 @@ describe("C 이송 → 컨베이어 → 분류", () => {
     return state;
   }
 
+  it("A·C가 중간에 복귀해도 밀어 놓은 공작물이 따라오지 않는다", () => {
+    const state = createAutomationState({ workpieces: "금" });
+    run(state, ["A전솔"], 0.32);
+    const feed = state.feedStroke;
+    run(state, ["A후솔"], 0.18);
+    expect(state.feedStroke).toBe(feed);
+    run(state, ["A전솔"], 0.6);
+    expect(state.feedStroke).toBe(0);
+    run(state, ["B전솔", "드릴모터"], 0.6);
+    run(state, ["C전솔"], 0.38);
+    const send = state.sendStroke;
+    run(state, [], 0.2);
+    expect(state.sendStroke).toBe(send);
+    run(state, ["C전솔"], 0.44);
+    expect(state.belt[0].drilled).toBe(true);
+    expect(state.belt[0].progress).toBe(0);
+    run(state, [], 0.24);
+    expect(state.belt[0].progress).toBe(0);
+  });
+
   it("비금속: D 미작동 → 포토센서 통과 → 컨베이어 끝 저장박스", () => {
     const state = supplied("비");
     run(state, ["C전솔"], 0.7); // 컨베이어 초입으로 이송
@@ -181,6 +202,21 @@ describe("C 이송 → 컨베이어 → 분류", () => {
     const state = supplied("금");
     run(state, ["C전솔"], 0.7);
     run(state, ["컨베이어", "D전솔"], 7); // D 게이트 열림 유지
+    expect(state.eject).toEqual(["metal"]);
+    expect(state.store).toHaveLength(0);
+  });
+
+  it("분기된 물품은 낙하 동안 한 번만 집계되고 이전 스냅숏의 좌표는 유지된다", () => {
+    const state = createAutomationState({});
+    state.belt.push({ material: "metal", progress: 0.53 });
+    state.cyl.D = 1;
+    run(state, ["D전솔"], DT);
+    const first = cloneAutomationState(state);
+    run(state, [], 0.18);
+    expect(first.falling[0].fraction).toBe(0);
+    expect(state.falling[0].fraction).toBeGreaterThan(0);
+    run(state, [], 0.4);
+    expect(state.falling).toHaveLength(0);
     expect(state.eject).toEqual(["metal"]);
     expect(state.store).toHaveLength(0);
   });
