@@ -32,7 +32,7 @@ import type { AutomationOutputChannel, AutomationInputChannel } from "../library
 /** 실린더 전 행정 시간 (초) — 논리 근사용 고정값 */
 const STROKE_TIME = 0.5;
 /** 컨베이어 전 구간 이동 시간 (초) — 수업자료 래더의 T0018(8s)보다 짧아 벨트 정지 전 낙하 */
-const CONVEYOR_TRAVEL = 6;
+export const CONVEYOR_TRAVEL = 6;
 /** 포토센서 감지 구간 (컨베이어 진행률) — 초입 통과 감지 */
 const PHOTO_WINDOW: [number, number] = [0.02, 0.18];
 /**
@@ -42,7 +42,7 @@ const PHOTO_WINDOW: [number, number] = [0.02, 0.18];
  */
 const DETECT_WINDOW: [number, number] = [0.06, 0.24];
 /** D실린더 분기 게이트 구간 (컨베이어 진행률) */
-const GATE_WINDOW: [number, number] = [0.45, 0.6];
+export const GATE_WINDOW: [number, number] = [0.45, 0.6];
 /** 매거진 최대 적재 수 */
 export const AUTOMATION_MAGAZINE_MAX = 8;
 
@@ -50,6 +50,7 @@ export interface BeltPiece {
   material: WorkpieceMaterial;
   /** 컨베이어 진행률 0(초입)..1(끝 — 저장박스 낙하) */
   progress: number;
+  drilled?: boolean;
 }
 
 /** 스테이션 런타임 상태 (엔진이 부품 런타임에 보관, 틱마다 갱신) */
@@ -58,11 +59,17 @@ export interface AutomationStationState {
   magazine: WorkpieceMaterial[];
   /** 공급/가공 위치의 물품 (A 공급 후 B 드릴 가공 위치 — 재질 판별은 벨트 초입에서) */
   supply: WorkpieceMaterial | null;
+  /** 재접근하는 푸셔가 닿을 때까지 공작물은 직전 위치를 유지한다. */
+  feedStroke: number;
+  sendStroke: number;
+  supplyDrilled: boolean;
   belt: BeltPiece[];
   /** 컨베이어 끝 저장박스 (낙하 순) */
   store: WorkpieceMaterial[];
   /** D실린더 열 배출박스 (배출 순) */
   eject: WorkpieceMaterial[];
+  /** 배출 판정 직후 낙하 중인 물품. 시뮬레이션 틱으로만 진행한다. */
+  falling: (BeltPiece & { fraction: number; stroke: number; destination: "store" | "eject" })[];
   /** 실린더 위치 0(후진)..1(전진) */
   cyl: { A: number; B: number; C: number; D: number };
   /**
@@ -127,9 +134,13 @@ export function createAutomationState(properties: Record<string, unknown>): Auto
   return {
     magazine,
     supply: null,
+    feedStroke: 0,
+    sendStroke: 0,
+    supplyDrilled: false,
     belt: [],
     store: [],
     eject: [],
+    falling: [],
     cyl: { A: 0, B: 0, C: 0, D: 0 },
     aSpool: 0,
     aPushed: false,
@@ -170,20 +181,31 @@ export function stepAutomationStation(
   state.cyl.D = clamp01(state.cyl.D + (out("D전솔") ? step : -step));
 
   // --- A 공급: 전진 완료 시 매거진 → 공급 위치 (1행정 1회) ---
+  if (state.magazine.length && state.supply === null && !state.aPushed) {
+    state.feedStroke = Math.max(state.feedStroke, state.cyl.A);
+  }
   if (state.cyl.A >= 0.99 && !state.aPushed) {
     state.aPushed = true;
     if (state.magazine.length > 0 && state.supply === null) {
       state.supply = state.magazine.shift()!;
+      state.feedStroke = 0;
+      state.supplyDrilled = false;
     }
   }
   if (state.cyl.A < 0.5) state.aPushed = false;
 
   // --- C 이송: 전진 완료 시 공급 위치 → 컨베이어 초입 (초입이 비어 있을 때만) ---
+  const startClear = !state.belt.some((piece) => piece.progress < 0.15);
+  if (state.supply !== null && state.cyl.B >= 0.94 && out("드릴모터")) state.supplyDrilled = true;
+  if (state.supply !== null && startClear && !state.cPushed) {
+    state.sendStroke = Math.max(state.sendStroke, state.cyl.C);
+  }
   if (state.cyl.C >= 0.99 && !state.cPushed) {
     state.cPushed = true;
-    const startClear = !state.belt.some((p) => p.progress < 0.15);
     if (state.supply !== null && startClear) {
-      state.belt.push({ material: state.supply, progress: 0 });
+      state.belt.push({ material: state.supply, progress: 0, drilled: state.supplyDrilled });
+      state.sendStroke = 0;
+      state.supplyDrilled = false;
       state.supply = null;
     }
   }
@@ -196,11 +218,15 @@ export function stepAutomationStation(
   }
 
   // --- D 게이트 배출 / 끝 낙하 ---
+  for (const piece of state.falling) piece.fraction += dt / 0.44;
+  state.falling = state.falling.filter((piece) => piece.fraction < 1);
   const remaining: BeltPiece[] = [];
   for (const p of state.belt) {
     if (p.progress >= GATE_WINDOW[0] && p.progress <= GATE_WINDOW[1] && state.cyl.D >= 0.9) {
+      state.falling.push({ ...p, fraction: 0, stroke: state.cyl.D, destination: "eject" });
       state.eject.push(p.material); // D실린더가 밀어 배출박스로
     } else if (p.progress >= 1) {
+      state.falling.push({ ...p, fraction: 0, stroke: 0, destination: "store" });
       state.store.push(p.material); // 컨베이어 끝 저장박스 낙하
     } else {
       remaining.push(p);
@@ -254,6 +280,7 @@ export function cloneAutomationState(s: AutomationStationState): AutomationStati
     belt: s.belt.map((p) => ({ ...p })),
     store: [...s.store],
     eject: [...s.eject],
+    falling: s.falling.map((p) => ({ ...p })),
     cyl: { ...s.cyl },
     pb: [...s.pb] as [boolean, boolean, boolean, boolean],
     lamps: { ...s.lamps },
