@@ -1,6 +1,9 @@
 import type { CircuitDocument } from "../model/types";
 import { buildCircuit, lc, rungOf } from "./builder";
 import { buildAutomationStationExample } from "./automation-example";
+import type { AppMode } from "../model/mode";
+
+export { buildBlankConveyorDocument } from "./automation-example";
 
 // 래더 조립 헬퍼(lc/rungOf)와 buildCircuit은 ./builder로 분리 — 테스트 호환을 위해 재-export
 export { lc, rungOf } from "./builder";
@@ -787,10 +790,15 @@ export const examples: ExampleEntry[] = [
   {
     id: "automation-basic",
     category: "자동화설비",
-    name: "23. 자동화설비 스테이션 자동운전 — 공급·가공·분류",
+    name: "1. 스테이션 자동운전 (공급·가공·분류)",
     build: () => buildAutomationStationExample(),
   },
 ];
+
+/** 예제가 속한 작업 모드 (Phase 37) — 자동화설비 예제는 컨베이어 모드에서만 연다 */
+export function exampleMode(example: ExampleEntry): AppMode {
+  return example.category === "자동화설비" ? "conveyor" : "circuit";
+}
 
 export function getExample(id: string): ExampleEntry | undefined {
   return examples.find((e) => e.id === id);

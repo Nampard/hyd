@@ -9,6 +9,8 @@ import { DiagramPanel } from "../ui/diagram/DiagramPanel";
 import { EquipmentView } from "../ui/equipment/EquipmentView";
 import { useEditorStore } from "../ui/editor/store";
 import { useSimStore } from "../ui/sim/simStore";
+import { ConveyorWorkspace } from "../ui/conveyor/ConveyorWorkspace";
+import { ModeSelect } from "./ModeSelect";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -31,10 +33,21 @@ function useViewportWidth(): number {
 
 export function App(): ReactElement {
   const equipmentOpen = useEditorStore((s) => s.equipmentViewOpen);
+  const appMode = useEditorStore((s) => s.appMode);
   const viewportWidth = useViewportWidth();
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
+      // 도면 편집 단축키는 공유압 회로 모드에서만 — 컨베이어 모드에는 고를 부품이 없다 (Phase 37)
+      const mode = useEditorStore.getState().appMode;
+      if (mode !== "circuit") {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && mode === "conveyor" && !useSimStore.getState().running) {
+          e.preventDefault();
+          if (e.shiftKey) useEditorStore.getState().redo();
+          else useEditorStore.getState().undo();
+        }
+        return;
+      }
       if (useSimStore.getState().running) return; // 시뮬레이션 중 편집 단축키 잠금
       const s = useEditorStore.getState();
 
@@ -84,18 +97,30 @@ export function App(): ReactElement {
 
   return (
     <>
-      <div className="app-layout">
-        <Toolbar />
-        <div className="app-main">
-          <Palette />
-          <EditorCanvas />
-          {equipmentOpen && <EquipmentView />}
-          <PropertyPanel />
+      {appMode === null ? (
+        <div className="app-layout">
+          <ModeSelect />
         </div>
-        <DiagramPanel />
-        <PlcPanel />
-        <StatusBar />
-      </div>
+      ) : (
+        <div className={`app-layout mode-${appMode}`}>
+          <Toolbar />
+          {appMode === "conveyor" ? (
+            <ConveyorWorkspace />
+          ) : (
+            <>
+              <div className="app-main">
+                <Palette />
+                <EditorCanvas />
+                {equipmentOpen && <EquipmentView />}
+                <PropertyPanel />
+              </div>
+              <DiagramPanel />
+              <PlcPanel />
+            </>
+          )}
+          <StatusBar />
+        </div>
+      )}
       <div className="narrow-screen-notice">
         <div className="narrow-screen-notice-box">
           <p className="app-name">HYD</p>

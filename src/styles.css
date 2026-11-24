@@ -1,10 +1,15 @@
+/* 색 토큰 (Phase 37 정리) — 실습실의 재료에서 가져왔다.
+   도면지(바탕) · 제도 잉크(글자·기호) · 공압 튜브 파랑(조작·강조) · 알루미늄 프로파일(구분선)
+   · 그래파이트(장비 패널, 컨베이어 모드) · 안전 황색(처음 화면에서 고른 장비 표시에만). */
 :root {
-  --bg: #f5f6f8;
+  --bg: #f2f4f1;
   --panel-bg: #ffffff;
-  --panel-border: #d8dce2;
-  --text: #1d2430;
-  --text-dim: #6b7280;
-  --accent: #2563eb;
+  --panel-border: #cdd4d9;
+  --text: #172131;
+  --text-dim: #5d6876;
+  --accent: #1e63c9;
+  --safety: #f0b400;
+  --graphite: #1b2030;
   --ok: #16a34a;
   --err: #dc2626;
   --canvas-bg: #fdfdfd;
@@ -132,11 +137,24 @@ body,
   color: var(--accent);
 }
 
-.app-tagline {
-  font-size: 10px;
-  color: var(--text-dim);
-  max-width: 130px;
-  line-height: 1.2;
+/* 지금 모드 + 처음 화면으로 돌아가기 (Phase 37) */
+.toolbar .mode-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 10px;
+  border-color: var(--panel-border);
+  background: var(--bg);
+}
+.mode-chip-name {
+  font-weight: 700;
+}
+.mode-chip-action {
+  font-size: 12px;
+  color: var(--accent);
+}
+.toolbar-end {
+  margin-left: auto;
 }
 
 .title-input {
@@ -232,7 +250,6 @@ body,
   font-weight: 700;
   margin: 4px 4px 8px;
   color: var(--text-dim);
-  text-transform: uppercase;
 }
 
 .palette-category {
@@ -825,96 +842,294 @@ body,
 .status-right {
   flex-shrink: 0;
   margin-left: 16px;
+  display: flex;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
 }
 
-/* --- 장비 모니터 (Phase 29 → Phase 35 정리) ---
-   배경 사진(남색 스튜디오 톤)과 창의 색을 맞춰 사진 가장자리가 창에 녹아들게 했다.
-   모니터 안의 버튼은 툴바 버튼 규칙(.toolbar button)을 물려받으므로 같은 특이도로 덮는다. */
-.station-monitor {
-  --sm-bg: #1b2030;
+/* --- 처음 화면: 모드 고르기 (Phase 37) ---
+   이 화면이 앱에서 유일하게 크게 힘을 준 곳이다. 두 실습대(판)의 바탕 — 도면지와
+   그래파이트 — 가 두 작업 환경을 그대로 보여 주고, 고른 판 위에만 안전 황색 띠가 그어진다. */
+.mode-select {
+  box-sizing: border-box;
+  word-break: keep-all;
+  width: 100%;
+  max-width: 1280px;
+  height: 100%;
+  margin: 0 auto;
+  padding: clamp(20px, 3.2vw, 48px) clamp(24px, 5vw, 72px) 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+}
+.mode-select-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.mode-select h1 {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mode-select-mark {
+  font-size: clamp(56px, 7vw, 92px);
+  font-weight: 800;
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+  color: var(--text);
+}
+.mode-select-sub {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+.mode-select-lang {
+  padding: 6px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+.mode-select-question {
+  margin: 4px 0 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.mode-select-benches {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.bench {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-bg);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  animation: bench-in 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.bench-conveyor {
+  animation-delay: 90ms;
+  background: var(--graphite);
+  border-color: #39415a;
+  color: #eef2f8;
+}
+/* 바닥 안전선처럼 — 누르려는 판 위에만 그어진다 (사용자 동작에 대한 응답) */
+.bench-tape {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 6px;
+  background: var(--safety);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 200ms ease-out;
+  z-index: 1;
+}
+.bench:hover .bench-tape,
+.bench:focus-visible .bench-tape {
+  transform: scaleX(1);
+}
+.bench:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.bench-drawing {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  background: var(--canvas-bg);
+  border-bottom: 1px solid var(--panel-border);
+}
+.bench-photo {
+  display: block;
+  aspect-ratio: 2 / 1;
+  background: linear-gradient(#2a2e3d 0%, #333a4c 55%, #575e72 100%);
+  border-bottom: 1px solid #39415a;
+}
+.bench-photo {
+  position: relative;
+  overflow: hidden;
+}
+.bench-photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bench-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 24px 24px;
+}
+.bench-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.bench-desc {
+  max-width: 46ch;
+  word-break: keep-all;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.bench-conveyor .bench-desc {
+  color: #c3cbdb;
+}
+.bench-meta {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.bench-conveyor .bench-meta {
+  color: #a7b1c6;
+}
+.bench-cta {
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+/* 표제란 — KS 도면 표제란처럼 칸을 실선으로 나눠 실제 정보를 적는다 */
+.title-block {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 2fr 4fr 1.3fr;
+  border: 1.5px solid var(--text);
+  background: var(--panel-bg);
+}
+.title-block > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-left: 1px solid var(--text);
+}
+.title-block > div:first-child {
+  border-left: none;
+}
+.tb-key {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.tb-val {
+  font-size: 13px;
+  line-height: 1.5;
+}
+@keyframes bench-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bench {
+    animation: none;
+  }
+  .bench-tape {
+    transition: none;
+  }
+}
+
+/* --- 컨베이어 시스템 모드 작업 화면 (Phase 37) --- */
+.conveyor-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.conveyor-top {
+  flex: 1 1 58%;
+  min-height: 0;
+  display: flex;
+}
+.conveyor-missing {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+.plc-panel.plc-panel-main {
+  height: auto;
+  flex: 1 1 42%;
+  min-height: 220px;
+}
+
+/* --- 장비 무대 (Phase 35 장비 모니터 → Phase 37 컨베이어 작업 화면에 붙박이) ---
+   배경 사진(남색 스튜디오 톤)과 같은 그래파이트 계열이라 사진 가장자리가 무대에 녹아든다. */
+.station-stage {
   --sm-panel: #222839;
   --sm-line: #39415a;
   --sm-text: #eef2f8;
   --sm-dim: #a7b1c6;
   --sm-accent: #60a5fa;
-  box-sizing: border-box;
-  width: min(96vw, 1500px);
-  max-width: 96vw;
-  max-height: 96dvh;
-  padding: 0;
-  border: 1px solid var(--sm-line);
-  border-radius: 14px;
-  background: var(--sm-bg);
-  color: var(--sm-text);
-  box-shadow: 0 24px 80px #0009;
-  overflow: hidden;
-}
-.station-monitor::backdrop { background: #0f1420c4; }
-.station-monitor header,
-.station-monitor footer {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px clamp(12px, 2vw, 26px);
-  flex-wrap: wrap;
-  background: var(--sm-panel);
-}
-.station-monitor header { border-bottom: 1px solid var(--sm-line); }
-.station-monitor footer { border-top: 1px solid var(--sm-line); }
-.station-monitor h2 { margin: 0; font-size: clamp(15px, 1.6vw, 21px); letter-spacing: -0.03em; }
-.station-actions { display: flex; align-items: center; gap: 8px; }
-.station-monitor dl { display: flex; align-items: center; gap: clamp(10px, 2vw, 28px); margin: 0; }
-.station-monitor dt { font-size: 11px; color: var(--sm-dim); }
-.station-monitor dd { margin: 2px 0 0; font-size: 17px; font-variant-numeric: tabular-nums; }
-.station-monitor dd.hit { color: #6ee7b7; }
-
-.toolbar .station-monitor button {
-  min-height: 32px;
-  border-radius: 6px;
-  padding: 4px 12px;
-  background: #2c3348;
+  flex-direction: column;
+  background: var(--graphite);
   color: var(--sm-text);
-  border: 1px solid #47506b;
 }
-.toolbar .station-monitor button:hover:not(:disabled) { background: #36405a; border-color: var(--sm-accent); }
-.toolbar .station-monitor button[aria-pressed="true"] { background: #1e3a6b; border-color: var(--sm-accent); color: #fff; }
-.toolbar .station-monitor button.primary { background: var(--run); border-color: var(--run); color: #fff; font-weight: 700; }
-.toolbar .station-monitor button.primary:hover:not(:disabled) { background: #15803d; }
+.station-stage button {
+  font: inherit;
+  cursor: pointer;
+}
+.station-stage button:focus-visible {
+  outline: 2px solid var(--sm-accent);
+  outline-offset: 2px;
+}
 
-/* 공정 단계 표시줄 — 화살표 칩이 왼쪽에서 오른쪽으로 공정 순서를 보여 준다 */
+/* 공정 단계 — 화살표 칩이 왼쪽에서 오른쪽으로 공정 순서를 보여 준다 */
 .station-stages {
   display: flex;
   gap: 4px;
   margin: 0;
-  padding: 8px clamp(12px, 2vw, 26px);
+  padding: 8px 14px;
   list-style: none;
-  background: var(--sm-bg);
+  border-bottom: 1px solid var(--sm-line);
 }
 .station-stages li { flex: 1; min-width: 0; }
-.toolbar .station-monitor .station-stages button {
+.station-stages button {
   width: 100%;
   display: flex;
   align-items: baseline;
   gap: 6px;
-  padding: 5px 10px;
+  padding: 5px 12px;
+  border: 1px solid #353d55;
   border-radius: 6px;
   background: #242b3d;
-  border-color: #353d55;
   color: var(--sm-dim);
   clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%);
   transition: background 160ms, color 160ms;
 }
 .station-stages .num { font-size: 11px; opacity: 0.7; }
 .station-stages .label { font-weight: 700; }
-.station-stages .device { font-size: 11px; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; }
-.toolbar .station-monitor .station-stages button.on { background: #1d6b4c; color: #fff; border-color: #34d399; }
-.toolbar .station-monitor .station-stages button.viewing { box-shadow: inset 0 -2px 0 var(--sm-accent); }
+.station-stages .device { font-size: 11px; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.station-stages button.on { background: #1d6b4c; color: #fff; border-color: #34d399; }
+.station-stages button.viewing { box-shadow: inset 0 -2px 0 var(--sm-accent); }
 
-/* 사진 영역 — 배경 사진 위→아래 색 변화(남색 → 밝은 회청)와 같은 그라디언트로 여백을 채운다 */
+/* 사진 영역 — 사진 위→아래 색 변화(남색 → 밝은 회청)와 같은 그라디언트로 여백을 채운다 */
 .station-picture {
   position: relative;
-  height: min(62dvh, 50vw);
+  flex: 1;
+  min-height: 0;
   background: linear-gradient(#2a2e3d 0%, #333a4c 55%, #575e72 100%);
 }
 .station-camera {
@@ -929,23 +1144,86 @@ body,
   background: #121725cc;
   backdrop-filter: blur(4px);
 }
-.toolbar .station-monitor .station-camera button { min-height: 26px; padding: 2px 10px; font-size: 12px; border-color: transparent; background: transparent; }
-.toolbar .station-monitor .station-camera button[aria-pressed="true"] { background: #2f4f8a; border-color: transparent; }
-.station-speed { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: #161b28; }
-.toolbar .station-monitor .station-speed button { min-height: 28px; padding: 2px 8px; font-size: 12px; background: transparent; border-color: transparent; }
-.toolbar .station-monitor .station-speed button[aria-pressed="true"] { background: #2f4f8a; }
-
-/* 래더와 함께 보기 — 모달이 아닌 떠 있는 작은 창. 뒤의 래더·회로도를 그대로 조작할 수 있다 */
-.station-monitor.docked {
-  position: fixed;
-  inset: auto 16px 40px auto;
-  margin: 0;
-  width: min(640px, 50vw);
-  z-index: 50;
-  box-shadow: 0 12px 40px #0f172a66;
+.station-camera button,
+.station-speed button {
+  min-height: 26px;
+  padding: 2px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sm-text);
+  font-size: 12px;
 }
-.station-monitor.docked .station-picture { height: auto; aspect-ratio: 16 / 9; }
-.station-monitor.docked h2 { font-size: 14px; }
-.station-monitor.docked .station-stages .device,
-.station-monitor.docked dl > div:nth-child(n + 5) { display: none; }
-.station-monitor.docked dd { font-size: 14px; }
+.station-camera button[aria-pressed="true"],
+.station-speed button[aria-pressed="true"] {
+  background: #2f4f8a;
+}
+
+/* 아랫단 — 조작 패널 · 센서·집계 · 재생 속도 */
+.station-console {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 28px);
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  background: var(--sm-panel);
+  border-top: 1px solid var(--sm-line);
+}
+.operator-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.operator-panel .pb {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 3px solid #c8ced6;
+  background: radial-gradient(circle at 38% 32%, #fca5a5, #dc2626 55%, #7f1d1d);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-shadow: 0 1px 1px #0008;
+  touch-action: none;
+}
+.operator-panel .pb.pressed {
+  transform: scale(0.93);
+  background: radial-gradient(circle at 50% 50%, #ef4444, #991b1b);
+}
+.operator-panel .lamps {
+  display: flex;
+  gap: 5px;
+  margin-left: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #141926;
+}
+.lamp {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  opacity: 0.25;
+}
+.lamp-red { background: #ef4444; }
+.lamp-yellow { background: #facc15; }
+.lamp-green { background: #22c55e; }
+.lamp.lit { opacity: 1; box-shadow: 0 0 10px currentColor; }
+.lamp-red.lit { color: #ef4444; }
+.lamp-yellow.lit { color: #facc15; }
+.lamp-green.lit { color: #22c55e; }
+.station-readouts {
+  display: flex;
+  gap: clamp(10px, 1.6vw, 22px);
+  margin: 0;
+}
+.station-readouts dt { font-size: 11px; color: var(--sm-dim); }
+.station-readouts dd { margin: 2px 0 0; font-size: 15px; font-variant-numeric: tabular-nums; }
+.station-readouts dd.hit { color: #6ee7b7; }
+.station-speed {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #161b28;
+}

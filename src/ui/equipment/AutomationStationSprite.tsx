@@ -2,7 +2,6 @@ import { ConveyorScene } from "./ConveyorScene";
 import type { ReactElement } from "react";
 import type { SymbolProps } from "../symbols";
 import { createAutomationState, type AutomationStationState } from "../../core/sim/automation-station";
-import { useStationMonitor } from "./StationMonitor";
 
 /**
  * 자동화설비 스테이션 장비 뷰 스프라이트 (Phase 14 — 모듈 분리).
@@ -29,11 +28,10 @@ export function AutomationStationSprite({
     : undefined;
   const sceneState = station ?? createAutomationState(properties);
   const lamps = sceneState.lamps;
-  const openMonitor = useStationMonitor((s) => s.setOpen);
 
   // 장비 카드 (Phase 35) — 사진 배경(남색 스튜디오 톤)과 같은 색의 어두운 카드로 감싸
   // 밝은 프로파일 판 위에서도 사진이 "모니터 화면"처럼 자연스럽게 읽히게 했다.
-  // 위: 제목·조작 패널(PB1~4)·시그널 램프 / 가운데: 장비 사진 / 아래: 집계·크게 보기
+  // 위: 제목·조작 패널(PB1~4)·시그널 램프 / 가운데: 장비 사진 / 아래: 매거진·배출·저장 집계
   return (
     <g>
       <defs>
@@ -125,7 +123,7 @@ export function AutomationStationSprite({
         );
       })}
 
-      {/* 아랫단: 집계 + 크게 보기 */}
+      {/* 아랫단: 집계 */}
       <path d="M-140 62 h280 v15 a8 8 0 0 1 -8 8 h-264 a8 8 0 0 1 -8 -8 Z" fill="#222839" />
       <line x1={-140} y1={62} x2={140} y2={62} stroke="#39415a" strokeWidth={0.8} />
       <g fontSize={7} fontWeight={700} fill="#eef2f8">
@@ -137,24 +135,6 @@ export function AutomationStationSprite({
         </text>
         <text x={-48} y={76}>
           <tspan fill="#a7b1c6">저장</tspan> {station?.store.length ?? 0}
-        </text>
-      </g>
-      <g
-        role="button"
-        tabIndex={0}
-        aria-label="장비 모니터 열기"
-        style={{ cursor: "pointer" }}
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          openMonitor(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") openMonitor(true);
-        }}
-      >
-        <rect x={74} y={66} width={60} height={14} rx={4} fill="#2f4f8a" stroke="#60a5fa" strokeWidth={0.6} />
-        <text x={104} y={75.6} fontSize={7} fontWeight={700} textAnchor="middle" fill="#ffffff">
-          ⛶ 크게 보기
         </text>
       </g>
     </g>

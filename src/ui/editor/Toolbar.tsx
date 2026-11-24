@@ -2,12 +2,11 @@ import { useState, type ReactElement } from "react";
 import { useEditorStore } from "./store";
 import { clearSimHistory, useSimStore } from "../sim/simStore";
 import { downloadDocument, exportCircuitSvg, openDocumentFile } from "../../app/file";
-import { examples, getExample } from "../../core/examples";
+import { examples, exampleMode, getExample } from "../../core/examples";
 import { createBrowserStorage } from "../../core/storage";
 import { prepareDocumentForPersistence } from "../../core/model/schema";
 import { useI18nStore, useT } from "../i18n";
 import { APP_VERSION, forceRefreshToLatest } from "../../app/refresh";
-import { StationMonitorButton } from "../equipment/StationMonitor";
 
 const browserStorage = createBrowserStorage();
 
@@ -27,6 +26,9 @@ export function Toolbar(): ReactElement {
   const plcOpen = useEditorStore((s) => s.plcPanelOpen);
   const equipmentOpen = useEditorStore((s) => s.equipmentViewOpen);
   const diagramOpen = useEditorStore((s) => s.diagramPanelOpen);
+  const appMode = useEditorStore((s) => s.appMode) ?? "circuit";
+  const circuit = appMode === "circuit";
+  const modeExamples = examples.filter((ex) => exampleMode(ex) === appMode);
   const running = useSimStore((s) => s.running);
   const stepPaused = useSimStore((s) => s.paused);
   const t = useT();
@@ -139,6 +141,12 @@ export function Toolbar(): ReactElement {
     useEditorStore.getState().zoomAt(factor, rect ? { x: rect.width / 2, y: rect.height / 2 } : { x: 0, y: 0 });
   };
 
+  /** 처음 화면으로 — 모드를 바꾸면 지금 문서를 그 모드에서 이어 쓸 수 없으므로 미저장 확인 */
+  const handleSwitchMode = () => {
+    if (running) useSimStore.getState().stop();
+    useEditorStore.getState().leaveMode();
+  };
+
   const handleExample = (id: string) => {
     if (!id) return;
     const example = getExample(id);
@@ -150,16 +158,20 @@ export function Toolbar(): ReactElement {
 
   return (
     <div className="toolbar">
-      <span className="app-name" title="교육용 논리/상태 시뮬레이션 — 실제 설비 선정·압력 설정·안전 검증에 사용 금지">
+      <span className="app-name" title="교육용 논리/상태 시뮬레이션입니다. 실제 설비 선정·압력 설정·안전 검증에는 쓰지 마세요.">
         HYD
       </span>
-      <span className="app-tagline">{t("appTagline")}</span>
+      {/* 지금 모드 + 처음 화면으로 (Phase 37) */}
+      <button className="mode-chip" onClick={handleSwitchMode} title={t("modeSwitch")}>
+        <span className="mode-chip-name">{circuit ? t("modeCircuit") : t("modeConveyor")}</span>
+        <span className="mode-chip-action">{t("modeSwitch")}</span>
+      </button>
       <input
         className="title-input"
         value={title}
         disabled={running}
         onChange={(e) => useEditorStore.getState().setTitle(e.target.value)}
-        placeholder={t("titlePlaceholder")}
+        placeholder={circuit ? t("titlePlaceholder") : t("taskTitlePlaceholder")}
       />
       <button
         className={`run-button${running ? " running" : ""}`}
@@ -192,9 +204,9 @@ export function Toolbar(): ReactElement {
           onChange={(e) => handleExample(e.target.value)}
         >
           <option value="">{t("openExample")}</option>
-          {[...new Set(examples.map((ex) => ex.category))].map((category) => (
+          {[...new Set(modeExamples.map((ex) => ex.category))].map((category) => (
             <optgroup key={category} label={category}>
-              {examples
+              {modeExamples
                 .filter((ex) => ex.category === category)
                 .map((ex) => (
                   <option key={ex.id} value={ex.id}>
@@ -207,7 +219,7 @@ export function Toolbar(): ReactElement {
       </div>
       <div className="toolbar-group">
         <button disabled={running} onClick={handleNew}>
-          {t("newCircuit")}
+          {circuit ? t("newCircuit") : t("newTask")}
         </button>
         <button disabled={running} onClick={handleOpen}>
           {t("open")}
@@ -255,84 +267,91 @@ export function Toolbar(): ReactElement {
           {t("redo")}
         </button>
         {/* 회전은 단축키 R로도 되지만 버튼이 없으면 발견하기 어렵다 (Phase 16-2) */}
-        <button
-          disabled={running || !hasComponentSelection}
-          onClick={() => useEditorStore.getState().rotateSelection()}
-          title="선택한 부품을 90° 회전 (단축키: R)"
-        >
-          {t("rotate")}
-        </button>
+        {circuit && (
+          <button
+            disabled={running || !hasComponentSelection}
+            onClick={() => useEditorStore.getState().rotateSelection()}
+            title="선택한 부품을 90° 회전 (단축키: R)"
+          >
+            {t("rotate")}
+          </button>
+        )}
       </div>
       {/* 선택 편집 (Phase 24) — 키보드 단축키(Delete·Ctrl+C/V·Shift)가 없는 태블릿에서도
           같은 동작을 할 수 있게 버튼으로 노출한다 */}
-      <div className="toolbar-group">
-        <button
-          className={multiSelectMode ? "plc-toggle-on" : undefined}
-          disabled={running}
-          onClick={() => useEditorStore.getState().toggleMultiSelectMode()}
-          title="켜면 부품 탭 = 선택 추가/제거, 빈 곳 드래그 = 영역 선택 (PC에서는 Shift와 같음)"
-        >
-          {t("multiSelect")}
-        </button>
-        <button
-          disabled={running || !hasPartSelection}
-          onClick={() => useEditorStore.getState().copySelection()}
-          title="선택한 부품과 그 사이 배선을 복사 (단축키: Ctrl+C)"
-        >
-          {t("copy")}
-        </button>
-        <button
-          disabled={running || !hasClipboard}
-          onClick={() => useEditorStore.getState().pasteClipboard()}
-          title="복사한 부품을 붙여넣기 (단축키: Ctrl+V)"
-        >
-          {t("paste")}
-        </button>
-        <button
-          className="delete-parts"
-          disabled={running || !hasAnySelection}
-          onClick={() => useEditorStore.getState().deleteSelection()}
-          title="선택한 부품(연결된 배선 포함) 또는 배선을 삭제 (단축키: Delete)"
-        >
-          {t("deleteParts")}
-        </button>
-      </div>
-      <div className="toolbar-group">
-        <button onClick={() => zoomCanvas(1 / 1.25)} title="축소">
-          {t("zoomOut")}
-        </button>
-        <button onClick={() => zoomCanvas(1.25)} title="확대">
-          {t("zoomIn")}
-        </button>
-        <button onClick={() => useEditorStore.getState().setViewport({ x: 0, y: 0, zoom: 1 })}>
-          {t("resetView")}
-        </button>
-        <button
-          className={plcOpen ? "plc-toggle-on" : undefined}
-          onClick={() => useEditorStore.getState().togglePlcPanel()}
-        >
-          {t("plcLadder")}
-        </button>
-        <button
-          className={equipmentOpen ? "plc-toggle-on" : undefined}
-          onClick={() => useEditorStore.getState().toggleEquipmentView()}
-        >
-          {t("equipmentView")}
-        </button>
-        <StationMonitorButton />
-        <button
-          className={diagramOpen ? "plc-toggle-on" : undefined}
-          onClick={() => useEditorStore.getState().toggleDiagramPanel()}
-        >
-          {t("diagram")}
-        </button>
-        <button
-          disabled={!hasComponents}
-          onClick={() => exportCircuitSvg(title || "circuit")}
-          title="회로도를 SVG 파일로 내보내기 (인쇄용)"
-        >
-          {t("exportSvg")}
-        </button>
+      {circuit && (
+        <div className="toolbar-group">
+          <button
+            className={multiSelectMode ? "plc-toggle-on" : undefined}
+            disabled={running}
+            onClick={() => useEditorStore.getState().toggleMultiSelectMode()}
+            title="켜면 부품 탭 = 선택 추가/제거, 빈 곳 드래그 = 영역 선택 (PC에서는 Shift와 같음)"
+          >
+            {t("multiSelect")}
+          </button>
+          <button
+            disabled={running || !hasPartSelection}
+            onClick={() => useEditorStore.getState().copySelection()}
+            title="선택한 부품과 그 사이 배선을 복사 (단축키: Ctrl+C)"
+          >
+            {t("copy")}
+          </button>
+          <button
+            disabled={running || !hasClipboard}
+            onClick={() => useEditorStore.getState().pasteClipboard()}
+            title="복사한 부품을 붙여넣기 (단축키: Ctrl+V)"
+          >
+            {t("paste")}
+          </button>
+          <button
+            className="delete-parts"
+            disabled={running || !hasAnySelection}
+            onClick={() => useEditorStore.getState().deleteSelection()}
+            title="선택한 부품(연결된 배선 포함) 또는 배선을 삭제 (단축키: Delete)"
+          >
+            {t("deleteParts")}
+          </button>
+        </div>
+      )}
+      {circuit && (
+        <div className="toolbar-group">
+          <button onClick={() => zoomCanvas(1 / 1.25)} title="축소">
+            {t("zoomOut")}
+          </button>
+          <button onClick={() => zoomCanvas(1.25)} title="확대">
+            {t("zoomIn")}
+          </button>
+          <button onClick={() => useEditorStore.getState().setViewport({ x: 0, y: 0, zoom: 1 })}>
+            {t("resetView")}
+          </button>
+          <button
+            className={plcOpen ? "plc-toggle-on" : undefined}
+            onClick={() => useEditorStore.getState().togglePlcPanel()}
+          >
+            {t("plcLadder")}
+          </button>
+          <button
+            className={equipmentOpen ? "plc-toggle-on" : undefined}
+            onClick={() => useEditorStore.getState().toggleEquipmentView()}
+          >
+            {t("equipmentView")}
+          </button>
+          <button
+            className={diagramOpen ? "plc-toggle-on" : undefined}
+            onClick={() => useEditorStore.getState().toggleDiagramPanel()}
+          >
+            {t("diagram")}
+          </button>
+          <button
+            disabled={!hasComponents}
+            onClick={() => exportCircuitSvg(title || "circuit")}
+            title="회로도를 SVG 파일로 내보내기 (인쇄용)"
+          >
+            {t("exportSvg")}
+          </button>
+        </div>
+      )}
+      <div className="toolbar-group toolbar-end">
         <button onClick={() => useI18nStore.getState().toggle()} title="한국어 / English">
           {lang === "ko" ? "EN" : "한"}
         </button>

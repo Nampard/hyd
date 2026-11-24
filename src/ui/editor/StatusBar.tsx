@@ -17,6 +17,7 @@ export function StatusBar(): ReactElement {
   const lastStep = useSimStore((s) => s.lastStep);
   const simTime = useSimStore((s) => s.snapshot?.time ?? 0);
   const diagnostics = useSimStore((s) => s.snapshot?.diagnostics);
+  const appMode = useEditorStore((s) => s.appMode);
   const t = useT();
 
   // 솔버 미수렴 = 자기모순 회로(NC 자기 궤환 등) 가능성 — 최우선 경고 (review-2 P0)
@@ -37,7 +38,9 @@ export function StatusBar(): ReactElement {
   if (valveConflict) hint = t("statusValveConflict");
   if (unstable) hint = t("statusUnstable"); // 미수렴이 더 근본적인 문제 — 최우선
   if (!hint) {
-    if (running && mode === "step") {
+    if (appMode === "conveyor") {
+      hint = running ? t("statusConveyorRunning") : t("statusConveyorIdle");
+    } else if (running && mode === "step") {
       hint = t("statusStepRunning");
     } else if (running) hint = t("statusRunning");
     else if (placingType) hint = t("statusPlacing");
@@ -48,10 +51,20 @@ export function StatusBar(): ReactElement {
   return (
     <div className={`status-bar${running ? " running" : ""}`}>
       <span className="status-message">{hint}</span>
+      {/* 칸마다 하나의 값 — 가운뎃점으로 이어 붙이지 않고 간격으로 나눈다 (Phase 37) */}
       <span className="status-right">
-        {running && <span className="sim-time">t = {simTime.toFixed(1)}s · </span>}
-        {t("countParts")} {componentCount} · {t("countWires")} {wireCount} · {Math.round(zoom * 100)}%
-        {" · "}
+        {running && <span className="sim-time">t = {simTime.toFixed(1)}s</span>}
+        {appMode === "circuit" && (
+          <>
+            <span>
+              {t("countParts")} {componentCount}
+            </span>
+            <span>
+              {t("countWires")} {wireCount}
+            </span>
+            <span>{Math.round(zoom * 100)}%</span>
+          </>
+        )}
         <span className="build-version" title="현재 보고 있는 화면의 빌드 버전">
           v{APP_VERSION}
         </span>

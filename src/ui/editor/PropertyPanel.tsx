@@ -72,13 +72,10 @@ export function PropertyPanel(): ReactElement {
   const selection = useEditorStore((s) => s.selection);
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const running = useSimStore((s) => s.running);
+  const conveyor = useEditorStore((s) => s.appMode === "conveyor");
   const t = useT();
 
   if (selection?.type !== "component") {
-    const activity = doc.meta.learningActivity ?? "";
-    // 회로가 바뀌어 저장된 설명이 현재 자동 초안과 다르면 안내 (수동 수정분은 존중, 재작성은 선택)
-    const autoDraft = doc.components.length > 0 ? summarizeLearningActivity(doc) : "";
-    const stale = activity.trim() !== "" && autoDraft !== "" && activity.trim() !== autoDraft;
     return (
       <div className="property-panel">
         <h2 className="panel-title">{t("properties")}</h2>
@@ -89,39 +86,7 @@ export function PropertyPanel(): ReactElement {
               ? t("wireSelected")
               : t("selectHint")}
         </p>
-        <div className="doc-meta-field">
-          <label className="field-label" htmlFor="learning-activity-input">
-            {t("learningActivityLabel")}
-          </label>
-          <textarea
-            id="learning-activity-input"
-            className="learning-activity-input"
-            rows={3}
-            maxLength={MAX_LEARNING_ACTIVITY}
-            value={activity}
-            disabled={running}
-            placeholder={t("learningActivityPlaceholder")}
-            aria-describedby="learning-activity-hint"
-            onChange={(e) => useEditorStore.getState().setLearningActivity(e.target.value)}
-          />
-          <div className="learning-activity-meta">
-            <button
-              type="button"
-              className="learning-activity-autofill"
-              disabled={running || doc.components.length === 0}
-              onClick={() => useEditorStore.getState().setLearningActivity(summarizeLearningActivity(doc))}
-            >
-              {t("learningActivityAutoFill")}
-            </button>
-            <span className="learning-activity-count">
-              {activity.length}/{MAX_LEARNING_ACTIVITY}
-            </span>
-          </div>
-          {stale && <p className="doc-meta-warn">{t("learningActivityStale")}</p>}
-          <p id="learning-activity-hint" className="doc-meta-hint">
-            {t("learningActivityHint")}
-          </p>
-        </div>
+        <LearningActivityField />
       </div>
     );
   }
@@ -158,9 +123,56 @@ export function PropertyPanel(): ReactElement {
           </label>
         );
       })}
-      <div className="property-hint">
-        {running ? t("simEditLock") : t("editHint")}
-      </div>
+      {/* 컨베이어 모드에는 회전·삭제할 부품이 없다 — 대신 과제 전체의 학습 활동 칸을 함께 보인다 (Phase 37) */}
+      {(running || !conveyor) && <div className="property-hint">{running ? t("simEditLock") : t("editHint")}</div>}
+      {conveyor && <LearningActivityField />}
     </div>
   );
 }
+
+/** 학습 활동 설명 (Phase 12) — 문서 전체에 대한 메타 정보라 선택과 무관하게 같은 칸을 쓴다 */
+function LearningActivityField(): ReactElement {
+  const doc = useEditorStore((s) => s.document);
+  const running = useSimStore((s) => s.running);
+  const t = useT();
+  const activity = doc.meta.learningActivity ?? "";
+  // 회로가 바뀌어 저장된 설명이 현재 자동 초안과 다르면 안내 (수동 수정분은 존중, 재작성은 선택)
+  const autoDraft = doc.components.length > 0 ? summarizeLearningActivity(doc) : "";
+  const stale = activity.trim() !== "" && autoDraft !== "" && activity.trim() !== autoDraft;
+  return (
+    <div className="doc-meta-field">
+      <label className="field-label" htmlFor="learning-activity-input">
+        {t("learningActivityLabel")}
+      </label>
+      <textarea
+        id="learning-activity-input"
+        className="learning-activity-input"
+        rows={3}
+        maxLength={MAX_LEARNING_ACTIVITY}
+        value={activity}
+        disabled={running}
+        placeholder={t("learningActivityPlaceholder")}
+        aria-describedby="learning-activity-hint"
+        onChange={(e) => useEditorStore.getState().setLearningActivity(e.target.value)}
+      />
+      <div className="learning-activity-meta">
+        <button
+          type="button"
+          className="learning-activity-autofill"
+          disabled={running || doc.components.length === 0}
+          onClick={() => useEditorStore.getState().setLearningActivity(summarizeLearningActivity(doc))}
+        >
+          {t("learningActivityAutoFill")}
+        </button>
+        <span className="learning-activity-count">
+          {activity.length}/{MAX_LEARNING_ACTIVITY}
+        </span>
+      </div>
+      {stale && <p className="doc-meta-warn">{t("learningActivityStale")}</p>}
+      <p id="learning-activity-hint" className="doc-meta-hint">
+        {t("learningActivityHint")}
+      </p>
+    </div>
+  );
+}
+

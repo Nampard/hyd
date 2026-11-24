@@ -38,7 +38,9 @@
 | 문서 조작(이동·복사·리밋 스위치 마커) | `src/core/model/operations.ts` |
 | 내장 예제 (23개) | `src/core/examples/index.ts` |
 | 회로도 기호 / 장비 뷰 스프라이트 | `src/ui/symbols/index.tsx` / `src/ui/equipment/sprites.tsx` |
-| 자동화설비 스테이션 · 장비 모니터 · PLC 래더 | `src/ui/equipment/AutomationStationSprite.tsx` · `ConveyorScene.tsx`·`StationMonitor.tsx` · `src/ui/plc/PlcPanel.tsx` |
+| 처음 화면(모드 고르기) · 모드 판정 | `src/app/ModeSelect.tsx` · `src/core/model/mode.ts`(`documentMode`) |
+| 컨베이어 모드 작업 화면 · 장비 무대 | `src/ui/conveyor/ConveyorWorkspace.tsx` · `StationStage.tsx` (장면은 `src/ui/equipment/ConveyorScene.tsx`) |
+| PLC 래더 | `src/ui/plc/PlcPanel.tsx` |
 | 색 토큰 | `src/styles.css` (`--electric`, `--electric-return` 등) |
 | 서비스 워커 · 버전 표시 | `public/sw.js`, `vite.config.ts`(`__APP_VERSION__`, 빌드 ID 스탬프), `src/app/refresh.ts` |
 
@@ -49,8 +51,12 @@
 - 화면에 보이는 변경은 브라우저 패널에서 직접 확인한다. `.claude/launch.json`에 `dev`(5173),
   `preview`(4173)가 있다.
   - 가로 1080px 미만이면 앱 대신 안내 화면이 나오므로(`src/styles.css`의 `max-width: 1079px`) 먼저 1280×850 정도로 뷰포트를 키운다.
+  - 앱은 처음 화면(모드 고르기)에서 시작한다. `.bench-circuit`(공유압 회로) 또는 `.bench-conveyor`(컨베이어)를
+    클릭해야 툴바가 나온다. 모드는 문서 내용으로 정해지므로 다른 모드의 예제·파일을 열면 모드가 바뀐다.
   - 예제 로드: `window.confirm = () => true` 후 `.example-select`의 value를 설정하고 `change` 이벤트를 보낸다.
-  - 시뮬레이션: `▶ 실행` 버튼 → 패널의 푸시버튼(START 등)을 pointerdown/pointerup으로 누른다.
+    목록에는 지금 모드의 예제만 있다(예: `automation-basic`은 컨베이어 모드에서만).
+  - 시뮬레이션: 회로 모드는 `▶ 실행` 버튼 → 도면의 푸시버튼(START 등)을 pointerdown/pointerup으로 누른다.
+    컨베이어 모드는 `.operator-panel .pb`(PB1~4)를 누르면 실행까지 함께 된다.
 - vitest는 프로젝트 안에서 실행한다 (scratchpad에서 돌리면 권한 오류). 임시 디버그 테스트는 끝나면 지운다.
 
 ## 배포

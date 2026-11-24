@@ -10,7 +10,12 @@ export function Palette(): ReactElement {
   const placingType = useEditorStore((s) => s.placingType);
   const running = useSimStore((s) => s.running);
   const t = useT();
-  const groups = listByCategory();
+  // 채널로 물리는 복합 장비(자동화설비 스테이션)는 컨베이어 모드 전용 — 회로 팔레트에서 뺀다 (Phase 37)
+  const groups = new Map(
+    [...listByCategory().entries()]
+      .map(([category, defs]) => [category, defs.filter((d) => !d.ioChannels?.length)] as const)
+      .filter(([, defs]) => defs.length > 0),
+  );
 
   return (
     <div className="palette">

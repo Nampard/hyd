@@ -450,8 +450,9 @@ function Rails({
   );
 }
 
-export function PlcPanel(): ReactElement | null {
-  const open = useEditorStore((s) => s.plcPanelOpen);
+/** alwaysOpen: 컨베이어 모드처럼 래더가 작업의 중심인 화면에서는 토글과 무관하게 늘 보인다 (Phase 37) */
+export function PlcPanel({ alwaysOpen = false }: { alwaysOpen?: boolean } = {}): ReactElement | null {
+  const open = useEditorStore((s) => s.plcPanelOpen) || alwaysOpen;
   const doc = useEditorStore((s) => s.document);
   const running = useSimStore((s) => s.running);
   const plcMonitor = useSimStore((s) => s.snapshot?.plc ?? null);
@@ -630,7 +631,7 @@ export function PlcPanel(): ReactElement | null {
   const { layouts, totalHeight } = layoutRungs(program.rungs);
 
   return (
-    <div className="plc-panel">
+    <div className={`plc-panel${alwaysOpen ? " plc-panel-main" : ""}`}>
       <div className="plc-main">
         <div className="plc-toolbar">
           <strong>PLC 래더</strong>

@@ -1,5 +1,6 @@
 import type { CircuitDocument } from "../model/types";
 import { buildCircuit, lc, rungOf } from "./builder";
+import { createEmptyProgram } from "../plc/model";
 
 /**
  * 예제 19: 자동화설비 스테이션 자동운전 (수업자료 슬라이드 9 LD 재구성 — Phase 14).
@@ -234,4 +235,18 @@ export function buildAutomationStationExample(): CircuitDocument {
         },
       )
   );
+}
+
+/**
+ * 빈 컨베이어 과제 (Phase 37) — 컨베이어 모드의 "새 과제".
+ * 스테이션과 수업자료 I/O 맵(입력 16 + 출력 10)은 갖춰 두고 래더만 비운다. 학생은 배선이나
+ * 주소 배정 없이 바로 래더 작성부터 시작한다.
+ */
+export function buildBlankConveyorDocument(): CircuitDocument {
+  const example = buildAutomationStationExample();
+  return {
+    ...example,
+    meta: { ...example.meta, title: "새 컨베이어 과제", learningActivity: undefined },
+    plcProgram: createEmptyProgram(),
+  };
 }
