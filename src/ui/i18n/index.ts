@@ -28,7 +28,7 @@ const ko = {
   undo: "↩ 실행 취소",
   redo: "↪ 다시 실행",
   rotate: "⟳ 회전",
-  forceRefresh: "최신 버전 받기",
+  forceRefresh: "최신 버전 갱신",
   resetView: "화면 초기화",
   plcLadder: "PLC 래더",
   equipmentView: "장비 뷰",
