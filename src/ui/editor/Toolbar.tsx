@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { useEditorStore } from "./store";
 import { clearSimHistory, useSimStore } from "../sim/simStore";
 import { downloadDocument, exportCircuitSvg, openDocumentFile } from "../../app/file";
@@ -158,216 +158,251 @@ export function Toolbar(): ReactElement {
     useEditorStore.getState().loadDocument(example.build());
   };
 
-  return (
-    <div className="toolbar">
-      <span className="app-name" title="교육용 논리/상태 시뮬레이션입니다. 실제 설비 선정·압력 설정·안전 검증에는 쓰지 마세요.">
-        HYD
-      </span>
-      {/* 지금 모드 + 처음 화면으로 (Phase 37) */}
-      <button className="mode-chip" onClick={handleSwitchMode} title={t("modeSwitch")}>
-        <span className="mode-chip-name">
-          {circuit ? t("modeCircuit") : appMode === "plc" ? t("modePlc") : t("modeConveyor")}
-        </span>
-        <span className="mode-chip-action">{t("modeSwitch")}</span>
-      </button>
-      <input
-        className="title-input"
-        value={title}
-        disabled={running}
-        onChange={(e) => useEditorStore.getState().setTitle(e.target.value)}
-        placeholder={circuit ? t("titlePlaceholder") : t("taskTitlePlaceholder")}
-      />
-      <button
-        className={`run-button${running ? " running" : ""}`}
-        disabled={!running && !canRun}
-        onClick={() => handleRun("continuous")}
-        title={running ? undefined : "연속동작 실행"}
-      >
-        {running ? t("stop") : t("run")}
-      </button>
-      {!running && (
-        <button
-          className="run-button step"
-          disabled={!canRun}
-          onClick={() => handleRun("step")}
-          title="구분동작 실행 — 동작 하나가 끝날 때마다 일시정지"
-        >
-          {t("runStep")}
-        </button>
-      )}
-      {running && stepPaused && (
-        <button className="run-button next-step" onClick={() => useSimStore.getState().advanceStep()}>
-          {t("nextStep")}
-        </button>
-      )}
-      <div className="toolbar-group">
-        <select
-          className="example-select"
-          value=""
-          disabled={running}
-          onChange={(e) => handleExample(e.target.value)}
-        >
-          <option value="">{t("openExample")}</option>
-          {[...new Set(modeExamples.map((ex) => ex.category))].map((category) => (
-            <optgroup key={category} label={category}>
-              {modeExamples
-                .filter((ex) => ex.category === category)
-                .map((ex) => (
-                  <option key={ex.id} value={ex.id}>
-                    {ex.name}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </select>
-      </div>
-      <div className="toolbar-group">
-        <button disabled={running} onClick={handleNew}>
-          {circuit ? t("newCircuit") : t("newTask")}
-        </button>
-        <button disabled={running} onClick={handleOpen}>
-          {t("open")}
-        </button>
-        <button
-          disabled={running}
-          onClick={() => {
-            syncForSave();
-            const s = useEditorStore.getState();
-            downloadDocument(s.document);
-            s.markSaved();
-          }}
-        >
-          {t("saveJson")}
-        </button>
-      </div>
-      {browserStorage && (
-        <div className="toolbar-group">
-          <button disabled={running || !hasComponents} onClick={handleBrowserSave} title="파일 없이 이 브라우저에 저장">
-            {t("browserSave")}
-          </button>
-          <select
-            className="example-select"
-            value=""
-            disabled={running}
-            onChange={(e) => handleBrowserOpen(e.target.value)}
-          >
-            <option value="">{t("browserOpen")}</option>
-            {storedDocs.map((d) => (
-              <option key={d.name} value={d.name}>
-                {d.name} (부품 {d.componentCount})
+  const exampleSelect = (
+    <select
+      className="example-select"
+      value=""
+      disabled={running}
+      onChange={(e) => handleExample(e.target.value)}
+      aria-label={t("openExample")}
+    >
+      <option value="">{t("openExample")}</option>
+      {[...new Set(modeExamples.map((ex) => ex.category))].map((category) => (
+        <optgroup key={category} label={category}>
+          {modeExamples
+            .filter((ex) => ex.category === category)
+            .map((ex) => (
+              <option key={ex.id} value={ex.id}>
+                {ex.name}
               </option>
             ))}
-          </select>
-          <button disabled={running} onClick={handleBrowserDelete} title="현재 제목과 같은 저장 항목 삭제">
-            {t("delete")}
+        </optgroup>
+      ))}
+    </select>
+  );
+
+  return (
+    <header className={`toolbar${circuit ? " has-tools" : ""}`}>
+      {/* 1단: 앱 막대 — 정체(모드)·문서·실행·메뉴 (Phase 38: 세 줄로 흩어지던 버튼을 묶음) */}
+      <div className="appbar">
+        <span className="app-name" title="교육용 논리/상태 시뮬레이션입니다. 실제 설비 선정·압력 설정·안전 검증에는 쓰지 마세요.">
+          HYD
+        </span>
+        {/* 지금 모드 + 처음 화면으로 (Phase 37) */}
+        <button className="mode-chip" onClick={handleSwitchMode} title={t("modeSwitch")}>
+          <span className="mode-chip-name">
+            {circuit ? t("modeCircuit") : appMode === "plc" ? t("modePlc") : t("modeConveyor")}
+          </span>
+          <span className="mode-chip-action">{t("modeSwitch")}</span>
+        </button>
+        <input
+          className="title-input"
+          value={title}
+          disabled={running}
+          onChange={(e) => useEditorStore.getState().setTitle(e.target.value)}
+          placeholder={circuit ? t("titlePlaceholder") : t("taskTitlePlaceholder")}
+          aria-label={circuit ? t("titlePlaceholder") : t("taskTitlePlaceholder")}
+        />
+        <div className="run-group">
+          <button
+            className={`run-button${running ? " running" : ""}`}
+            disabled={!running && !canRun}
+            onClick={() => handleRun("continuous")}
+            title={running ? undefined : "연속동작 실행"}
+          >
+            {running ? t("stop") : t("run")}
+          </button>
+          {!running && (
+            <button
+              className="run-button step"
+              disabled={!canRun}
+              onClick={() => handleRun("step")}
+              title="구분동작 실행 — 동작 하나가 끝날 때마다 일시정지"
+            >
+              {t("runStep")}
+            </button>
+          )}
+          {running && stepPaused && (
+            <button className="run-button next-step" onClick={() => useSimStore.getState().advanceStep()}>
+              {t("nextStep")}
+            </button>
+          )}
+        </div>
+        {exampleSelect}
+        <Menu label={t("fileMenu")} disabled={running}>
+          <button onClick={handleNew}>{circuit ? t("newCircuit") : t("newTask")}</button>
+          <button onClick={handleOpen}>{t("open")}</button>
+          <button
+            onClick={() => {
+              syncForSave();
+              const s = useEditorStore.getState();
+              downloadDocument(s.document);
+              s.markSaved();
+            }}
+          >
+            {t("saveJson")}
+          </button>
+          {circuit && (
+            <button disabled={!hasComponents} onClick={() => exportCircuitSvg(title || "circuit")}>
+              {t("exportSvg")}
+            </button>
+          )}
+          {browserStorage && (
+            <>
+              <hr />
+              <button disabled={!canRun} onClick={handleBrowserSave} title="파일 없이 이 브라우저에 저장">
+                {t("browserSave")}
+              </button>
+              <span className="tb-menu-heading">{t("browserSavedList")}</span>
+              {storedDocs.length === 0 && <span className="tb-menu-empty">{t("browserSavedEmpty")}</span>}
+              {storedDocs.map((d) => (
+                <button key={d.name} className="tb-menu-doc" onClick={() => handleBrowserOpen(d.name)}>
+                  {d.name}
+                </button>
+              ))}
+              <button className="tb-menu-danger" onClick={handleBrowserDelete} title="현재 제목과 같은 저장 항목 삭제">
+                {t("delete")}
+              </button>
+            </>
+          )}
+        </Menu>
+        <div className="toolbar-end">
+          <button className="quiet" disabled={running || !canUndo} onClick={() => useEditorStore.getState().undo()}>
+            {t("undo")}
+          </button>
+          <button className="quiet" disabled={running || !canRedo} onClick={() => useEditorStore.getState().redo()}>
+            {t("redo")}
+          </button>
+          <button className="quiet" onClick={() => useI18nStore.getState().toggle()} title="한국어 / English">
+            {lang === "ko" ? "EN" : "한"}
+          </button>
+          {/* 브라우저마다 강력 새로고침 동작이 달라(특히 Safari) 확실한 탈출구를 버튼으로
+              제공한다 — 워커 해제 + 캐시 삭제 + 캐시 무효화 재접속 (Phase 19-3) */}
+          <button
+            className="quiet"
+            onClick={() => void forceRefreshToLatest()}
+            title={`현재 버전 ${APP_VERSION} — 저장된 캐시를 지우고 최신 버전을 새로 받습니다`}
+          >
+            {t("forceRefresh")}
           </button>
         </div>
-      )}
-      <div className="toolbar-group">
-        <button disabled={running || !canUndo} onClick={() => useEditorStore.getState().undo()}>
-          {t("undo")}
-        </button>
-        <button disabled={running || !canRedo} onClick={() => useEditorStore.getState().redo()}>
-          {t("redo")}
-        </button>
-        {/* 회전은 단축키 R로도 되지만 버튼이 없으면 발견하기 어렵다 (Phase 16-2) */}
-        {circuit && (
-          <button
-            disabled={running || !hasComponentSelection}
-            onClick={() => useEditorStore.getState().rotateSelection()}
-            title="선택한 부품을 90° 회전 (단축키: R)"
-          >
-            {t("rotate")}
-          </button>
-        )}
       </div>
-      {/* 선택 편집 (Phase 24) — 키보드 단축키(Delete·Ctrl+C/V·Shift)가 없는 태블릿에서도
-          같은 동작을 할 수 있게 버튼으로 노출한다 */}
+
+      {/* 2단: 회로 도구 — 공유압 회로 모드에서만 (편집 · 보기) */}
       {circuit && (
-        <div className="toolbar-group">
-          <button
-            className={multiSelectMode ? "plc-toggle-on" : undefined}
-            disabled={running}
-            onClick={() => useEditorStore.getState().toggleMultiSelectMode()}
-            title="켜면 부품 탭 = 선택 추가/제거, 빈 곳 드래그 = 영역 선택 (PC에서는 Shift와 같음)"
-          >
-            {t("multiSelect")}
-          </button>
-          <button
-            disabled={running || !hasPartSelection}
-            onClick={() => useEditorStore.getState().copySelection()}
-            title="선택한 부품과 그 사이 배선을 복사 (단축키: Ctrl+C)"
-          >
-            {t("copy")}
-          </button>
-          <button
-            disabled={running || !hasClipboard}
-            onClick={() => useEditorStore.getState().pasteClipboard()}
-            title="복사한 부품을 붙여넣기 (단축키: Ctrl+V)"
-          >
-            {t("paste")}
-          </button>
-          <button
-            className="delete-parts"
-            disabled={running || !hasAnySelection}
-            onClick={() => useEditorStore.getState().deleteSelection()}
-            title="선택한 부품(연결된 배선 포함) 또는 배선을 삭제 (단축키: Delete)"
-          >
-            {t("deleteParts")}
-          </button>
+        <div className="toolrow" role="toolbar" aria-label="회로 도구">
+          <div className="toolbar-group">
+            {/* 회전은 단축키 R로도 되지만 버튼이 없으면 발견하기 어렵다 (Phase 16-2) */}
+            <button
+              disabled={running || !hasComponentSelection}
+              onClick={() => useEditorStore.getState().rotateSelection()}
+              title="선택한 부품을 90° 회전 (단축키: R)"
+            >
+              {t("rotate")}
+            </button>
+            {/* 선택 편집 (Phase 24) — 키보드 단축키(Delete·Ctrl+C/V·Shift)가 없는 태블릿에서도
+                같은 동작을 할 수 있게 버튼으로 노출한다 */}
+            <button
+              className={multiSelectMode ? "plc-toggle-on" : undefined}
+              disabled={running}
+              onClick={() => useEditorStore.getState().toggleMultiSelectMode()}
+              title="켜면 부품 탭 = 선택 추가/제거, 빈 곳 드래그 = 영역 선택 (PC에서는 Shift와 같음)"
+            >
+              {t("multiSelect")}
+            </button>
+            <button
+              disabled={running || !hasPartSelection}
+              onClick={() => useEditorStore.getState().copySelection()}
+              title="선택한 부품과 그 사이 배선을 복사 (단축키: Ctrl+C)"
+            >
+              {t("copy")}
+            </button>
+            <button
+              disabled={running || !hasClipboard}
+              onClick={() => useEditorStore.getState().pasteClipboard()}
+              title="복사한 부품을 붙여넣기 (단축키: Ctrl+V)"
+            >
+              {t("paste")}
+            </button>
+            <button
+              className="delete-parts"
+              disabled={running || !hasAnySelection}
+              onClick={() => useEditorStore.getState().deleteSelection()}
+              title="선택한 부품(연결된 배선 포함) 또는 배선을 삭제 (단축키: Delete)"
+            >
+              {t("deleteParts")}
+            </button>
+          </div>
+          <div className="toolbar-group">
+            <button onClick={() => zoomCanvas(1 / 1.25)} title="축소" aria-label="축소">
+              {t("zoomOut")}
+            </button>
+            <button onClick={() => zoomCanvas(1.25)} title="확대" aria-label="확대">
+              {t("zoomIn")}
+            </button>
+            <button onClick={() => useEditorStore.getState().setViewport({ x: 0, y: 0, zoom: 1 })}>
+              {t("resetView")}
+            </button>
+          </div>
+          <div className="toolbar-group" aria-label="함께 보기">
+            <button
+              className={plcOpen ? "plc-toggle-on" : undefined}
+              aria-pressed={plcOpen}
+              onClick={() => useEditorStore.getState().togglePlcPanel()}
+            >
+              {t("plcLadder")}
+            </button>
+            <button
+              className={equipmentOpen ? "plc-toggle-on" : undefined}
+              aria-pressed={equipmentOpen}
+              onClick={() => useEditorStore.getState().toggleEquipmentView()}
+            >
+              {t("equipmentView")}
+            </button>
+            <button
+              className={diagramOpen ? "plc-toggle-on" : undefined}
+              aria-pressed={diagramOpen}
+              onClick={() => useEditorStore.getState().toggleDiagramPanel()}
+            >
+              {t("diagram")}
+            </button>
+          </div>
         </div>
       )}
-      {circuit && (
-        <div className="toolbar-group">
-          <button onClick={() => zoomCanvas(1 / 1.25)} title="축소">
-            {t("zoomOut")}
-          </button>
-          <button onClick={() => zoomCanvas(1.25)} title="확대">
-            {t("zoomIn")}
-          </button>
-          <button onClick={() => useEditorStore.getState().setViewport({ x: 0, y: 0, zoom: 1 })}>
-            {t("resetView")}
-          </button>
-          <button
-            className={plcOpen ? "plc-toggle-on" : undefined}
-            onClick={() => useEditorStore.getState().togglePlcPanel()}
-          >
-            {t("plcLadder")}
-          </button>
-          <button
-            className={equipmentOpen ? "plc-toggle-on" : undefined}
-            onClick={() => useEditorStore.getState().toggleEquipmentView()}
-          >
-            {t("equipmentView")}
-          </button>
-          <button
-            className={diagramOpen ? "plc-toggle-on" : undefined}
-            onClick={() => useEditorStore.getState().toggleDiagramPanel()}
-          >
-            {t("diagram")}
-          </button>
-          <button
-            disabled={!hasComponents}
-            onClick={() => exportCircuitSvg(title || "circuit")}
-            title="회로도를 SVG 파일로 내보내기 (인쇄용)"
-          >
-            {t("exportSvg")}
-          </button>
-        </div>
-      )}
-      <div className="toolbar-group toolbar-end">
-        <button onClick={() => useI18nStore.getState().toggle()} title="한국어 / English">
-          {lang === "ko" ? "EN" : "한"}
-        </button>
-        {/* 브라우저마다 강력 새로고침 동작이 달라(특히 Safari) 확실한 탈출구를 버튼으로
-            제공한다 — 워커 해제 + 캐시 삭제 + 캐시 무효화 재접속 (Phase 19-3) */}
-        <button
-          onClick={() => void forceRefreshToLatest()}
-          title={`현재 버전 ${APP_VERSION} — 저장된 캐시를 지우고 최신 버전을 새로 받습니다`}
-        >
-          {t("forceRefresh")}
-        </button>
+    </header>
+  );
+}
+
+/**
+ * 툴바 펼침 메뉴 (Phase 38) — 파일·브라우저 저장처럼 가끔 쓰는 동작을 한곳에 묶는다.
+ * 항목을 누르거나 바깥을 누르면 닫히고, Esc로도 닫힌다.
+ */
+function Menu({ label, disabled, children }: { label: string; disabled?: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (e: Event) => {
+      const el = ref.current;
+      if (!el?.open) return;
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !el.contains(e.target as Node)) el.open = false;
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, []);
+  return (
+    <details className={`tb-menu${disabled ? " disabled" : ""}`} ref={ref}>
+      <summary aria-disabled={disabled}>{label}</summary>
+      <div
+        className="tb-menu-panel"
+        onClick={(e) => {
+          if ((e.target as Element).closest("button") && ref.current) ref.current.open = false;
+        }}
+      >
+        {children}
       </div>
-    </div>
+    </details>
   );
 }

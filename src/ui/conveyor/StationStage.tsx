@@ -130,7 +130,8 @@ export function StationStage({ stationId, properties }: { stationId: string; pro
 
 /**
  * 조작 패널 — 스테이션의 누름버튼 PB1~4와 시그널 램프.
- * PB1~3은 누르는 동안만 입력이 들어가는 모멘터리 버튼이다. PB4는 실습 장비처럼
+ * PB1~3은 누르는 동안만 입력이 들어가는 모멘터리 버튼이다. 색은 학교 실습 장비 조작반(초록·빨강·주황)을
+ * 따랐다 (Phase 38, 수업 영상 참고). PB4는 실습 장비처럼
  * **Turn to Reset**(누르면 잠기고 돌려야 풀리는 버섯형) 버튼이라, 한 번 누르면 잠겨 있다가
  * 다시 누르면(돌려서 해제) 풀린다 (Phase 38). 운전 전이면 누르는 순간 시뮬레이션을 시작한다.
  */
@@ -159,7 +160,7 @@ function OperatorPanel({ stationId, station }: { stationId: string; station: Aut
       {[0, 1, 2].map((i) => (
         <button
           key={i}
-          className={`pb${station?.pb[i] ? " pressed" : ""}`}
+          className={`pb pb-${i + 1}${station?.pb[i] ? " pressed" : ""}`}
           aria-pressed={station?.pb[i] ?? false}
           onPointerDown={(e) => {
             (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
@@ -192,6 +193,11 @@ function OperatorPanel({ stationId, station }: { stationId: string; station: Aut
         <span className="pb-latch-cap" aria-hidden="true" />
         <span className="pb-latch-label">PB4</span>
       </button>
+      {/* 실습 장비 조작반의 7세그먼트 카운터처럼 — 분류를 마친 공작물 수 */}
+      <span className="seg-counter" title="분류를 마친 공작물 수 (옆 배출 + 끝 저장)">
+        <span className="seg-digits">{String((station?.eject.length ?? 0) + (station?.store.length ?? 0)).padStart(2, "0")}</span>
+        <span className="seg-label">처리</span>
+      </span>
       <span className="lamps" aria-label="시그널 램프">
         {LAMPS.map(([key, name]) => (
           <span key={key} className={`lamp lamp-${key}${lamps[key] ? " lit" : ""}`} title={`${name}램 ${lamps[key] ? "켜짐" : "꺼짐"}`} />

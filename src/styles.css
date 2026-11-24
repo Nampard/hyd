@@ -119,22 +119,56 @@ body,
   }
 }
 
-/* --- 툴바 --- */
+/* --- 툴바 (Phase 38 재구성) ---
+   1단 앱 막대: 정체·문서·실행·메뉴. 2단 도구 줄(회로 모드만): 편집·보기, 묶음 사이를 세로선으로 나눈다.
+   좁은 폭에서는 묶음 단위로만 줄바꿈한다 (버튼 안 글자는 줄바꿈 금지). */
 .toolbar {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap; /* 좁은 폭에서는 그룹 단위로 줄바꿈 (버튼 내부 줄바꿈 금지) */
-  gap: 8px 12px;
-  padding: 6px 12px;
+  flex-direction: column;
   background: var(--panel-bg);
   border-bottom: 1px solid var(--panel-border);
   word-break: keep-all;
 }
+.appbar,
+.toolrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 7px 14px;
+}
+.toolrow {
+  gap: 6px 0;
+  padding: 5px 14px;
+  border-top: 1px solid #e6eaed;
+  background: #fafbfa;
+}
+.toolrow .toolbar-group {
+  padding: 0 12px;
+  border-left: 1px solid var(--panel-border);
+}
+.toolrow .toolbar-group:first-child {
+  padding-left: 0;
+  border-left: none;
+}
+.run-group {
+  display: flex;
+  gap: 4px;
+}
+.toolbar .quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-dim);
+}
+.toolbar .quiet:hover:not(:disabled) {
+  color: var(--text);
+}
 
 .app-name {
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--accent);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
 }
 
 /* 지금 모드 + 처음 화면으로 돌아가기 (Phase 37) */
@@ -155,13 +189,116 @@ body,
 }
 .toolbar-end {
   margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+
+/* 펼침 메뉴 — 파일·브라우저 저장 */
+.tb-menu {
+  position: relative;
+}
+.tb-menu > summary {
+  list-style: none;
+  padding: 5px 26px 5px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+}
+.tb-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.tb-menu > summary::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--text-dim);
+  border-bottom: 1.5px solid var(--text-dim);
+  transform: translateY(-70%) rotate(45deg);
+}
+.tb-menu > summary:hover {
+  border-color: var(--accent);
+}
+.tb-menu > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.tb-menu.disabled {
+  pointer-events: none;
+  opacity: 0.4;
+}
+.tb-menu-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  box-shadow: 0 10px 28px #17213124;
+}
+.toolbar .tb-menu-panel button {
+  justify-content: flex-start;
+  text-align: left;
+  border-color: transparent;
+  background: transparent;
+  padding: 7px 10px;
+}
+.toolbar .tb-menu-panel button:hover:not(:disabled) {
+  background: #eef3fb;
+  border-color: transparent;
+}
+.tb-menu-panel hr {
+  width: 100%;
+  margin: 6px 0;
+  border: none;
+  border-top: 1px solid #e6eaed;
+}
+.tb-menu-heading {
+  padding: 6px 10px 2px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.tb-menu-empty {
+  padding: 2px 10px 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.toolbar .tb-menu-panel .tb-menu-doc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+.toolbar .tb-menu-panel .tb-menu-danger {
+  color: var(--err);
 }
 
 .title-input {
-  width: 200px;
-  padding: 4px 8px;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  width: 220px;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--bg);
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+}
+.title-input:hover,
+.title-input:focus {
+  border-color: var(--panel-border);
+  background: var(--panel-bg);
 }
 
 .toolbar-group {
@@ -170,17 +307,28 @@ body,
 }
 
 .toolbar button {
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 11px;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--panel-bg);
+  color: var(--text);
+  font: inherit;
   cursor: pointer;
   white-space: nowrap; /* "다음 동작" 등 버튼 라벨의 음절 분리 방지 (review-3 P1) */
 }
 
 .toolbar button:hover:not(:disabled) {
-  background: #eef2ff;
+  background: #eef3fb;
   border-color: var(--accent);
+}
+.toolbar button:focus-visible,
+.toolbar select:focus-visible,
+.toolbar input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .toolbar button:disabled {
@@ -200,9 +348,11 @@ body,
   border-color: var(--run-stop) !important;
 }
 
+/* 구분 실행은 보조 동작 — 실행과 같은 초록 계열의 외곽선 버튼으로 위계를 낮춘다 */
 .run-button.step {
-  background: #0e7490 !important;
-  border-color: #0e7490 !important;
+  color: var(--run) !important;
+  background: var(--panel-bg) !important;
+  border-color: var(--run) !important;
 }
 
 .run-button.next-step {
@@ -221,11 +371,14 @@ body,
 }
 
 .example-select {
+  min-height: 30px;
   padding: 4px 8px;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--panel-bg);
-  max-width: 220px;
+  color: var(--text);
+  font: inherit;
+  max-width: 230px;
 }
 
 .status-bar.running {
@@ -236,61 +389,86 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
-/* --- 팔레트 --- */
+/* --- 팔레트 (Phase 38 정리) ---
+   부품 하나하나를 똑같은 카드로 쪼개지 않고, 도면 기호 목록처럼 가는 구분선으로 잇는다.
+   기호 썸네일은 도면지 칸 위에 — 캔버스에 놓였을 때의 모습과 같다. */
 .palette {
-  width: 208px;
+  width: 216px;
   overflow-y: auto;
   background: var(--panel-bg);
   border-right: 1px solid var(--panel-border);
-  padding: 8px;
+  padding: 10px 0 16px;
 }
 
 .panel-title {
-  font-size: 13px;
-  font-weight: 700;
-  margin: 4px 4px 8px;
-  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 800;
+  margin: 2px 14px 6px;
+  color: var(--text);
 }
 
 .palette-category {
+  position: sticky;
+  top: -10px;
+  z-index: 1;
+  margin: 10px 0 0;
+  padding: 6px 14px 4px;
   font-size: 12px;
-  font-weight: 600;
-  margin: 12px 4px 4px;
+  font-weight: 700;
   color: var(--text-dim);
+  background: var(--panel-bg);
+  border-bottom: 1px solid #e6eaed;
 }
 
 .palette-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 6px;
-  margin-bottom: 4px;
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  background: var(--panel-bg);
+  padding: 5px 14px 5px 10px;
+  border: none;
+  border-bottom: 1px solid #eef1f3;
+  border-left: 3px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
   cursor: pointer;
   text-align: left;
 }
 
-.palette-item:hover {
-  border-color: var(--accent);
+.palette-item:hover:not(:disabled) {
+  background: #f3f6fa;
 }
 
+.palette-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* 배치 대기 중인 부품 — 왼쪽 튜브 파랑 띠 */
 .palette-item.active {
-  border-color: var(--accent);
-  background: #eef2ff;
+  border-left-color: var(--accent);
+  background: #eaf1fb;
+}
+
+.palette-item:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .palette-thumb {
-  width: 52px;
+  width: 54px;
   height: 40px;
   flex-shrink: 0;
+  border-radius: 4px;
+  background: var(--canvas-bg) radial-gradient(var(--grid-dot) 0.6px, transparent 0.7px) 0 0 / 6px 6px;
+  border: 1px solid #e6eaed;
 }
 
 .palette-name {
-  font-size: 12px;
-  line-height: 1.3;
+  font-size: 12.5px;
+  line-height: 1.35;
+  word-break: keep-all;
 }
 
 /* --- 캔버스 --- */
@@ -403,15 +581,22 @@ body,
 
 /* --- 속성 패널 --- */
 .property-panel {
-  width: 224px;
+  width: 236px;
   background: var(--panel-bg);
   border-left: 1px solid var(--panel-border);
-  padding: 8px;
+  padding: 10px 10px 16px;
   overflow-y: auto;
+  word-break: keep-all;
+}
+
+.property-panel .panel-title {
+  margin: 2px 4px 8px;
 }
 
 .property-header {
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
   padding: 4px;
   margin-bottom: 8px;
 }
@@ -546,18 +731,20 @@ body,
 
 .equipment-head {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-dim);
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
   border-bottom: 1px solid var(--panel-border);
   background: var(--panel-bg);
 }
 
 .equipment-head-hint {
+  font-size: 12px;
   font-weight: 400;
+  color: var(--text-dim);
   flex: 1;
 }
 
@@ -579,7 +766,7 @@ body,
 
 /* --- 변위단계선도 패널 --- */
 .diagram-panel {
-  border-top: 2px solid var(--panel-border);
+  border-top: 1px solid var(--panel-border);
   background: var(--panel-bg);
   max-height: 240px;
   display: flex;
@@ -587,15 +774,20 @@ body,
 }
 
 .diagram-head {
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-dim);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
   border-bottom: 1px solid var(--panel-border);
 }
 
 .diagram-empty {
+  font-size: 12px;
   font-weight: 400;
+  color: var(--text-dim);
 }
 
 .diagram-scroll {
@@ -607,7 +799,7 @@ body,
 .plc-panel {
   display: flex;
   height: 280px;
-  border-top: 2px solid var(--panel-border);
+  border-top: 1px solid var(--panel-border);
   background: var(--panel-bg);
   min-height: 0;
 }
@@ -619,28 +811,47 @@ body,
   min-width: 0;
 }
 
+/* 래더 도구 — 접점·코일 기호를 고르는 한 줄. 고른 도구는 튜브 파랑으로 채운다 */
 .plc-toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--panel-border);
+  gap: 3px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #e6eaed;
+  background: #fafbfa;
   flex-wrap: wrap;
+}
+.plc-toolbar > strong {
+  margin-right: 10px;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .plc-tool {
-  padding: 2px 8px;
+  min-height: 28px;
+  padding: 2px 9px;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--panel-bg);
+  color: var(--text);
   cursor: pointer;
-  font-family: monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; /* 래더 기호를 글자로 그린 것이라 고정폭이 맞다 */
   font-size: 12px;
+}
+
+.plc-tool:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.plc-tool:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .plc-tool.active {
   border-color: var(--accent);
-  background: #eef2ff;
+  background: var(--accent);
+  color: #fff;
 }
 
 .plc-toolbar-gap {
@@ -726,12 +937,13 @@ body,
 
 .plc-hint {
   margin: 0;
-  padding: 6px 8px;
-  font-size: 11px;
-  line-height: 1.5;
+  padding: 6px 12px;
+  max-width: 110ch;
+  font-size: 12px;
+  line-height: 1.55;
   color: var(--text-dim);
   background: var(--panel-bg);
-  border-bottom: 1px solid var(--panel-border);
+  word-break: keep-all;
 }
 
 .plc-hint strong {
@@ -752,9 +964,16 @@ body,
 .plc-side {
   width: 300px;
   border-left: 1px solid var(--panel-border);
-  padding: 8px;
+  padding: 10px 12px;
   overflow-y: auto;
   font-size: 12px;
+  background: #fafbfa;
+}
+.plc-side > strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .plc-iomap {
@@ -849,7 +1068,8 @@ body,
 /* 터치 기기 (Phase 24): 손가락으로 누르기 쉽게 툴바 버튼 높이를 키운다 */
 @media (pointer: coarse) {
   .toolbar button,
-  .toolbar select {
+  .toolbar select,
+  .tb-menu > summary {
     min-height: 34px;
   }
 }
@@ -858,7 +1078,9 @@ body,
 .status-bar {
   display: flex;
   justify-content: space-between;
-  padding: 4px 12px;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 14px;
   font-size: 12px;
   color: var(--text-dim);
   background: var(--panel-bg);
@@ -1215,9 +1437,36 @@ body,
   text-shadow: 0 1px 1px #0008;
   touch-action: none;
 }
+/* 실습 장비 조작반 색 — PB1 초록 · PB2 빨강 · PB3 주황 (PB4는 버섯형 비상정지) */
+.operator-panel .pb-1 { background: radial-gradient(circle at 38% 32%, #86efac, #16a34a 55%, #14532d); }
+.operator-panel .pb-2 { background: radial-gradient(circle at 38% 32%, #fca5a5, #dc2626 55%, #7f1d1d); }
+.operator-panel .pb-3 { background: radial-gradient(circle at 38% 32%, #fdba74, #ea580c 55%, #7c2d12); }
+.seg-counter {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-left: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: #0b0d12;
+  border: 1px solid #39415a;
+}
+.seg-digits {
+  font-family: "DSEG7 Classic", ui-monospace, "SF Mono", Menlo, monospace; /* 7세그먼트 표시기를 흉내 낸 고정폭 */
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ff3b30;
+  text-shadow: 0 0 6px #ff3b3088;
+  font-variant-numeric: tabular-nums;
+}
+.seg-label {
+  font-size: 10px;
+  color: #a7b1c6;
+}
 .operator-panel .pb.pressed {
   transform: scale(0.93);
-  background: radial-gradient(circle at 50% 50%, #ef4444, #991b1b);
+  filter: brightness(0.82);
 }
 /* PB4 Turn to Reset — 노란 받침 위 버섯형 빨간 머리. 잠기면 머리가 들어가고 돌린 자국(반원 화살)이 보인다 */
 .operator-panel .pb-latch {

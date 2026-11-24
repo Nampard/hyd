@@ -39,6 +39,7 @@
 | 내장 예제 (23개) | `src/core/examples/index.ts` |
 | 회로도 기호 / 장비 뷰 스프라이트 | `src/ui/symbols/index.tsx` / `src/ui/equipment/sprites.tsx` |
 | 처음 화면(모드 고르기) · 모드 판정 | `src/app/ModeSelect.tsx` · `src/core/model/mode.ts`(`documentMode`) |
+| PLC 래더 모드 작업 화면 (입출력 판) | `src/ui/plcmode/PlcWorkspace.tsx` · 예제 `src/core/examples/plc-ladder-examples.ts` |
 | 컨베이어 모드 작업 화면 · 장비 무대 | `src/ui/conveyor/ConveyorWorkspace.tsx` · `StationStage.tsx` (장면은 `src/ui/equipment/ConveyorScene.tsx`) |
 | PLC 래더 | `src/ui/plc/PlcPanel.tsx` |
 | 색 토큰 | `src/styles.css` (`--electric`, `--electric-return` 등) |
@@ -51,12 +52,13 @@
 - 화면에 보이는 변경은 브라우저 패널에서 직접 확인한다. `.claude/launch.json`에 `dev`(5173),
   `preview`(4173)가 있다.
   - 가로 1080px 미만이면 앱 대신 안내 화면이 나오므로(`src/styles.css`의 `max-width: 1079px`) 먼저 1280×850 정도로 뷰포트를 키운다.
-  - 앱은 처음 화면(모드 고르기)에서 시작한다. `.bench-circuit`(공유압 회로) 또는 `.bench-conveyor`(컨베이어)를
-    클릭해야 툴바가 나온다. 모드는 문서 내용으로 정해지므로 다른 모드의 예제·파일을 열면 모드가 바뀐다.
+  - 앱은 처음 화면(모드 고르기)에서 시작한다. `.bench-circuit`(공유압 회로)·`.bench-plc`(PLC 래더)·
+    `.bench-conveyor`(컨베이어)를 클릭해야 툴바가 나온다. 모드는 문서 내용으로 정해지므로 다른 모드의 예제·파일을 열면 모드가 바뀐다.
   - 예제 로드: `window.confirm = () => true` 후 `.example-select`의 value를 설정하고 `change` 이벤트를 보낸다.
     목록에는 지금 모드의 예제만 있다(예: `automation-basic`은 컨베이어 모드에서만).
   - 시뮬레이션: 회로 모드는 `▶ 실행` 버튼 → 도면의 푸시버튼(START 등)을 pointerdown/pointerup으로 누른다.
-    컨베이어 모드는 `.operator-panel .pb`(PB1~4)를 누르면 실행까지 함께 된다.
+    컨베이어 모드는 `.operator-panel .pb`(PB1~4, PB4는 클릭할 때마다 잠김/해제)를, PLC 래더 모드는
+    `.io-push`(누르는 동안)·`.io-toggle`(클릭 토글)을 누르면 실행까지 함께 된다. 파일·저장은 툴바의 `파일` 메뉴(`.tb-menu`).
 - vitest는 프로젝트 안에서 실행한다 (scratchpad에서 돌리면 권한 오류). 임시 디버그 테스트는 끝나면 지운다.
 
 ## 배포
@@ -68,5 +70,5 @@
     크롬에서 "사이트에 연결할 수 없음"이 간헐적으로 났다 (Phase 25).
 - 샌드박스 안에서는 배포 사이트에 접속할 수 없다. Pages 배포는 api.github.com(Actions runs API)으로 확인하고
   (`gh` CLI 없음), 실제 사이트 응답은 샌드박스 밖 `curl`로 확인한다. 배포 버전은 메인 JS에 박힌 커밋 해시로 대조한다.
-- 서비스 워커는 빌드마다 새 ID가 박혀 자동 갱신되고, 상태 표시줄에 커밋 해시 버전이, 툴바에 `⟳ 최신으로`
+- 서비스 워커는 빌드마다 새 ID가 박혀 자동 갱신되고, 상태 표시줄에 커밋 해시 버전이, 툴바에 `최신 버전 받기`
   버튼이 있다. 캐시 관련 문제를 고칠 때 이 구조를 유지한다.
