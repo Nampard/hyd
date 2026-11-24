@@ -6,8 +6,8 @@
 
 ## 현재 상태
 
-- Phase 0~36 완료. 진행 기록과 다음 후보는 [docs/ROADMAP.md](docs/ROADMAP.md)의 마지막
-  Phase와 "후순위 후보"에 있다. 새 작업은 ROADMAP에 Phase를 추가하며 진행한다.
+- 진행 기록과 다음 후보는 [docs/ROADMAP.md](docs/ROADMAP.md)의 마지막 Phase와 "후순위 후보"에
+  있다. 새 작업은 ROADMAP에 Phase를 추가하며 진행한다.
 - 문서 스키마 v5 (v4: ioMap channel, v5: `auto.automation-station` 리네임).
 - 작업 전 [docs/PRD.md](docs/PRD.md)(범위·non-goals)와
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)(모듈·데이터 모델·솔버)를 필요한 만큼 읽는다.
@@ -48,7 +48,7 @@
   `npx tsc -b`를 통과시킨다.
 - 화면에 보이는 변경은 브라우저 패널에서 직접 확인한다. `.claude/launch.json`에 `dev`(5173),
   `preview`(4173)가 있다.
-  - 패널이 좁으면 레이아웃이 모바일형으로 바뀌므로 먼저 1280×850 정도로 뷰포트를 키운다.
+  - 가로 1080px 미만이면 앱 대신 안내 화면이 나오므로(`src/styles.css`의 `max-width: 1079px`) 먼저 1280×850 정도로 뷰포트를 키운다.
   - 예제 로드: `window.confirm = () => true` 후 `.example-select`의 value를 설정하고 `change` 이벤트를 보낸다.
   - 시뮬레이션: `▶ 실행` 버튼 → 패널의 푸시버튼(START 등)을 pointerdown/pointerup으로 누른다.
 - vitest는 프로젝트 안에서 실행한다 (scratchpad에서 돌리면 권한 오류). 임시 디버그 테스트는 끝나면 지운다.
