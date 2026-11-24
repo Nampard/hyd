@@ -17,8 +17,8 @@ const FIRST_RELEASED = "2026-07-14";
  * 실습실에서 "오늘은 어느 장비 앞에 설까"를 고르는 장면으로 그렸다. 왼쪽은 도면지 위의
  * 실제 회로 기호(공유압 회로 모드에서 그리게 될 것), 오른쪽은 그래파이트 위의 스테이션
  * 사진(컨베이어 모드에서 운전하게 될 것)이다. 두 판의 바탕 자체가 두 작업 환경의 차이를
- * 보여 준다. 아래 표제란은 도면 오른쪽 아래 구석의 표제란처럼 이름·버전·처음 공개일·기호 기준·저작권을
- * 2단 칸에 적고, 용도 고지는 그 왼쪽에 주의 문구로 둔다.
+ * 보여 준다. 맨 아래는 도면지의 아래 테두리처럼 전체 폭의 선 하나를 긋고, 오른쪽 끝에 표제란(이름·버전·
+ * 처음 공개일·기호 기준·저작권)을 매단다. 용도 고지는 왼쪽에 실습실 안전 테이프 띠와 함께 둔다.
  */
 export function ModeSelect(): ReactElement {
   const t = useT();
@@ -94,30 +94,33 @@ export function ModeSelect(): ReactElement {
         </button>
       </div>
 
-      {/* 아래 줄 — 왼쪽은 용도 주의 문구, 오른쪽은 도면 오른쪽 아래 구석의 표제란처럼 2단 칸 */}
+      {/* 도면 아래 테두리 — 전체 폭의 선 하나에 왼쪽은 용도 주의 문구, 오른쪽은 표제란이 매달린다 */}
       <footer className="mode-select-foot">
         <p className="use-notice">
-          <span className="use-notice-key">{t("tbUse")}</span>
+          <span className="use-notice-tape" aria-hidden="true" />
           {t("tbUseText")}
         </p>
         <dl className="title-block">
           <div className="tb-name">
-            <dt>{t("tbTitle")}</dt>
+            <dt className="sr-only">{t("tbTitle")}</dt>
             <dd>
-              <strong>HYD</strong> {t("modeSelectProduct")}
+              <strong>HYD</strong>
+              <span>{t("modeSelectProduct")}</span>
             </dd>
           </div>
           <div>
             <dt>{t("tbVersion")}</dt>
-            <dd className="tb-mono">{APP_VERSION}</dd>
+            <dd className="tb-num">{APP_VERSION}</dd>
           </div>
           <div>
             <dt>{t("tbReleased")}</dt>
-            <dd className="tb-mono">
-              <time dateTime={FIRST_RELEASED}>{lang === "ko" ? `${FIRST_RELEASED.replaceAll("-", ". ")}.` : FIRST_RELEASED}</time>
+            <dd className="tb-num">
+              <time dateTime={FIRST_RELEASED}>
+                {lang === "ko" ? `${FIRST_RELEASED.replaceAll("-", ". ")}.` : FIRST_RELEASED}
+              </time>
             </dd>
           </div>
-          <div>
+          <div className="tb-symbols">
             <dt>{t("tbSymbols")}</dt>
             <dd>KS B 0054, ISO 1219, KS C IEC 60617</dd>
           </div>

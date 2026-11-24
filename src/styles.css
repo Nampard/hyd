@@ -1261,79 +1261,108 @@ body,
   color: #fff;
   font-weight: 700;
 }
-/* 아래 줄 — 용도 주의 문구(왼쪽) + 도면 구석 표제란(오른쪽) */
+/* 도면 아래 테두리 — 전체 폭의 선(--sheet-line) 하나에 용도 문구와 표제란이 함께 걸린다.
+   표제란은 선에서 아래로 매달려(윗변 없음) 도면 오른쪽 아래 구석처럼 보인다. */
 .mode-select-foot {
+  --sheet-line: var(--text);
+  --cell-line: color-mix(in srgb, var(--text) 32%, transparent);
   margin-top: auto;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 32px;
+  gap: 40px;
+  border-top: 2px solid var(--sheet-line);
 }
 .use-notice {
   margin: 0;
-  max-width: 420px;
-  padding-left: 12px;
-  border-left: 4px solid var(--safety);
+  flex: 0 1 42em;
+  min-width: 0;
+  padding-top: 14px;
+  text-wrap: pretty;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-dim);
 }
-.use-notice-key {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text);
+/* 실습대 위의 노랑·검정 안전 테이프 조각 — 처음 화면 실습대 테이프와 같은 노랑 */
+.use-notice-tape {
+  flex: none;
+  width: 28px;
+  height: 10px;
+  border-radius: 1px;
+  background: repeating-linear-gradient(-45deg, var(--safety) 0 5px, var(--graphite) 5px 10px);
+  transform: translateY(1px);
 }
-/* 표제란 — 바깥 굵은 선, 안쪽 가는 선. 첫 줄은 이름(넓게)·버전·처음 공개, 둘째 줄은 기호 기준·저작권 */
 .title-block {
   margin: 0;
-  flex: 0 1 600px;
+  flex: 0 0 560px;
   display: grid;
-  grid-template-columns: 2.2fr 1fr 1.1fr;
-  border: 2px solid var(--text);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  border: 2px solid var(--sheet-line);
+  border-top: none;
   background: var(--panel-bg);
 }
 .title-block > div {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
   min-width: 0;
-  padding: 9px 14px 10px;
-  border-left: 1px solid color-mix(in srgb, var(--text) 55%, transparent);
-  border-top: 1px solid color-mix(in srgb, var(--text) 55%, transparent);
+  padding: 8px 14px 9px;
+  border-left: 1px solid var(--cell-line);
 }
-.title-block > div:nth-child(-n + 3) {
-  border-top: none;
+.title-block > div:nth-child(n + 4) {
+  border-top: 1px solid var(--cell-line);
 }
-.title-block > div:nth-child(1),
-.title-block > div:nth-child(4) {
+.title-block > .tb-name,
+.title-block > .tb-symbols {
   border-left: none;
 }
-.title-block > div:nth-child(4) {
+.title-block > .tb-symbols {
   grid-column: 1 / 3;
 }
 .title-block dt {
   font-size: 11px;
+  line-height: 1.5;
   color: var(--text-dim);
 }
 .title-block dd {
-  margin: 0;
+  margin: 1px 0 0;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
+/* 이름 칸 — 라벨 없이 이름만. 위 큰 HYD 로고와 겹치지 않게 표제란 안에서만 조금 크게 */
+.title-block > .tb-name {
+  display: flex;
+  align-items: center;
+}
 .tb-name dd {
-  font-size: 14px;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 .tb-name strong {
-  font-size: 17px;
+  font-size: 18px;
+  line-height: 1;
   font-weight: 800;
-  margin-right: 4px;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
-.tb-mono {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+/* 화면에는 숨기고 화면 읽기 프로그램에는 읽히는 글 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.tb-num {
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 @keyframes bench-in {
   from {
