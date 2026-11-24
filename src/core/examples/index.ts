@@ -4,11 +4,19 @@ import { buildAutomationStationExample } from "./automation-example";
 import type { AppMode } from "../model/mode";
 
 export { buildBlankConveyorDocument } from "./automation-example";
+export { buildBlankLadderDocument } from "./plc-ladder-examples";
+import {
+  buildCounterLadder,
+  buildFlickerLadder,
+  buildInterlockLadder,
+  buildOnDelayLadder,
+  buildSelfHoldLadder,
+} from "./plc-ladder-examples";
 
 // 래더 조립 헬퍼(lc/rungOf)와 buildCircuit은 ./builder로 분리 — 테스트 호환을 위해 재-export
 export { lc, rungOf } from "./builder";
 
-export type ExampleCategory = "공압 기초" | "전기공압" | "유압" | "PLC" | "자격증 유형" | "자동화설비";
+export type ExampleCategory = "공압 기초" | "전기공압" | "유압" | "PLC" | "자격증 유형" | "자동화설비" | "PLC 래더";
 
 export interface ExampleEntry {
   id: string;
@@ -793,11 +801,19 @@ export const examples: ExampleEntry[] = [
     name: "1. 스테이션 자동운전 (공급·가공·분류)",
     build: () => buildAutomationStationExample(),
   },
+  // ===== PLC 래더 모드 (Phase 38) — 부품 없이 래더만, 화면 입력 스위치·출력 램프로 확인 =====
+  { id: "ladder-self-hold", category: "PLC 래더", name: "1. 자기유지 회로 (시작·정지)", build: buildSelfHoldLadder },
+  { id: "ladder-on-delay", category: "PLC 래더", name: "2. 타이머 지연 동작 (TON)", build: buildOnDelayLadder },
+  { id: "ladder-flicker", category: "PLC 래더", name: "3. 플리커 회로 (1초 점멸)", build: buildFlickerLadder },
+  { id: "ladder-counter", category: "PLC 래더", name: "4. 카운터 (CTU)와 리셋", build: buildCounterLadder },
+  { id: "ladder-interlock", category: "PLC 래더", name: "5. 정역 운전 인터록", build: buildInterlockLadder },
 ];
 
-/** 예제가 속한 작업 모드 (Phase 37) — 자동화설비 예제는 컨베이어 모드에서만 연다 */
+/** 예제가 속한 작업 모드 (Phase 37) — 자동화설비 예제는 컨베이어, PLC 래더 예제는 PLC 래더 모드에서만 연다 */
 export function exampleMode(example: ExampleEntry): AppMode {
-  return example.category === "자동화설비" ? "conveyor" : "circuit";
+  if (example.category === "자동화설비") return "conveyor";
+  if (example.category === "PLC 래더") return "plc";
+  return "circuit";
 }
 
 export function getExample(id: string): ExampleEntry | undefined {

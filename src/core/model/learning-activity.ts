@@ -173,8 +173,37 @@ const MAX_FEATURED_PARTS = 3;
  * 회로 구성에서 학습 활동 설명 문장을 자동으로 초안한다.
  * 부품이 없는 문서나 판정 불가능한 구성이면 빈 문자열을 반환한다.
  */
+/** 래더 명령 → 학습 활동 문장에 쓰는 이름 (앞쪽일수록 먼저 소개) */
+const LADDER_INSTRUCTION_NAMES: [string, string][] = [
+  ["ton", "온딜레이 타이머"],
+  ["toff", "오프딜레이 타이머"],
+  ["ctu", "업 카운터"],
+  ["ctd", "다운 카운터"],
+  ["set", "세트 코일"],
+  ["rst", "리셋 코일"],
+  ["ne", "음변환 접점"],
+  ["nc", "b접점"],
+  ["no", "a접점"],
+  ["coil", "출력 코일"],
+];
+
+/**
+ * 부품 없이 래더만 있는 문서(PLC 래더 모드, Phase 38)의 학습 활동 초안 —
+ * 쓰인 명령을 무게 있는 것(타이머·카운터)부터 골라 "…을 활용한 PLC 래더 제어 회로 구현".
+ */
+function summarizeLadderOnly(doc: CircuitDocument): string {
+  const used = new Set(
+    (doc.plcProgram?.rungs ?? []).flatMap((r) => r.cells.flat().map((c) => c?.kind).filter(Boolean) as string[]),
+  );
+  const names = LADDER_INSTRUCTION_NAMES.filter(([kind]) => used.has(kind)).map(([, name]) => name);
+  if (names.length === 0) return "";
+  const featured = names.slice(0, MAX_FEATURED_PARTS);
+  const list = formatKoreanList(featured);
+  return `${list}${objectParticle(featured[featured.length - 1])} 활용한 PLC 래더 제어 회로 구현`;
+}
+
 export function summarizeLearningActivity(doc: CircuitDocument): string {
-  if (doc.components.length === 0) return "";
+  if (doc.components.length === 0) return summarizeLadderOnly(doc);
 
   const a = analyze(doc);
   const controlType = controlTypeOf(a);

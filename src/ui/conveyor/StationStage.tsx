@@ -130,14 +130,18 @@ export function StationStage({ stationId, properties }: { stationId: string; pro
 
 /**
  * 조작 패널 — 스테이션의 누름버튼 PB1~4와 시그널 램프.
- * 실물처럼 누르는 동안만 입력이 들어가고(모멘터리), 운전 전이면 누르는 순간 시뮬레이션을 시작한다.
+ * PB1~3은 누르는 동안만 입력이 들어가는 모멘터리 버튼이다. PB4는 실습 장비처럼
+ * **Turn to Reset**(누르면 잠기고 돌려야 풀리는 버섯형) 버튼이라, 한 번 누르면 잠겨 있다가
+ * 다시 누르면(돌려서 해제) 풀린다 (Phase 38). 운전 전이면 누르는 순간 시뮬레이션을 시작한다.
  */
+const LATCHING_PB = 3;
 function OperatorPanel({ stationId, station }: { stationId: string; station: AutomationStationState | undefined }) {
   const held = useRef(new Set<number>());
   useEffect(
     () => () => {
       // 화면을 떠날 때 눌린 채 남은 버튼을 모두 뗀다
       for (const i of held.current) useSimStore.getState().setDiscreteInput(stationId, `PB${i + 1}`, false);
+      useSimStore.getState().setDiscreteInput(stationId, `PB${LATCHING_PB + 1}`, false);
     },
     [stationId],
   );
@@ -149,9 +153,10 @@ function OperatorPanel({ stationId, station }: { stationId: string; station: Aut
     useSimStore.getState().setDiscreteInput(stationId, `PB${i + 1}`, active);
   };
   const lamps = station?.lamps ?? { red: false, yellow: false, green: false };
+  const pb4Latched = station?.pb[LATCHING_PB] ?? false;
   return (
     <div className="operator-panel" aria-label="조작 패널">
-      {[0, 1, 2, 3].map((i) => (
+      {[0, 1, 2].map((i) => (
         <button
           key={i}
           className={`pb${station?.pb[i] ? " pressed" : ""}`}
@@ -177,6 +182,16 @@ function OperatorPanel({ stationId, station }: { stationId: string; station: Aut
           PB{i + 1}
         </button>
       ))}
+      {/* PB4: 누르면 잠김 → 다시 누르면 돌려서 해제 (Turn to Reset) */}
+      <button
+        className={`pb pb-latch${pb4Latched ? " pressed" : ""}`}
+        aria-pressed={pb4Latched}
+        onClick={() => press(LATCHING_PB, !pb4Latched)}
+        title={pb4Latched ? "PB4 잠김 — 누르면 돌려서 해제합니다" : "PB4 — 누르면 잠깁니다 (돌려서 해제)"}
+      >
+        <span className="pb-latch-cap" aria-hidden="true" />
+        <span className="pb-latch-label">PB4</span>
+      </button>
       <span className="lamps" aria-label="시그널 램프">
         {LAMPS.map(([key, name]) => (
           <span key={key} className={`lamp lamp-${key}${lamps[key] ? " lit" : ""}`} title={`${name}램 ${lamps[key] ? "켜짐" : "꺼짐"}`} />

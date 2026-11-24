@@ -16,7 +16,7 @@ import {
 } from "../../core/model/operations";
 import type { ComponentGroup } from "../../core/model/operations";
 import { documentMode, type AppMode } from "../../core/model/mode";
-import { buildBlankConveyorDocument } from "../../core/examples";
+import { buildBlankConveyorDocument, buildBlankLadderDocument } from "../../core/examples";
 
 export type Selection = { type: "component" | "wire"; id: string } | null;
 
@@ -152,10 +152,14 @@ function pushHistory(state: EditorState, snapshot: CircuitDocument) {
 
 const initialDocument = createEmptyDocument();
 
-/** 모드별 새 문서 — 컨베이어는 스테이션·I/O 맵을 갖춘 빈 과제 */
+/** 모드별 새 문서 — 컨베이어는 스테이션·I/O 맵을 갖춘 빈 과제, PLC 래더는 빈 렁 하나 */
 function freshDocument(mode: AppMode): CircuitDocument {
-  return mode === "conveyor" ? buildBlankConveyorDocument() : createEmptyDocument();
+  if (mode === "conveyor") return buildBlankConveyorDocument();
+  if (mode === "plc") return buildBlankLadderDocument();
+  return createEmptyDocument();
 }
+
+const MODE_NAMES: Record<AppMode, string> = { circuit: "공유압 회로", conveyor: "컨베이어 시스템", plc: "PLC 래더" };
 
 /** 컨베이어 문서에서는 스테이션을 선택해 둔다 — 속성 창에 매거진 물품 편집이 바로 보이도록 */
 function defaultSelection(doc: CircuitDocument, mode: AppMode): Selection {
@@ -186,7 +190,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   enterMode(mode) {
     const state = get();
-    const keep = documentMode(state.document) === mode && (mode === "conveyor" || state.document.components.length > 0);
+    const keep = documentMode(state.document) === mode && (mode !== "circuit" || state.document.components.length > 0);
     if (keep) {
       set({ appMode: mode, selection: defaultSelection(state.document, mode), selectedIds: [] });
       return;
@@ -225,7 +229,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedIds: [],
       pendingWireFrom: null,
       placingType: null,
-      statusMessage: mode === "conveyor" ? "새 컨베이어 과제를 시작했습니다." : "새 회로를 시작했습니다.",
+      statusMessage:
+        mode === "conveyor" ? "새 컨베이어 과제를 시작했습니다." : mode === "plc" ? "새 래더를 시작했습니다." : "새 회로를 시작했습니다.",
     });
   },
 
@@ -243,7 +248,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       pendingWireFrom: null,
       placingType: null,
       statusMessage: switched
-        ? `"${doc.meta.title}"을(를) 불러왔습니다. ${mode === "conveyor" ? "컨베이어 시스템" : "공유압 회로"} 모드로 바꿨습니다.`
+        ? `"${doc.meta.title}"을(를) 불러왔습니다. ${MODE_NAMES[mode]} 모드로 바꿨습니다.`
         : `"${doc.meta.title}" 불러오기 완료`,
       // PLC 프로그램이 있는 회로 문서는 래더 패널 자동 표시 (컨베이어 모드는 래더가 항상 보인다)
       plcPanelOpen: mode === "circuit" && (doc.plcProgram?.rungs.length ?? 0) > 0,

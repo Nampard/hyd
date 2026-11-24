@@ -10,6 +10,7 @@ import { EquipmentView } from "../ui/equipment/EquipmentView";
 import { useEditorStore } from "../ui/editor/store";
 import { useSimStore } from "../ui/sim/simStore";
 import { ConveyorWorkspace } from "../ui/conveyor/ConveyorWorkspace";
+import { PlcWorkspace } from "../ui/plcmode/PlcWorkspace";
 import { ModeSelect } from "./ModeSelect";
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -41,7 +42,7 @@ export function App(): ReactElement {
       // 도면 편집 단축키는 공유압 회로 모드에서만 — 컨베이어 모드에는 고를 부품이 없다 (Phase 37)
       const mode = useEditorStore.getState().appMode;
       if (mode !== "circuit") {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && mode === "conveyor" && !useSimStore.getState().running) {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && mode !== null && !useSimStore.getState().running) {
           e.preventDefault();
           if (e.shiftKey) useEditorStore.getState().redo();
           else useEditorStore.getState().undo();
@@ -106,6 +107,8 @@ export function App(): ReactElement {
           <Toolbar />
           {appMode === "conveyor" ? (
             <ConveyorWorkspace />
+          ) : appMode === "plc" ? (
+            <PlcWorkspace />
           ) : (
             <>
               <div className="app-main">

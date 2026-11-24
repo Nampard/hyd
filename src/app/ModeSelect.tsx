@@ -21,14 +21,15 @@ export function ModeSelect(): ReactElement {
   const lang = useI18nStore((s) => s.lang);
   const doc = useEditorStore((s) => s.document);
   const current = documentMode(doc);
+  const ladderWritten = (doc.plcProgram?.rungs ?? []).some((r) => r.cells.flat().some((c) => c !== null));
   const inProgress = (mode: AppMode) =>
-    current === mode && (mode === "conveyor" ? doc.plcProgram?.rungs.length : doc.components.length);
+    current === mode && (mode === "circuit" ? doc.components.length > 0 : ladderWritten);
   const count = (mode: AppMode) => examples.filter((e) => exampleMode(e) === mode).length;
   const enter = (mode: AppMode) => {
     const s = useEditorStore.getState();
     // 다른 모드로 가면 지금 문서를 그 모드에서 이어 쓸 수 없어 새 문서로 바뀐다 — 저장 안 한 변경이 있으면 묻는다
     if (documentMode(s.document) !== mode && s.isDirty()) {
-      const what = current === "conveyor" ? "컨베이어 과제" : "회로";
+      const what = current === "conveyor" ? "컨베이어 과제" : current === "plc" ? "래더" : "회로";
       if (!window.confirm(`저장하지 않은 ${what}가 있습니다. 버리고 새로 시작할까요?`)) return;
     }
     s.enterMode(mode);
@@ -57,6 +58,17 @@ export function ModeSelect(): ReactElement {
             <span className="bench-desc">{t("modeCircuitDesc")}</span>
             <span className="bench-meta">{t("modeExampleCount").replace("{n}", String(count("circuit")))}</span>
             <span className="bench-cta">{inProgress("circuit") ? t("modeContinue") : t("modeCircuitStart")}</span>
+          </span>
+        </button>
+
+        <button className="bench bench-plc" onClick={() => enter("plc")}>
+          <span className="bench-tape" aria-hidden="true" />
+          <LadderPreview />
+          <span className="bench-text">
+            <span className="bench-title">{t("modePlc")}</span>
+            <span className="bench-desc">{t("modePlcDesc")}</span>
+            <span className="bench-meta">{t("modeExampleCount").replace("{n}", String(count("plc")))}</span>
+            <span className="bench-cta">{inProgress("plc") ? t("modeContinue") : t("modePlcStart")}</span>
           </span>
         </button>
 
@@ -131,6 +143,57 @@ function CircuitPreview(): ReactElement {
           <Source properties={{}} />
         </g>
       </g>
+    </svg>
+  );
+}
+
+/** PLC 래더 판의 그림 — 자기유지 렁 하나를 XG5000식 표기로 (모선·a접점·b접점·코일·병렬 분기) */
+function LadderPreview(): ReactElement {
+  const ink = "var(--symbol)";
+  const contact = (x: number, y: number, nc = false) => (
+    <g stroke={ink} strokeWidth={2.2}>
+      <line x1={x - 7} y1={y - 9} x2={x - 7} y2={y + 9} />
+      <line x1={x + 7} y1={y - 9} x2={x + 7} y2={y + 9} />
+      {nc && <line x1={x - 5} y1={y + 9} x2={x + 5} y2={y - 9} />}
+    </g>
+  );
+  const label = (x: number, y: number, text: string) => (
+    <text x={x} y={y - 15} fontSize={10} textAnchor="middle" fill="var(--text-dim)">
+      {text}
+    </text>
+  );
+  return (
+    <svg className="bench-drawing" viewBox="0 0 496 248" aria-hidden="true">
+      <defs>
+        <pattern id="ms-grid-plc" width="10" height="10" patternUnits="userSpaceOnUse">
+          <circle cx="0.8" cy="0.8" r="0.8" fill="var(--grid-dot)" />
+        </pattern>
+      </defs>
+      <rect width="496" height="248" fill="url(#ms-grid-plc)" />
+      {/* 좌·우 모선 */}
+      <line x1={70} y1={50} x2={70} y2={200} stroke={ink} strokeWidth={3.5} />
+      <line x1={426} y1={50} x2={426} y2={200} stroke={ink} strokeWidth={3.5} />
+      {/* 렁 0: P00000 ─┤/├ P00001 ─( P00010 ) — 켜진 상태를 초록으로 */}
+      <g stroke="var(--run)" strokeWidth={2.2}>
+        <line x1={70} y1={100} x2={133} y2={100} />
+        <line x1={147} y1={100} x2={213} y2={100} />
+        <line x1={227} y1={100} x2={344} y2={100} />
+        <line x1={370} y1={100} x2={426} y2={100} />
+      </g>
+      {contact(140, 100)}
+      {contact(220, 100, true)}
+      <path d="M 350 91 A 13 13 0 0 0 350 109 M 364 91 A 13 13 0 0 1 364 109" fill="none" stroke="var(--run)" strokeWidth={2.4} />
+      {label(140, 100, "P00000")}
+      {label(220, 100, "P00001")}
+      {label(357, 100, "P00010")}
+      {/* 자기유지 병렬: P00010 a접점이 P00000을 건너뛴다 */}
+      <g stroke="var(--run)" strokeWidth={2.2}>
+        <line x1={70} y1={150} x2={133} y2={150} />
+        <line x1={147} y1={150} x2={180} y2={150} />
+        <line x1={180} y1={100} x2={180} y2={150} />
+      </g>
+      {contact(140, 150)}
+      {label(140, 150, "P00010")}
     </svg>
   );
 }

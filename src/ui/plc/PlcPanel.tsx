@@ -624,9 +624,17 @@ export function PlcPanel({ alwaysOpen = false }: { alwaysOpen?: boolean } = {}):
     const comp = doc.components.find((c) => c.id === id);
     if (!comp) return "(삭제됨)";
     const def = getComponentDefinition(comp.type);
-    const name = comp.properties.name ?? comp.properties.label ?? "";
-    return `${name} — ${def.name}`;
+    const name = String(comp.properties.name ?? comp.properties.label ?? "");
+    // 이름표가 있으면 이름표를 앞에 — 없으면 부품 이름만 (예전엔 빈 이름 앞에 대시가 붙었다)
+    return name ? `${name} ${def.name}` : def.name;
   };
+  /**
+   * 채널 장비가 한 대뿐인 문서(컨베이어 모드)는 모든 행이 같은 부품을 가리키므로 부품 열을
+   * 숨기고 새 행도 그 장비로 채운다 — 좁은 옆 칸에서 채널 이름이 잘리지 않게 (Phase 38)
+   */
+  const channelEquipment = doc.components.filter((c) => getComponentDefinition(c.type).ioChannels);
+  const soleEquipment =
+    channelEquipment.length === 1 && doc.components.length === 1 ? channelEquipment[0] : null;
 
   const { layouts, totalHeight } = layoutRungs(program.rungs);
 
@@ -760,117 +768,139 @@ export function PlcPanel({ alwaysOpen = false }: { alwaysOpen?: boolean } = {}):
           XG5000 표기 관례를 참고한 교육용 독립 구현 — LS ELECTRIC과 무관하며 .xgp 등
           XG5000 파일과 호환되지 않습니다.
         </div>
-        <strong>I/O 매핑 (P 디바이스 ↔ 부품)</strong>
-        <table className="plc-iomap">
-          <thead>
-            <tr>
-              <th>디바이스</th>
-              <th>방향</th>
-              <th>부품</th>
-              <th>채널</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {ioMap.map((entry, i) => (
-              <tr key={i} className={dupRows.has(i) ? "plc-iomap-dup" : undefined} title={dupRows.has(i) ? "중복 매핑 — 저장 시 거부됩니다. 디바이스나 채널을 다르게 바꾸세요." : undefined}>
-                <td>
-                  <input
-                    value={entry.device}
-                    disabled={running}
-                    onChange={(e) => {
-                      const next = [...ioMap];
-                      next[i] = { ...entry, device: e.target.value.toUpperCase() };
-                      commitIoMap(next);
-                    }}
-                  />
-                </td>
-                <td>
-                  <select
-                    value={entry.direction}
-                    disabled={running}
-                    onChange={(e) => {
-                      const direction = e.target.value as IoEntry["direction"];
-                      const next = [...ioMap];
-                      // 다채널 부품 항목은 방향이 바뀌면 그 방향의 첫 채널로 재설정
-                      next[i] = isMultiChannel(entry.componentId)
-                        ? { ...entry, direction, channel: channelsFor(entry.componentId, direction)[0] }
-                        : { ...entry, direction };
-                      commitIoMap(next);
-                    }}
-                  >
-                    <option value="input">입력</option>
-                    <option value="output">출력</option>
-                  </select>
-                </td>
-                <td>
-                  <select
-                    value={entry.componentId}
-                    disabled={running}
-                    onChange={(e) => {
-                      const componentId = e.target.value;
-                      const next = [...ioMap];
-                      if (isMultiChannel(componentId)) {
-                        // 다채널 부품 선택 시 방향에 맞는 첫 채널을 기본값으로
-                        next[i] = {
-                          ...entry,
-                          componentId,
-                          channel: entry.channel ?? channelsFor(componentId, entry.direction)[0],
-                        };
-                      } else {
-                        // 단채널 부품으로 바꾸면 채널 제거 (스키마 규칙)
-                        const { channel: _drop, ...rest } = entry;
-                        next[i] = { ...rest, componentId };
-                      }
-                      commitIoMap(next);
-                    }}
-                  >
-                    <option value="">(선택)</option>
-                    {(entry.direction === "input" ? inputCandidates : outputCandidates).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {componentLabel(c.id)}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  {isMultiChannel(entry.componentId) ? (
-                    <select
-                      value={entry.channel ?? ""}
-                      disabled={running}
-                      onChange={(e) => {
-                        const next = [...ioMap];
-                        next[i] = { ...entry, channel: e.target.value };
-                        commitIoMap(next);
-                      }}
-                    >
-                      {channelsFor(entry.componentId, entry.direction).map((ch) => (
-                        <option key={ch} value={ch}>
-                          {ch}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="plc-iomap-nochannel">—</span>
-                  )}
-                </td>
-                <td>
-                  {!running && (
-                    <button onClick={() => commitIoMap(ioMap.filter((_, j) => j !== i))}>×</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!running && (
-          <button
-            onClick={() =>
-              commitIoMap([...ioMap, { device: "P0", direction: "input", componentId: "" }])
-            }
-          >
-            + 매핑 추가
-          </button>
+        {/* PLC 래더 모드(부품 없음)는 입출력 판의 스위치·램프가 P 디바이스에 바로 물린다 (Phase 38) */}
+        {doc.components.length === 0 && alwaysOpen ? (
+          <p className="plc-direct-io">
+            이 모드에는 배선할 부품이 없습니다. 위쪽 입출력 판의 누름버튼(P00000~P00007)·토글 스위치(P00008~P0000F)가
+            입력으로, 출력 램프(P00010~P0001F)가 출력으로 바로 연결됩니다.
+          </p>
+        ) : (
+          <>
+            <strong>I/O 매핑 (P 디바이스 ↔ 부품)</strong>
+            <table className="plc-iomap">
+              <thead>
+                <tr>
+                  <th className="col-device">디바이스</th>
+                  <th className="col-dir">방향</th>
+                  {!soleEquipment && <th>부품</th>}
+                  <th className="col-channel">채널</th>
+                  <th className="col-del" />
+                </tr>
+              </thead>
+              <tbody>
+                {ioMap.map((entry, i) => (
+                  <tr key={i} className={`plc-iomap-${entry.direction}${dupRows.has(i) ? " plc-iomap-dup" : ""}`} title={dupRows.has(i) ? "중복 매핑 — 저장 시 거부됩니다. 디바이스나 채널을 다르게 바꾸세요." : undefined}>
+                    <td>
+                      <input
+                        value={entry.device}
+                        disabled={running}
+                        onChange={(e) => {
+                          const next = [...ioMap];
+                          next[i] = { ...entry, device: e.target.value.toUpperCase() };
+                          commitIoMap(next);
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={entry.direction}
+                        disabled={running}
+                        onChange={(e) => {
+                          const direction = e.target.value as IoEntry["direction"];
+                          const next = [...ioMap];
+                          // 다채널 부품 항목은 방향이 바뀌면 그 방향의 첫 채널로 재설정
+                          next[i] = isMultiChannel(entry.componentId)
+                            ? { ...entry, direction, channel: channelsFor(entry.componentId, direction)[0] }
+                            : { ...entry, direction };
+                          commitIoMap(next);
+                        }}
+                      >
+                        <option value="input">입력</option>
+                        <option value="output">출력</option>
+                      </select>
+                    </td>
+                    {!soleEquipment && (
+                      <td>
+                        <select
+                          value={entry.componentId}
+                          disabled={running}
+                          onChange={(e) => {
+                            const componentId = e.target.value;
+                            const next = [...ioMap];
+                            if (isMultiChannel(componentId)) {
+                              // 다채널 부품 선택 시 방향에 맞는 첫 채널을 기본값으로
+                              next[i] = {
+                                ...entry,
+                                componentId,
+                                channel: entry.channel ?? channelsFor(componentId, entry.direction)[0],
+                              };
+                            } else {
+                              // 단채널 부품으로 바꾸면 채널 제거 (스키마 규칙)
+                              const { channel: _drop, ...rest } = entry;
+                              next[i] = { ...rest, componentId };
+                            }
+                            commitIoMap(next);
+                          }}
+                        >
+                          <option value="">(선택)</option>
+                          {(entry.direction === "input" ? inputCandidates : outputCandidates).map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {componentLabel(c.id)}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
+                    <td>
+                      {isMultiChannel(entry.componentId) ? (
+                        <select
+                          value={entry.channel ?? ""}
+                          disabled={running}
+                          onChange={(e) => {
+                            const next = [...ioMap];
+                            next[i] = { ...entry, channel: e.target.value };
+                            commitIoMap(next);
+                          }}
+                        >
+                          {channelsFor(entry.componentId, entry.direction).map((ch) => (
+                            <option key={ch} value={ch}>
+                              {ch}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="plc-iomap-nochannel">—</span>
+                      )}
+                    </td>
+                    <td>
+                      {!running && (
+                        <button onClick={() => commitIoMap(ioMap.filter((_, j) => j !== i))}>×</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!running && (
+              <button
+                onClick={() =>
+                  commitIoMap([
+                    ...ioMap,
+                    soleEquipment
+                      ? {
+                          device: "P0",
+                          direction: "input",
+                          componentId: soleEquipment.id,
+                          channel: channelsFor(soleEquipment.id, "input")[0],
+                        }
+                      : { device: "P0", direction: "input", componentId: "" },
+                  ])
+                }
+              >
+                + 매핑 추가
+              </button>
+            )}
+          </>
         )}
         {running && plcMonitor && (
           <div className="plc-bits">

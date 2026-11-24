@@ -28,6 +28,8 @@ export function Toolbar(): ReactElement {
   const diagramOpen = useEditorStore((s) => s.diagramPanelOpen);
   const appMode = useEditorStore((s) => s.appMode) ?? "circuit";
   const circuit = appMode === "circuit";
+  // PLC 래더 모드는 부품 없이 래더만으로 실행한다
+  const canRun = hasComponents || appMode === "plc";
   const modeExamples = examples.filter((ex) => exampleMode(ex) === appMode);
   const running = useSimStore((s) => s.running);
   const stepPaused = useSimStore((s) => s.paused);
@@ -163,7 +165,9 @@ export function Toolbar(): ReactElement {
       </span>
       {/* 지금 모드 + 처음 화면으로 (Phase 37) */}
       <button className="mode-chip" onClick={handleSwitchMode} title={t("modeSwitch")}>
-        <span className="mode-chip-name">{circuit ? t("modeCircuit") : t("modeConveyor")}</span>
+        <span className="mode-chip-name">
+          {circuit ? t("modeCircuit") : appMode === "plc" ? t("modePlc") : t("modeConveyor")}
+        </span>
         <span className="mode-chip-action">{t("modeSwitch")}</span>
       </button>
       <input
@@ -175,7 +179,7 @@ export function Toolbar(): ReactElement {
       />
       <button
         className={`run-button${running ? " running" : ""}`}
-        disabled={!running && !hasComponents}
+        disabled={!running && !canRun}
         onClick={() => handleRun("continuous")}
         title={running ? undefined : "연속동작 실행"}
       >
@@ -184,7 +188,7 @@ export function Toolbar(): ReactElement {
       {!running && (
         <button
           className="run-button step"
-          disabled={!hasComponents}
+          disabled={!canRun}
           onClick={() => handleRun("step")}
           title="구분동작 실행 — 동작 하나가 끝날 때마다 일시정지"
         >

@@ -44,6 +44,12 @@ export class SimulationEngine {
   private plcForced = new Map<string, boolean>();
   /** PLC 출력이 강제한 다채널 부품의 채널 상태 — compId → (channel → on) (Phase 14) */
   private plcForcedChannels = new Map<string, Map<string, boolean>>();
+  /**
+   * 화면의 입력 스위치로 직접 넣는 PLC 입력 (Phase 38 — PLC 래더 모드).
+   * 부품 없이 래더만 연습할 때 P 입력을 버튼·토글 스위치로 준다. ioMap에 물린 디바이스는
+   * 부품 상태가 우선한다.
+   */
+  private plcDirectInputs = new Map<string, boolean>();
   private time = 0;
   private listeners = new Set<(snap: SimulationSnapshot) => void>();
   /** 최근 솔브 수렴 여부 (발진 회로 진단, review-2 P0) */
@@ -130,6 +136,11 @@ export class SimulationEngine {
 
   getManual(componentId: string): boolean {
     return this.runtimes.get(componentId)?.manualActive ?? false;
+  }
+
+  /** PLC 입력 디바이스(P…)를 직접 켜고 끈다 — ioMap에 없는 디바이스에만 효과가 있다 (Phase 38) */
+  setPlcInput(device: string, active: boolean): void {
+    this.plcDirectInputs.set(device, active);
   }
 
   /**
@@ -400,7 +411,7 @@ export class SimulationEngine {
     if (!this.plcRunner) return;
     const ioMap = this.doc.ioMap ?? [];
 
-    const inputs = new Map<string, boolean>();
+    const inputs = new Map<string, boolean>(this.plcDirectInputs);
     // 복합설비의 센서 이미지(readInputs)는 부품당 1회만 계산해 캐시
     const equipmentImageCache = new Map<string, Record<string, boolean>>();
     for (const entry of ioMap) {

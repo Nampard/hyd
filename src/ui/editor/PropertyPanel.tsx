@@ -73,19 +73,22 @@ export function PropertyPanel(): ReactElement {
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const running = useSimStore((s) => s.running);
   const conveyor = useEditorStore((s) => s.appMode === "conveyor");
+  const plcMode = useEditorStore((s) => s.appMode === "plc");
   const t = useT();
 
   if (selection?.type !== "component") {
     return (
       <div className="property-panel">
         <h2 className="panel-title">{t("properties")}</h2>
-        <p className="panel-empty">
-          {selectedIds.length > 1
-            ? `부품 ${selectedIds.length}개 선택됨 — Ctrl+C로 복사, R로 회전, Delete로 삭제`
-            : selection?.type === "wire"
-              ? t("wireSelected")
-              : t("selectHint")}
-        </p>
+        {!plcMode && (
+          <p className="panel-empty">
+            {selectedIds.length > 1
+              ? `부품 ${selectedIds.length}개 선택됨 — Ctrl+C로 복사, R로 회전, Delete로 삭제`
+              : selection?.type === "wire"
+                ? t("wireSelected")
+                : t("selectHint")}
+          </p>
+        )}
         <LearningActivityField />
       </div>
     );
@@ -137,7 +140,8 @@ function LearningActivityField(): ReactElement {
   const t = useT();
   const activity = doc.meta.learningActivity ?? "";
   // 회로가 바뀌어 저장된 설명이 현재 자동 초안과 다르면 안내 (수동 수정분은 존중, 재작성은 선택)
-  const autoDraft = doc.components.length > 0 ? summarizeLearningActivity(doc) : "";
+  // 부품이 없어도 래더만 있는 문서(PLC 래더 모드)는 초안이 나온다 (Phase 38)
+  const autoDraft = summarizeLearningActivity(doc);
   const stale = activity.trim() !== "" && autoDraft !== "" && activity.trim() !== autoDraft;
   return (
     <div className="doc-meta-field">
@@ -159,7 +163,7 @@ function LearningActivityField(): ReactElement {
         <button
           type="button"
           className="learning-activity-autofill"
-          disabled={running || doc.components.length === 0}
+          disabled={running || autoDraft === ""}
           onClick={() => useEditorStore.getState().setLearningActivity(summarizeLearningActivity(doc))}
         >
           {t("learningActivityAutoFill")}

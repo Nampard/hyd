@@ -40,6 +40,8 @@ export function StatusBar(): ReactElement {
   if (!hint) {
     if (appMode === "conveyor") {
       hint = running ? t("statusConveyorRunning") : t("statusConveyorIdle");
+    } else if (appMode === "plc") {
+      hint = running ? t("statusPlcRunning") : t("statusPlcIdle");
     } else if (running && mode === "step") {
       hint = t("statusStepRunning");
     } else if (running) hint = t("statusRunning");

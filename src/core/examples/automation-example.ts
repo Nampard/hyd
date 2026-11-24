@@ -195,10 +195,12 @@ export function buildAutomationStationExample(): CircuitDocument {
                 rungOf(
                   [
                     [lc("no", "M00101"), lc("nc", "_T1S"), lc("nc", "P00003"), lc("coil", "P00018")],
-                    [lc("no", "M00100")],
+                    [lc("no", "M00100"), lc("hline")],
                   ],
-                  [{ r: 0, c: 0 }, { r: 0, c: 1 }],
-                ), // 황램: 판별 완료 점멸
+                  // M00100(금속 판별)은 M00101과 _T1S를 함께 건너뛴다 — 금속이면 황램이 점멸 없이 계속 켜지고,
+                  // 비금속(M00101)이면 1초 점멸한다 (소유자 요청, Phase 38)
+                  [{ r: 0, c: 0 }, { r: 0, c: 2 }],
+                ), // 황램: 판별 완료 (금속 연속 점등 / 비금속 점멸)
                 rungOf([[lc("no", "P00003"), lc("nc", "_T2S"), lc("coil", "P00017")]]), // 적램: 일시정지 2초 점멸
               ],
             },
