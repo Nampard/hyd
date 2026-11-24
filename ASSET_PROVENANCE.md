@@ -179,3 +179,7 @@ codex-review-phase-12-13 §7.5 권고 대응. 이 절은 **정식 법률 문서�
 ## 예제 23 전체 스테이션 (Phase 30)
 
 `src/ui/equipment/assets/automation-station.webp`는 같은 프로젝트의 컨셉 시안에서 만든 전체 공정용 고정 배경이다. 큐넷 시험 2의 그림 1을 참고해 A 공급 축과 C 송출 축이 B 가공점에서 만나도록 했다. 로드, 공작물, 절삭날, 검출 브래킷은 HYD가 겹쳐 그린다. 브래킷의 두 번째 다리와 화면상의 투영 거리는 제작 해석이다.
+
+## 컨베이어 복동 배관과 끝 저장함 (Phase 39)
+
+`src/ui/equipment/assets/automation-station.webp`는 Phase 30의 자체 배경을 OpenAI 이미지 생성 도구로 편집한 1672×941 고정 시점 이미지다. A·B·C·D 실린더의 전진·후진 포트마다 파란 호스를 연결하고 벨트 끝 저장함을 낮췄다. 공작물의 낙하와 저장함 앞 테두리 가림은 HYD가 SVG로 그린다.
