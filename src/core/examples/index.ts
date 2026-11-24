@@ -324,7 +324,7 @@ export const examples: ExampleEntry[] = [
   {
     id: "a-b-sequence",
     category: "자격증 유형",
-    name: "11. A+B+A−B− 시퀀스 (공유압기능사 유형)",
+    name: "11. A+B+A−B− 시퀀스 (메카트로닉스 관련 자격증 유형)",
     build: () =>
       buildCircuit(
         "A+B+A−B− 시퀀스",
