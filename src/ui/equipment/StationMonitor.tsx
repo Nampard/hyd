@@ -5,9 +5,10 @@ import { useEditorStore } from "../editor/store";
 import { useSimStore } from "../sim/simStore";
 import {
   activeStages,
+  autoZone,
   ConveyorScene,
-  followZone,
   STAGE_ZONE,
+  ZoneFollower,
   type StationStage,
   type StationZone,
 } from "./ConveyorScene";
@@ -39,7 +40,13 @@ const ZONES: { key: StationZone | "auto"; label: string }[] = [
 const SPEEDS = [0.25, 0.5, 1];
 
 function StationMonitor({ stationId, properties, close }: { stationId: string; properties: Record<string, unknown>; close: () => void }) {
-  const [camera, setCamera] = useState<StationZone | "auto">("auto");
+  const [camera, setCameraState] = useState<StationZone | "auto">("auto");
+  const follower = useRef(new ZoneFollower());
+  const setCamera = (next: StationZone | "auto") => {
+    // 자동 추적으로 돌아올 때는 지금 보던 자리에서 새로 판정을 시작한다
+    if (next === "auto") follower.current = new ZoneFollower();
+    setCameraState(next);
+  };
   // 작게 띄우기: 모달이 아닌 떠 있는 창 — 뒤의 PLC 래더·회로도를 보면서 조작할 수 있다
   const [docked, setDocked] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -84,7 +91,7 @@ function StationMonitor({ stationId, properties, close }: { stationId: string; p
   const sceneState = station ?? createAutomationState(properties);
   const inputs = automationInputs(sceneState);
   const stages = activeStages(sceneState);
-  const zone = camera === "auto" ? followZone(sceneState) : camera;
+  const zone = camera === "auto" ? follower.current.update(autoZone(sceneState), performance.now()) : camera;
 
   return (
     <dialog

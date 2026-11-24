@@ -57,6 +57,40 @@ function BracketProbe({ name, active, transform, steel }: {
   </g>;
 }
 
+/**
+ * 시그널 타워 (Phase 36) — 적(상)·황(중)·녹(하) 적층 램프. 자동화설비 배치도의 신호등으로,
+ * 배경 사진에는 없어서 SVG로 덧그린다. 켜진 램프는 렌즈가 밝아지고 빛이 번진다.
+ */
+const TOWER = { x: 1638, top: 240, base: 628 };
+function SignalTower({ lamps, glowId }: { lamps: AutomationStationState["lamps"]; glowId: string }) {
+  const seg = 46;
+  const w = 40;
+  const x0 = TOWER.x - w / 2;
+  const colors = [
+    ["red", "#ef4444", "#7f1d1d"],
+    ["yellow", "#facc15", "#78590a"],
+    ["green", "#22c55e", "#14532d"],
+  ] as const;
+  return <g data-signal-tower>
+    {/* 기둥 + 받침 */}
+    <rect x={TOWER.x - 5} y={TOWER.top + seg * 3 + 22} width={10} height={TOWER.base - TOWER.top - seg * 3 - 22} fill="#b9c1c3" stroke="#454a4d"/>
+    <path d={`M${TOWER.x - 22} ${TOWER.base} h44 l-6 -9 h-32Z`} fill="#3a3f44"/>
+    {/* 램프 몸통 — 위 캡, 렌즈 3단, 아래 목 */}
+    <rect x={x0 + 4} y={TOWER.top - 10} width={w - 8} height={12} rx={4} fill="#2b2f33"/>
+    {colors.map(([key, on, off], i) => {
+      const lit = lamps[key];
+      const y = TOWER.top + i * seg;
+      return <g key={key} data-lamp={key} data-on={lit}>
+        {lit && <ellipse cx={TOWER.x} cy={y + seg / 2} rx={58} ry={44} fill={on} opacity={.28} filter={`url(#${glowId})`}/>}
+        <rect x={x0} y={y} width={w} height={seg - 2} rx={5} fill={lit ? on : off} opacity={lit ? 1 : .55} stroke="#1b1e21" strokeWidth={2}/>
+        <rect x={x0 + 6} y={y + 5} width={7} height={seg - 14} rx={3} fill="#fff" opacity={lit ? .55 : .14}/>
+        {[0.33, 0.66].map(t => <line key={t} x1={x0 + 2} x2={x0 + w - 2} y1={y + (seg - 2) * t} y2={y + (seg - 2) * t} stroke="#000" opacity={.12}/>)}
+      </g>;
+    })}
+    <rect x={x0 + 6} y={TOWER.top + seg * 3 - 2} width={w - 12} height={24} rx={3} fill="#2b2f33"/>
+  </g>;
+}
+
 function ChromeRod({ x1,y1,x2,y2,width = 11 }: { x1:number; y1:number; x2:number; y2:number; width?:number }) {
   return <g strokeLinecap="round">
     <line {...{x1,y1,x2,y2}} stroke="#454a4d" strokeWidth={width}/>
@@ -69,9 +103,11 @@ function ChromeRod({ x1,y1,x2,y2,width = 11 }: { x1:number; y1:number; x2:number
  * 카메라 구역 (Phase 35). 배경 그림 좌표(1672×941)에서 공정 단계별로 볼 영역.
  * 가로세로비를 화면(16:9 근처)에 맞춰 확대해도 여백 없이 꽉 차게 잡았다.
  */
-export type StationZone = "all" | "supply" | "detect" | "sort";
+export type StationZone = "all" | "supply" | "belt" | "detect" | "sort";
 const ZONE_BOX: Record<StationZone, [number, number, number, number]> = {
   all: [0, 0, 1672, 941],
+  /** 벨트 전 구간 (검출부 ~ 끝 저장함) — 자동 추적이 검출·분류를 한 시점으로 묶어 본다 */
+  belt: [470, 150, 1202, 676],
   supply: [130, 170, 760, 428],
   detect: [500, 200, 640, 360],
   sort: [860, 210, 812, 457],
@@ -111,14 +147,67 @@ export function followZone(station: AutomationStationState): StationZone {
   return "all";
 }
 
-/** viewBox를 목표 구역으로 부드럽게 옮긴다 (SVG viewBox는 CSS 전환이 안 돼 rAF로 보간) */
+/**
+ * 자동 추적이 실제로 쓰는 시점 (Phase 36). 단계마다 시점을 바꾸면 검출→분류처럼 짧은 구간에서
+ * 화면이 연달아 움직여 어지럽다. 그래서 자동 추적은 시점을 셋으로만 쓴다 —
+ * 공급부(공급·가공·송출) / 벨트 전체(검출·분류) / 전체(정지).
+ */
+export function autoZone(station: AutomationStationState): StationZone {
+  const zone = followZone(station);
+  return zone === "detect" || zone === "sort" ? "belt" : zone;
+}
+
+/**
+ * 자동 추적 시점 결정기 (Phase 36) — 판정이 잠깐 흔들려도 화면이 따라 흔들리지 않게 한다.
+ * - 새 시점은 판정이 SETTLE_MS 동안 그대로일 때만 받아들인다 (단계 사이 빈틈에서 튀지 않음)
+ * - 한 번 옮긴 뒤 HOLD_MS 동안은 머문다 (연속 전환 방지)
+ * - "전체"(정지)로 물러나는 것은 IDLE_MS 동안 아무것도 안 움직일 때만 — 사이클 사이 잠깐의
+ *   정지에서 확대가 풀렸다 다시 잡히던 문제를 막는다
+ */
+export class ZoneFollower {
+  static SETTLE_MS = 500;
+  static HOLD_MS = 1800;
+  static IDLE_MS = 3000;
+  private zone: StationZone = "all";
+  private since = -Infinity;
+  private pending: StationZone | null = null;
+  private pendingSince = 0;
+
+  update(candidate: StationZone, now: number): StationZone {
+    if (candidate === this.zone) {
+      this.pending = null;
+      return this.zone;
+    }
+    if (candidate !== this.pending) {
+      this.pending = candidate;
+      this.pendingSince = now;
+    }
+    const settle = candidate === "all" ? ZoneFollower.IDLE_MS : ZoneFollower.SETTLE_MS;
+    if (now - this.pendingSince >= settle && now - this.since >= ZoneFollower.HOLD_MS) {
+      this.zone = candidate;
+      this.since = now;
+      this.pending = null;
+    }
+    return this.zone;
+  }
+}
+
+/**
+ * viewBox를 목표 구역으로 부드럽게 옮긴다 (SVG viewBox는 CSS 전환이 안 돼 rAF로 보간).
+ * 경과 시간 기반 지수 감쇠(시정수 0.45초)라 화면 주사율과 무관하게 같은 속도로 움직이고,
+ * 이동 중에 목표가 바뀌어도 지금 위치에서 이어서 간다.
+ */
 function useAnimatedBox(target: [number, number, number, number]): [number, number, number, number] {
   const [box, setBox] = useState(target);
   const current = useRef(target);
   useEffect(() => {
     let frame = 0;
-    const tick = () => {
-      const next = current.current.map((v, i) => v + (target[i] - v) * 0.16) as [number, number, number, number];
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      const alpha = 1 - Math.exp(-dt / 0.45);
+      const next = current.current.map((v, i) => v + (target[i] - v) * alpha) as [number, number, number, number];
       const done = next.every((v, i) => Math.abs(v - target[i]) < 0.5);
       current.current = done ? target : next;
       setBox(current.current);
@@ -172,6 +261,7 @@ export function ConveyorScene({
       <clipPath id={id+"-end-rim"}><path d="M1380 385 H1640 V533 L1486 537 H1380Z"/></clipPath>
       <image id={id+"-bed"} href={plate} width="1672" height="941"/>
       <linearGradient id={id+"-join"}><stop offset=".94" stopColor="white"/><stop offset="1" stopColor="black"/></linearGradient>
+      <filter id={id+"-glow"} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>
       <mask id={id+"-left"}><rect x={0} y={385} width={665} height={235} fill={paint("join")}/></mask>
     </defs>
     <use href={"#"+id+"-bed"}/>
@@ -247,6 +337,7 @@ export function ConveyorScene({
     </g>
     <BracketProbe name="포토" active={inputs.포토} transform="translate(709 540) rotate(-124)" steel={paint("steel")}/>
     <BracketProbe name="용량형" active={inputs.용량형} transform="translate(751 445)" steel={paint("steel")}/>
+    <SignalTower lamps={station.lamps} glowId={id+"-glow"}/>
     {!compact && zone !== "supply" && <>
       <SensorFlag name="포토" active={inputs.포토} x={542} y={338} headX={704} headY={540} k={flagScale}/>
       <SensorFlag name="용량형" active={inputs.용량형} x={653} y={251} headX={751} headY={432} k={flagScale}/>

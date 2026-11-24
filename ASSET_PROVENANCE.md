@@ -174,7 +174,7 @@ codex-review-phase-12-13 §7.5 권고 대응. 이 절은 **정식 법률 문서�
 
 ## 컨베이어 분기 배출부 (Phase 29)
 
-`src/ui/equipment/assets/eject-station.webp`는 이 프로젝트의 컨셉 시안을 바탕으로 생성한 고정 시점 배경이다. 한국산업인력공단의 자동화설비기능사 공개문제 시험 2 그림 1을 부품 간 배치 참고 자료로 사용했다. SVG 센서·로드·공작물 및 낙하 투영은 HYD에서 그린다. [큐넷 공개문제](https://www.q-net.or.kr/cst006.do?artlSeq=5199091&brdId=Q006&gSite=Q&id=cst00602)
+(Phase 36에서 삭제 — 기록 보존) `src/ui/equipment/assets/eject-station.webp`는 이 프로젝트의 컨셉 시안을 바탕으로 생성한 고정 시점 배경이었다. Phase 35 이후 어느 코드도 쓰지 않아 저장소에서 제거했다. 한국산업인력공단의 자동화설비기능사 공개문제 시험 2 그림 1을 부품 간 배치 참고 자료로 사용했다. SVG 센서·로드·공작물 및 낙하 투영은 HYD에서 그린다. [큐넷 공개문제](https://www.q-net.or.kr/cst006.do?artlSeq=5199091&brdId=Q006&gSite=Q&id=cst00602)
 
 ## 예제 23 전체 스테이션 (Phase 30)
 
