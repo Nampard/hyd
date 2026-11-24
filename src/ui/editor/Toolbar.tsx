@@ -1,4 +1,3 @@
-import { StationMonitorButton } from "../equipment/StationMonitor";
 import { useState, type ReactElement } from "react";
 import { useEditorStore } from "./store";
 import { clearSimHistory, useSimStore } from "../sim/simStore";
@@ -8,6 +7,7 @@ import { createBrowserStorage } from "../../core/storage";
 import { prepareDocumentForPersistence } from "../../core/model/schema";
 import { useI18nStore, useT } from "../i18n";
 import { APP_VERSION, forceRefreshToLatest } from "../../app/refresh";
+import { StationMonitorButton } from "../equipment/StationMonitor";
 
 const browserStorage = createBrowserStorage();
 
