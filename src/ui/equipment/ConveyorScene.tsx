@@ -118,7 +118,7 @@ const ZONE_BOX: Record<StationZone, [number, number, number, number]> = {
   belt: [470, 80, 1202, 676],
   supply: [130, 170, 760, 428],
   detect: [500, 200, 640, 360],
-  sort: [725, 210, 947, 533],
+  sort: [606, 120, 1066, 600],
 };
 
 /** 공정 단계 (Phase 35) — 모니터의 단계 표시줄·자동 추적 카메라가 같은 판정을 쓴다 */
