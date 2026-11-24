@@ -39,6 +39,8 @@ function SensorFlag({ name, active, x, y, headX, headY, k = 1 }: {
 
 const beltLength = 1467 - inlet.x;
 const beltX = (progress: number) => inlet.x + beltLength * progress;
+// 끝 저장함의 앞 테두리와 낙하 종점 (Phase 39). 공작물은 앞 테두리 뒤로 사라진다.
+const endBin = { lipY: 636, landingX: 1563, landingY: 655 };
 // 분기 장치를 실제 접촉 위치로 옮긴다. 공작물의 이송 속도는 구간마다 같아야 한다.
 const gateOffset = 50;
 const pushFraction = (d: number) => Math.max(0, (d - 0.23) / 0.77);
@@ -116,7 +118,7 @@ const ZONE_BOX: Record<StationZone, [number, number, number, number]> = {
   belt: [470, 80, 1202, 676],
   supply: [130, 170, 760, 428],
   detect: [500, 200, 640, 360],
-  sort: [860, 210, 812, 457],
+  sort: [725, 210, 947, 533],
 };
 
 /** 공정 단계 (Phase 35) — 모니터의 단계 표시줄·자동 추적 카메라가 같은 판정을 쓴다 */
@@ -264,7 +266,7 @@ export function ConveyorScene({
       <linearGradient id={id+"-steel"}><stop stopColor="#565855"/><stop offset=".14" stopColor="#eeede8"/><stop offset=".35" stopColor="#a8aaa6"/><stop offset=".68" stopColor="#646765"/><stop offset=".9" stopColor="#cfd2cd"/><stop offset="1" stopColor="#5a5b56"/></linearGradient>
       <linearGradient id={id+"-cap"} x2=".8" y2="1"><stop stopColor="#898d89"/><stop offset=".45" stopColor="#f5f4ed"/><stop offset="1" stopColor="#929692"/></linearGradient>
       <clipPath id={id+"-side-rim"}><path d="M0 0 H1672 V668 H923 L908 594 H0Z" transform={`translate(${gateOffset})`}/></clipPath>
-      <clipPath id={id+"-end-rim"}><path d="M1380 385 H1640 V533 L1486 537 H1380Z"/></clipPath>
+      <clipPath id={id+"-end-rim"}><rect width={1672} height={endBin.lipY}/></clipPath>
       <image id={id+"-bed"} href={plate} width="1672" height="941"/>
       <linearGradient id={id+"-join"}><stop offset=".94" stopColor="white"/><stop offset="1" stopColor="black"/></linearGradient>
       <filter id={id+"-glow"} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>
@@ -327,8 +329,8 @@ export function ConveyorScene({
     })}
     {station.falling.map((p,i) => {
       const end = p.destination === "store";
-      const x = end ? beltX(1)+70*p.fraction : beltX(p.progress)+7*p.fraction;
-      const y = end ? 530-20*p.fraction+55*p.fraction*p.fraction : 530+69*pushFraction(p.stroke)+116*p.fraction*p.fraction;
+      const x = end ? mix(beltX(1), endBin.landingX, p.fraction) : beltX(p.progress)+7*p.fraction;
+      const y = end ? mix(inlet.y, endBin.landingY, p.fraction ** 2) : 530+69*pushFraction(p.stroke)+116*p.fraction*p.fraction;
       return <g key={i} clipPath={paint(end ? "end-rim" : "side-rim")}>{puck(p.material,x,y,"drop",end ? "끝 저장" : "옆 배출",p.drilled)}</g>;
     })}
     {/* ∩ 상부 가로대가 벨트 폭을 건너며 용량형 헤드는 위에서 아래를 향한다. */}

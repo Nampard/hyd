@@ -1390,8 +1390,7 @@ body,
 .station-camera {
   position: absolute;
   top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 10px;
   display: flex;
   gap: 2px;
   padding: 3px;
