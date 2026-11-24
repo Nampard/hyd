@@ -1261,31 +1261,79 @@ body,
   color: #fff;
   font-weight: 700;
 }
-/* 표제란 — KS 도면 표제란처럼 칸을 실선으로 나눠 실제 정보를 적는다 */
-.title-block {
+/* 아래 줄 — 용도 주의 문구(왼쪽) + 도면 구석 표제란(오른쪽) */
+.mode-select-foot {
   margin-top: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+}
+.use-notice {
+  margin: 0;
+  max-width: 420px;
+  padding-left: 12px;
+  border-left: 4px solid var(--safety);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.use-notice-key {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+/* 표제란 — 바깥 굵은 선, 안쪽 가는 선. 첫 줄은 이름(넓게)·버전·처음 공개, 둘째 줄은 기호 기준·저작권 */
+.title-block {
+  margin: 0;
+  flex: 0 1 600px;
   display: grid;
-  grid-template-columns: 1fr 2fr 4fr 1.3fr;
-  border: 1.5px solid var(--text);
+  grid-template-columns: 2.2fr 1fr 1.1fr;
+  border: 2px solid var(--text);
   background: var(--panel-bg);
 }
 .title-block > div {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 12px;
-  border-left: 1px solid var(--text);
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 14px 10px;
+  border-left: 1px solid color-mix(in srgb, var(--text) 55%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--text) 55%, transparent);
 }
-.title-block > div:first-child {
+.title-block > div:nth-child(-n + 3) {
+  border-top: none;
+}
+.title-block > div:nth-child(1),
+.title-block > div:nth-child(4) {
   border-left: none;
 }
-.tb-key {
+.title-block > div:nth-child(4) {
+  grid-column: 1 / 3;
+}
+.title-block dt {
   font-size: 11px;
   color: var(--text-dim);
 }
-.tb-val {
+.title-block dd {
+  margin: 0;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.tb-name dd {
+  font-size: 14px;
+}
+.tb-name strong {
+  font-size: 17px;
+  font-weight: 800;
+  margin-right: 4px;
+}
+.tb-mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }
 @keyframes bench-in {
   from {
