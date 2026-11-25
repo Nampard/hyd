@@ -97,13 +97,20 @@ export function PropertyPanel(): ReactElement {
   const comp = getComponent(doc, selection.id);
   if (!comp) return <div className="property-panel" />;
   const def = getComponentDefinition(comp.type);
+  // 컨베이어 모드의 매거진은 장비 무대 아래 매거진 칸(넣기·비우기, 실행 중에도)에서 다룬다 —
+  // 같은 일을 하는 입력란을 두 곳에 두지 않는다 (Phase 42). 값은 문서에 그대로 저장된다.
+  const fields = conveyor ? def.propertySchema.filter((f) => f.key !== "workpieces") : def.propertySchema;
 
   return (
     <div className="property-panel">
       <h2 className="panel-title">{t("properties")}</h2>
       <div className="property-header">{def.name}</div>
-      {def.propertySchema.length === 0 && <p className="panel-empty">{t("noProperties")}</p>}
-      {def.propertySchema.map((field) => {
+      {conveyor ? (
+        <p className="property-hint">{t("conveyorMagazineHint")}</p>
+      ) : (
+        fields.length === 0 && <p className="panel-empty">{t("noProperties")}</p>
+      )}
+      {fields.map((field) => {
         // 자동화설비 스테이션 물품 큐: 인식 불가 토큰·개수 초과를 조용히 버리지 않고 경고 (codex-review P2-2)
         const queueWarn =
           field.key === "workpieces" &&
@@ -127,7 +134,7 @@ export function PropertyPanel(): ReactElement {
         );
       })}
       {/* 컨베이어 모드에는 회전·삭제할 부품이 없다 — 대신 과제 전체의 학습 활동 칸을 함께 보인다 (Phase 37) */}
-      {(running || !conveyor) && <div className="property-hint">{running ? t("simEditLock") : t("editHint")}</div>}
+      {!conveyor && <div className="property-hint">{running ? t("simEditLock") : t("editHint")}</div>}
       {conveyor && <LearningActivityField />}
     </div>
   );
