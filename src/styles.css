@@ -1633,7 +1633,7 @@ body,
 .lamp-red.lit { color: #ef4444; }
 .lamp-yellow.lit { color: #facc15; }
 .lamp-green.lit { color: #22c55e; }
-/* 매거진 칸 (Phase 42) — 공급 순서 칸 8개 + 넣기·비우기. 공작물 색은 실물(은색 금속·흰 플라스틱) */
+/* 매거진 칸 (Phase 42) — 공급 순서 칸 8개 + 넣기·비우기. 공작물 색은 장면과 같게(은색 금속·주황 비금속) */
 .magazine-control {
   display: flex;
   flex-direction: column;
@@ -1671,9 +1671,10 @@ body,
   background: radial-gradient(circle at 35% 30%, #ffffff 0 12%, #c9d1dc 35%, #7d8796 100%);
   box-shadow: inset 0 0 0 1px #5d6675;
 }
+/* 비금속 — 장면의 비금속 공작물과 같은 주황 (윗면 #e5a354, 옆면 #a45c1c) */
 .wp-nonmetal {
-  background: radial-gradient(circle at 35% 30%, #ffffff 0 40%, #dfe4ea 100%);
-  box-shadow: inset 0 0 0 1px #9aa4b4;
+  background: radial-gradient(circle at 35% 30%, #f6c98c 0 15%, #e5a354 45%, #a45c1c 100%);
+  box-shadow: inset 0 0 0 1px #7a4314;
 }
 .wp-empty {
   box-shadow: inset 0 0 0 1px var(--sm-line);
