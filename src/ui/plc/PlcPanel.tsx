@@ -102,6 +102,18 @@ function segColor(hot: boolean): string {
   return hot ? "var(--run)" : "var(--text)";
 }
 
+/**
+ * 여자(ON) 하이라이트 — 접점·코일·펑션 블록의 디바이스가 여자 상태일 때 기호 뒤에 형광펜처럼 칠한다 (Phase 41).
+ * 통전 경로(초록 선)와 따로 본다: b접점은 디바이스가 여자되면 하이라이트되지만 접점은 열려 전류가 끊긴다.
+ */
+function EnergizedMark({ x, y, w, h, device }: { x: number; y: number; w: number; h: number; device: string }): ReactElement {
+  return (
+    <rect className="plc-energized" x={x} y={y} width={w} height={h} rx={3}>
+      <title>{`${device} 여자 (ON)`}</title>
+    </rect>
+  );
+}
+
 function HLine({ x1, x2, y, hot }: { x1: number; x2: number; y: number; hot: boolean }): ReactElement {
   return <line x1={x1} y1={y} x2={x2} y2={y} stroke={segColor(hot)} strokeWidth={hot ? 2 : 1.5} />;
 }
@@ -114,6 +126,7 @@ function ContactSymbol({
   device,
   enterHot,
   conductHot,
+  on,
 }: {
   cx: number;
   cy: number;
@@ -123,12 +136,15 @@ function ContactSymbol({
   device: string;
   enterHot: boolean;
   conductHot: boolean;
+  /** 디바이스 여자 여부 (실행 중일 때만) */
+  on: boolean;
 }): ReactElement {
   const half = CW / 2;
   const gap = 9;
   const barH = 11;
   return (
     <g>
+      {on && <EnergizedMark x={cx - gap - 6} y={cy - barH / 2 - 5} w={gap * 2 + 12} h={barH + 10} device={device} />}
       <text x={cx} y={cy - 12} textAnchor="middle" fontSize={9} fill="var(--text-dim)">
         {device}
       </text>
@@ -161,17 +177,20 @@ function CoilSymbol({
   device,
   glyph,
   enterHot,
+  on,
 }: {
   cx: number;
   cy: number;
   device: string;
   glyph?: string;
   enterHot: boolean;
+  on: boolean;
 }): ReactElement {
   const half = CW / 2;
   const r = 9;
   return (
     <g>
+      {on && <EnergizedMark x={cx - 16} y={cy - r - 4} w={32} h={r * 2 + 8} device={device} />}
       <text x={cx} y={cy - 14} textAnchor="middle" fontSize={9} fill="var(--text-dim)">
         {device}
       </text>
@@ -200,6 +219,7 @@ function FunctionBlockSymbol({
   device,
   presetText,
   enterHot,
+  on,
 }: {
   cx: number;
   cy: number;
@@ -207,12 +227,15 @@ function FunctionBlockSymbol({
   device: string;
   presetText: string;
   enterHot: boolean;
+  /** 타이머·카운터 접점(완료 비트) 여자 */
+  on: boolean;
 }): ReactElement {
   const half = CW / 2;
   const boxW = 62;
   const boxH = 20;
   return (
     <g>
+      {on && <EnergizedMark x={cx - boxW / 2 - 3} y={cy - boxH / 2 - 3} w={boxW + 6} h={boxH + 6} device={device} />}
       <text x={cx} y={cy - 14} textAnchor="middle" fontSize={9} fill="var(--text-dim)">
         {device}
       </text>
@@ -255,28 +278,33 @@ function CellSymbol({
   cy,
   enterHot,
   conductHot,
+  bits,
 }: {
   cell: LadderCell;
   cx: number;
   cy: number;
   enterHot: boolean;
   conductHot: boolean;
+  /** 실행 중 디바이스 비트 (정지 중이면 null — 하이라이트 없음) */
+  bits: Record<string, boolean> | null;
 }): ReactElement | null {
+  // 여자 판정: 접점·코일·SET·타이머·카운터는 디바이스 비트, RST는 명령이 실행되는(입력이 통전된) 동안
+  const on = bits !== null && (cell.kind === "rst" ? enterHot : bits[cell.device ?? ""] === true);
   switch (cell.kind) {
     case "no":
-      return <ContactSymbol cx={cx} cy={cy} nc={false} device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} />;
+      return <ContactSymbol cx={cx} cy={cy} nc={false} device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} on={on} />;
     case "nc":
-      return <ContactSymbol cx={cx} cy={cy} nc={true} device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} />;
+      return <ContactSymbol cx={cx} cy={cy} nc={true} device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} on={on} />;
     case "ne":
-      return <ContactSymbol cx={cx} cy={cy} nc={false} edge="N" device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} />;
+      return <ContactSymbol cx={cx} cy={cy} nc={false} edge="N" device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} on={on} />;
     case "hline":
       return <HLine x1={cx - CW / 2} x2={cx + CW / 2} y={cy} hot={enterHot && conductHot} />;
     case "coil":
-      return <CoilSymbol cx={cx} cy={cy} device={cell.device ?? ""} enterHot={enterHot} />;
+      return <CoilSymbol cx={cx} cy={cy} device={cell.device ?? ""} enterHot={enterHot} on={on} />;
     case "set":
-      return <CoilSymbol cx={cx} cy={cy} device={cell.device ?? ""} glyph="S" enterHot={enterHot} />;
+      return <CoilSymbol cx={cx} cy={cy} device={cell.device ?? ""} glyph="S" enterHot={enterHot} on={on} />;
     case "rst":
-      return <CoilSymbol cx={cx} cy={cy} device={cell.device ?? ""} glyph="R" enterHot={enterHot} />;
+      return <CoilSymbol cx={cx} cy={cy} device={cell.device ?? ""} glyph="R" enterHot={enterHot} on={on} />;
     case "ton":
     case "toff":
       return (
@@ -287,6 +315,7 @@ function CellSymbol({
           device={cell.device ?? ""}
           presetText={`${cell.preset ?? 0}s`}
           enterHot={enterHot}
+          on={on}
         />
       );
     case "ctu":
@@ -299,6 +328,7 @@ function CellSymbol({
           device={cell.device ?? ""}
           presetText={`×${cell.preset ?? 0}`}
           enterHot={enterHot}
+          on={on}
         />
       );
   }
@@ -311,6 +341,7 @@ function RungGroup({
   top,
   rows,
   power,
+  bits,
   running,
   selected,
   onCellClick,
@@ -319,6 +350,7 @@ function RungGroup({
   top: number;
   rows: number;
   power: boolean[][] | undefined;
+  bits: Record<string, boolean> | null;
   running: boolean;
   selected: { rungId: string; r: number; c: number } | null;
   /** half: 클릭한 셀의 좌/우 절반 — vlink 도구가 좌측 노드(c)/우측 노드(c+1)를 구분하는 데 사용 */
@@ -341,7 +373,7 @@ function RungGroup({
               return (
                 <g key={c}>
                   {cell && (
-                    <CellSymbol cell={cell} cx={cx} cy={cy} enterHot={enterHot} conductHot={exitHot} />
+                    <CellSymbol cell={cell} cx={cx} cy={cy} enterHot={enterHot} conductHot={exitHot} bits={bits} />
                   )}
                   {!running && (
                     <rect
@@ -695,11 +727,30 @@ export function PlcPanel({ alwaysOpen = false }: { alwaysOpen?: boolean } = {}):
           )}
         </div>
 
-        <p className="plc-hint">
-          렁 = 좌·우 모선을 잇는 독립 회로줄. 자기유지처럼 세로선(OR)으로 잇는 병렬 회로는
-          같은 렁 안의 <strong>‘+ 병렬 분기’</strong>로 행을 추가해 만듭니다 —
-          <strong>‘+ 새 렁’</strong>은 위 렁과 세로선으로 이어지지 않습니다.
-        </p>
+        {running ? (
+          // 실행 중에는 편집 안내 대신 모니터 범례 — 여자/소자는 디바이스 상태, 초록 선은 통전 경로 (Phase 41)
+          <p className="plc-hint plc-hint-legend">
+            <span className="plc-legend">
+              <span className="plc-legend-on" aria-hidden="true" />
+              <strong>여자</strong>(ON)
+            </span>
+            <span className="plc-legend">
+              <span className="plc-legend-off" aria-hidden="true" />
+              <strong>소자</strong>(OFF)
+            </span>
+            <span className="plc-legend">
+              <span className="plc-legend-flow" aria-hidden="true" />
+              전류가 흐르는 길
+            </span>
+            b접점은 디바이스가 여자되면 칠해지지만 접점이 열려 전류는 끊깁니다.
+          </p>
+        ) : (
+          <p className="plc-hint">
+            렁 = 좌·우 모선을 잇는 독립 회로줄. 자기유지처럼 세로선(OR)으로 잇는 병렬 회로는
+            같은 렁 안의 <strong>‘+ 병렬 분기’</strong>로 행을 추가해 만듭니다 —
+            <strong>‘+ 새 렁’</strong>은 위 렁과 세로선으로 이어지지 않습니다.
+          </p>
+        )}
 
         <div className="plc-rungs">
           <div className="plc-ladder-wrap" style={{ width: SVG_WIDTH }}>
@@ -712,6 +763,7 @@ export function PlcPanel({ alwaysOpen = false }: { alwaysOpen?: boolean } = {}):
                   top={top}
                   rows={rows}
                   power={plcMonitor?.nodePower[rung.id]}
+                  bits={running ? (plcMonitor?.bits ?? null) : null}
                   running={running}
                   selected={selected}
                   onCellClick={(r, c, half) => handleCellClick(rung, r, c, half)}

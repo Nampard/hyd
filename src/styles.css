@@ -950,6 +950,38 @@ body,
   word-break: keep-all;
 }
 
+/* 여자(ON) 하이라이트 — 회로 모드의 여자 코일·부하와 같은 --energized 색 (Phase 41) */
+.plc-energized {
+  fill: var(--energized);
+  stroke: color-mix(in srgb, var(--electric) 45%, var(--energized));
+  stroke-width: 1;
+}
+.plc-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 14px;
+  white-space: nowrap;
+}
+.plc-legend-on,
+.plc-legend-off,
+.plc-legend-flow {
+  display: inline-block;
+  width: 18px;
+  height: 11px;
+  border-radius: 2px;
+}
+.plc-legend-on {
+  background: var(--energized);
+  border: 1px solid color-mix(in srgb, var(--electric) 45%, var(--energized));
+}
+.plc-legend-off {
+  border: 1px solid var(--panel-border);
+}
+.plc-legend-flow {
+  height: 3px;
+  background: var(--run);
+}
 .plc-hint strong {
   color: var(--text);
   font-weight: 600;
