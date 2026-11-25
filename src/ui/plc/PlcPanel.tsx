@@ -1,3 +1,4 @@
+import { nextFreeDevice, padDevice } from "../../core/plc/device";
 import { useState, type ReactElement } from "react";
 import { useEditorStore } from "../editor/store";
 import { useSimStore } from "../sim/simStore";
@@ -42,20 +43,24 @@ const TOOLS: { id: Tool; label: string; title: string }[] = [
   { id: "erase", label: "지우기", title: "셀 비우기" },
 ];
 
-function defaultDevice(kind: LadderCellKind): string {
+/**
+ * 새 요소의 기본 디바이스 — I/O 맵처럼 자릿수를 채운 주소 (Phase 43).
+ * 접점은 P00000, 코일·SET·RST는 안 쓴 가장 작은 M, 타이머·카운터는 안 쓴 가장 작은 T·C.
+ */
+function defaultDevice(kind: LadderCellKind, program: LadderProgram): string {
   switch (kind) {
     case "ton":
     case "toff":
-      return "T0";
+      return nextFreeDevice("T", program);
     case "ctu":
     case "ctd":
-      return "C0";
+      return nextFreeDevice("C", program);
     case "coil":
     case "set":
     case "rst":
-      return "M0";
+      return nextFreeDevice("M", program);
     default:
-      return "P0";
+      return padDevice("P0");
   }
 }
 
@@ -103,13 +108,14 @@ function segColor(hot: boolean): string {
 }
 
 /**
- * 여자(ON) 하이라이트 — 접점·코일·펑션 블록의 디바이스가 여자 상태일 때 기호 뒤에 형광펜처럼 칠한다 (Phase 41).
- * 통전 경로(초록 선)와 따로 본다: b접점은 디바이스가 여자되면 하이라이트되지만 접점은 열려 전류가 끊긴다.
+ * ON 하이라이트 — 기호 뒤에 형광펜처럼 칠한다 (Phase 41, Phase 43에서 XG5000 모니터 관례로 정리).
+ * 코일·SET·타이머·카운터는 디바이스가 여자(ON)일 때, 접점은 **접점이 닫혀(ON) 있을 때** 칠한다 —
+ * a접점은 디바이스 여자 시, b접점은 디바이스 소자 시(평상시 닫힘). 통전 경로(초록 선)는 따로 본다.
  */
-function EnergizedMark({ x, y, w, h, device }: { x: number; y: number; w: number; h: number; device: string }): ReactElement {
+function EnergizedMark({ x, y, w, h, label }: { x: number; y: number; w: number; h: number; label: string }): ReactElement {
   return (
     <rect className="plc-energized" x={x} y={y} width={w} height={h} rx={3}>
-      <title>{`${device} 여자 (ON)`}</title>
+      <title>{label}</title>
     </rect>
   );
 }
@@ -136,7 +142,7 @@ function ContactSymbol({
   device: string;
   enterHot: boolean;
   conductHot: boolean;
-  /** 디바이스 여자 여부 (실행 중일 때만) */
+  /** 접점이 닫힌(ON) 상태 (실행 중일 때만) */
   on: boolean;
 }): ReactElement {
   const half = CW / 2;
@@ -144,7 +150,15 @@ function ContactSymbol({
   const barH = 11;
   return (
     <g>
-      {on && <EnergizedMark x={cx - gap - 6} y={cy - barH / 2 - 5} w={gap * 2 + 12} h={barH + 10} device={device} />}
+      {on && (
+        <EnergizedMark
+          x={cx - gap - 6}
+          y={cy - barH / 2 - 5}
+          w={gap * 2 + 12}
+          h={barH + 10}
+          label={nc ? `${device} b접점 닫힘 (디바이스 소자)` : `${device} 접점 닫힘 (디바이스 여자)`}
+        />
+      )}
       <text x={cx} y={cy - 12} textAnchor="middle" fontSize={9} fill="var(--text-dim)">
         {device}
       </text>
@@ -190,7 +204,7 @@ function CoilSymbol({
   const r = 9;
   return (
     <g>
-      {on && <EnergizedMark x={cx - 16} y={cy - r - 4} w={32} h={r * 2 + 8} device={device} />}
+      {on && <EnergizedMark x={cx - 16} y={cy - r - 4} w={32} h={r * 2 + 8} label={`${device} 여자 (ON)`} />}
       <text x={cx} y={cy - 14} textAnchor="middle" fontSize={9} fill="var(--text-dim)">
         {device}
       </text>
@@ -235,7 +249,7 @@ function FunctionBlockSymbol({
   const boxH = 20;
   return (
     <g>
-      {on && <EnergizedMark x={cx - boxW / 2 - 3} y={cy - boxH / 2 - 3} w={boxW + 6} h={boxH + 6} device={device} />}
+      {on && <EnergizedMark x={cx - boxW / 2 - 3} y={cy - boxH / 2 - 3} w={boxW + 6} h={boxH + 6} label={`${device} 여자 (ON)`} />}
       <text x={cx} y={cy - 14} textAnchor="middle" fontSize={9} fill="var(--text-dim)">
         {device}
       </text>
@@ -288,8 +302,12 @@ function CellSymbol({
   /** 실행 중 디바이스 비트 (정지 중이면 null — 하이라이트 없음) */
   bits: Record<string, boolean> | null;
 }): ReactElement | null {
-  // 여자 판정: 접점·코일·SET·타이머·카운터는 디바이스 비트, RST는 명령이 실행되는(입력이 통전된) 동안
-  const on = bits !== null && (cell.kind === "rst" ? enterHot : bits[cell.device ?? ""] === true);
+  // ON 판정 (XG5000 모니터 관례): a접점·코일·SET·타이머·카운터는 디바이스 비트, b접점은 그 반대(소자일 때 닫힘),
+  // N접점은 음변환 펄스로 도통하는 그 스캔, RST는 명령이 실행되는(입력이 통전된) 동안
+  const bit = bits?.[cell.device ?? ""] === true;
+  const on =
+    bits !== null &&
+    (cell.kind === "nc" ? !bit : cell.kind === "ne" ? enterHot && conductHot : cell.kind === "rst" ? enterHot : bit);
   switch (cell.kind) {
     case "no":
       return <ContactSymbol cx={cx} cy={cy} nc={false} device={cell.device ?? ""} enterHot={enterHot} conductHot={conductHot} on={on} />;
@@ -588,7 +606,7 @@ export function PlcPanel({ alwaysOpen = false }: { alwaysOpen?: boolean } = {}):
     }
     const newCell: LadderCell = {
       kind,
-      device: kind === "hline" ? undefined : defaultDevice(kind),
+      device: kind === "hline" ? undefined : defaultDevice(kind, program),
       preset: ["ton", "toff", "ctu", "ctd"].includes(kind) ? 3 : undefined,
     };
     updateRung(rung.id, (rg) => ({
@@ -710,6 +728,14 @@ export function PlcPanel({ alwaysOpen = false }: { alwaysOpen?: boolean } = {}):
                   }
                   updateSelectedCell({ device: v });
                 }}
+                // 입력을 마치면 자릿수를 채운다: P3 → P00003, T1 → T0001 (Phase 43)
+                onBlur={(e) => {
+                  const padded = padDevice(e.target.value);
+                  if (padded !== (selectedCell.device ?? "")) updateSelectedCell({ device: padded });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
               />
               {["ton", "toff", "ctu", "ctd"].includes(selectedCell.kind) && (
                 <>
@@ -732,17 +758,17 @@ export function PlcPanel({ alwaysOpen = false }: { alwaysOpen?: boolean } = {}):
           <p className="plc-hint plc-hint-legend">
             <span className="plc-legend">
               <span className="plc-legend-on" aria-hidden="true" />
-              <strong>여자</strong>(ON)
+              <strong>ON</strong>(코일 여자, 접점 닫힘)
             </span>
             <span className="plc-legend">
               <span className="plc-legend-off" aria-hidden="true" />
-              <strong>소자</strong>(OFF)
+              <strong>OFF</strong>(코일 소자, 접점 열림)
             </span>
             <span className="plc-legend">
               <span className="plc-legend-flow" aria-hidden="true" />
               전류가 흐르는 길
             </span>
-            b접점은 디바이스가 여자되면 칠해지지만 접점이 열려 전류는 끊깁니다.
+            b접점은 디바이스가 소자일 때 닫혀 칠해지고, 여자되면 열려 칠이 사라집니다.
           </p>
         ) : (
           <p className="plc-hint">
@@ -851,6 +877,13 @@ export function PlcPanel({ alwaysOpen = false }: { alwaysOpen?: boolean } = {}):
                           next[i] = { ...entry, device: e.target.value.toUpperCase() };
                           commitIoMap(next);
                         }}
+                        onBlur={(e) => {
+                          const padded = padDevice(e.target.value);
+                          if (padded === entry.device) return;
+                          const next = [...ioMap];
+                          next[i] = { ...entry, device: padded };
+                          commitIoMap(next);
+                        }}
                       />
                     </td>
                     <td>
@@ -940,12 +973,12 @@ export function PlcPanel({ alwaysOpen = false }: { alwaysOpen?: boolean } = {}):
                     ...ioMap,
                     soleEquipment
                       ? {
-                          device: "P0",
+                          device: nextFreeDevice("P", undefined, ioMap.map((e) => e.device)),
                           direction: "input",
                           componentId: soleEquipment.id,
                           channel: channelsFor(soleEquipment.id, "input")[0],
                         }
-                      : { device: "P0", direction: "input", componentId: "" },
+                      : { device: nextFreeDevice("P", undefined, ioMap.map((e) => e.device)), direction: "input", componentId: "" },
                   ])
                 }
               >
