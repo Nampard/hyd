@@ -308,6 +308,39 @@ describe("Phase 14-3: 엔진 ioMap 채널 연동 (PLC ↔ 스테이션)", () => 
   });
 });
 
+describe("매거진 조작 명령 (Phase 42)", () => {
+  it("실행 중 금속·비금속을 맨 뒤에 넣고, 최대 개수를 넘지 않으며, 비우기는 빼 둔 재료까지 비운다", async () => {
+    const { applyMagazineCommand } = await import("../automation-station");
+    const s = createAutomationState({ workpieces: "금" });
+    applyMagazineCommand(s, "magazine:nonmetal");
+    applyMagazineCommand(s, "magazine:metal");
+    expect(s.magazine).toEqual(["metal", "nonmetal", "metal"]);
+    for (let i = 0; i < 10; i++) applyMagazineCommand(s, "magazine:metal");
+    expect(s.magazine).toHaveLength(AUTOMATION_MAGAZINE_MAX);
+    s.setAside = ["nonmetal"];
+    applyMagazineCommand(s, "magazine:clear");
+    expect(s.magazine).toEqual([]);
+    expect(s.setAside).toEqual([]);
+  });
+
+  it("엔진 경유: 빈 매거진으로 운전 중 금속을 넣으면 PB2 자동운전이 그 공작물을 분류한다", async () => {
+    const { getExample } = await import("../../examples");
+    const { SimulationEngine } = await import("../engine");
+    const doc = getExample("automation-basic")!.build();
+    const station = doc.components.find((c) => c.type === "auto.automation-station")!;
+    station.properties.workpieces = "";
+    const engine = new SimulationEngine(doc);
+    engine.tick(0.02);
+    engine.equipmentCommand(station.id, "magazine:metal");
+    engine.setDiscreteInput(station.id, "PB2", true);
+    for (let i = 0; i < 5; i++) engine.tick(0.02);
+    engine.setDiscreteInput(station.id, "PB2", false);
+    for (let i = 0; i < Math.round(12 / 0.02); i++) engine.tick(0.02);
+    const mps = engine.snapshot().components[station.id].equipment as AutomationStationState;
+    expect(mps.eject).toEqual(["metal"]);
+  });
+});
+
 describe("골든 시나리오: MPS 자동운전 (예제 19 — 수업자료 슬라이드 9 LD)", () => {
   /** PB2로 기동 후 지정 시간 실행. pb3At 초에 PB3 펄스(라인변경) 옵션 */
   async function runExample(workpieces: string, seconds: number, pb3At?: number) {

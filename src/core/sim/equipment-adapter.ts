@@ -20,6 +20,8 @@ export interface EquipmentAdapter<S = unknown> {
   snapshot(state: S): S;
   /** 이산 수동 입력 (조작 패널 버튼 등) — 채널 이름으로 지정 */
   setDiscreteInput(state: S, channel: string, active: boolean): void;
+  /** 실행 중 장비 조작 명령 (예: 매거진에 공작물 넣기) — 이름은 어댑터가 해석한다 (Phase 42) */
+  command?(state: S, name: string): void;
 }
 
 const registry = new Map<string, EquipmentAdapter>();

@@ -38,6 +38,8 @@ interface SimStore {
   toggleManual(componentId: string): void;
   /** 복합설비 이산 입력 (조작 패널 버튼 등)을 채널 이름으로 지정 (Phase 14) */
   setDiscreteInput(componentId: string, channel: string, active: boolean): void;
+  /** 실행 중 장비 조작 명령 (Phase 42) */
+  equipmentCommand(componentId: string, name: string): void;
   /** PLC 래더 모드의 입력 스위치 — P 디바이스를 직접 켜고 끈다 (Phase 38) */
   setPlcInput(device: string, active: boolean): void;
 }
@@ -154,6 +156,10 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
   setDiscreteInput(componentId, channel, active) {
     engine?.setDiscreteInput(componentId, channel, active);
+  },
+
+  equipmentCommand(componentId, name) {
+    engine?.equipmentCommand(componentId, name);
   },
 
   setPlcInput(device, active) {

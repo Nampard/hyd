@@ -154,6 +154,17 @@ export class SimulationEngine {
     getEquipmentAdapter(comp.type)?.setDiscreteInput(runtime.equipment, channel, active);
   }
 
+  /**
+   * 복합설비 조작 명령 (Phase 42). 예: 자동화설비 스테이션의 "magazine:metal"·"magazine:nonmetal"·"magazine:clear".
+   * 실행 중인 장비 상태만 바꾸고 문서 속성은 건드리지 않는다.
+   */
+  equipmentCommand(componentId: string, name: string): void {
+    const comp = this.doc.components.find((c) => c.id === componentId);
+    const runtime = this.runtimes.get(componentId);
+    if (!comp || !runtime?.equipment) return;
+    getEquipmentAdapter(comp.type)?.command?.(runtime.equipment, name);
+  }
+
   tick(dt: number): SimulationSnapshot {
     this.time += dt;
 

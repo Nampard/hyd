@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
-import { automationInputs, createAutomationState, type AutomationStationState } from "../../core/sim/automation-station";
+import {
+  AUTOMATION_MAGAZINE_MAX,
+  automationInputs,
+  createAutomationState,
+  type AutomationStationState,
+  type WorkpieceMaterial,
+} from "../../core/sim/automation-station";
 import { useSimStore } from "../sim/simStore";
+import { useEditorStore } from "../editor/store";
 import {
   activeStages,
   autoZone,
@@ -85,17 +92,20 @@ export function StationStage({ stationId, properties }: { stationId: string; pro
             </button>
           ))}
         </div>
+        {/* 재생 속도 — 인계·감지 순간을 천천히 관찰 (Phase 35). 카메라처럼 보는 방법이라 화면 오른쪽 아래에 (Phase 42) */}
+        <div className="station-speed" role="group" aria-label="재생 속도">
+          {SPEEDS.map((v) => (
+            <button key={v} aria-pressed={speed === v} onClick={() => useSimStore.getState().setSpeed(v)}>
+              ×{v}
+            </button>
+          ))}
+        </div>
       </div>
 
       <footer className="station-console">
         <OperatorPanel stationId={stationId} station={station} />
+        <MagazineControl stationId={stationId} station={station} magazine={sceneState.magazine} />
         <dl className="station-readouts">
-          <div>
-            <dt>매거진</dt>
-            <dd title={station?.setAside.length ? "기본동작(PB1) 중이라 재료를 빼 두었습니다. PB2를 누르면 다시 넣습니다." : undefined}>
-              {sceneState.magazine.length}개{station?.setAside.length ? ` (빼 둠 ${station.setAside.length})` : ""}
-            </dd>
-          </div>
           <div>
             <dt>포토</dt>
             <dd className={inputs.포토 ? "hit" : undefined}>{inputs.포토 ? "감지" : "대기"}</dd>
@@ -117,16 +127,71 @@ export function StationStage({ stationId, properties }: { stationId: string; pro
             <dd>{station?.store.length ?? 0}개</dd>
           </div>
         </dl>
-        {/* 재생 속도 — 인계·감지 순간을 천천히 관찰 (Phase 35) */}
-        <div className="station-speed" role="group" aria-label="재생 속도">
-          {SPEEDS.map((v) => (
-            <button key={v} aria-pressed={speed === v} onClick={() => useSimStore.getState().setSpeed(v)}>
-              ×{v}
-            </button>
-          ))}
-        </div>
       </footer>
     </section>
+  );
+}
+
+/**
+ * 매거진 칸 (Phase 42) — 쌓인 공작물을 공급 순서대로(왼쪽이 다음 공급) 보이고, 금속·비금속을 하나씩 넣거나 비운다.
+ * 실행 중이면 돌고 있는 장비의 매거진을 바로 바꾸고(정지하면 속성대로 돌아감), 정지 중이면 매거진 속성
+ * (시작할 때 채워지는 재료)을 고친다 — 그래서 정지 중 변경은 되돌리기(Ctrl+Z)가 된다.
+ */
+function MagazineControl({
+  stationId,
+  station,
+  magazine,
+}: {
+  stationId: string;
+  station: AutomationStationState | undefined;
+  magazine: WorkpieceMaterial[];
+}): ReactElement {
+  const running = station !== undefined;
+  const full = magazine.length >= AUTOMATION_MAGAZINE_MAX;
+  const setAside = station?.setAside.length ?? 0;
+  const write = (next: WorkpieceMaterial[]) =>
+    useEditorStore
+      .getState()
+      .setProperty(stationId, "workpieces", next.map((m) => (m === "metal" ? "금" : "비")).join(","));
+  const add = (m: WorkpieceMaterial) => {
+    if (running) useSimStore.getState().equipmentCommand(stationId, `magazine:${m}`);
+    else write([...magazine, m]);
+  };
+  const clear = () => {
+    if (running) useSimStore.getState().equipmentCommand(stationId, "magazine:clear");
+    else write([]);
+  };
+  return (
+    <div className="magazine-control" role="group" aria-label="매거진">
+      {/* 윗줄: 이름·개수와 공급 순서(왼쪽이 다음에 A가 밀어낼 공작물, 빈 자리는 테두리만) */}
+      <div className="magazine-head">
+        <span className="magazine-title">매거진</span>
+        <ol className="magazine-queue" aria-label={`공급 순서: ${magazine.map((m) => (m === "metal" ? "금속" : "비금속")).join(", ") || "비어 있음"}`}>
+          {Array.from({ length: AUTOMATION_MAGAZINE_MAX }, (_, i) => (
+            <li key={i} className={magazine[i] ? `wp wp-${magazine[i]}` : "wp wp-empty"} />
+          ))}
+        </ol>
+        <span className="magazine-count">
+          {magazine.length}/{AUTOMATION_MAGAZINE_MAX}
+          {setAside > 0 && (
+            <span title="기본동작(PB1) 중이라 재료를 빼 두었습니다. PB2를 누르면 다시 넣습니다."> (빼 둠 {setAside})</span>
+          )}
+        </span>
+      </div>
+      <div className="magazine-buttons">
+        <button onClick={() => add("metal")} disabled={full} title={full ? "매거진이 가득 찼습니다" : "금속 공작물을 맨 뒤에 넣습니다"}>
+          <span className="wp wp-metal" aria-hidden="true" />
+          금속
+        </button>
+        <button onClick={() => add("nonmetal")} disabled={full} title={full ? "매거진이 가득 찼습니다" : "비금속 공작물을 맨 뒤에 넣습니다"}>
+          <span className="wp wp-nonmetal" aria-hidden="true" />
+          비금속
+        </button>
+        <button onClick={clear} disabled={magazine.length === 0 && setAside === 0} title="매거진을 비웁니다 (벨트 위 공작물은 그대로)">
+          비우기
+        </button>
+      </div>
+    </div>
   );
 }
 

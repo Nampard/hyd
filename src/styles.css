@@ -1633,6 +1633,79 @@ body,
 .lamp-red.lit { color: #ef4444; }
 .lamp-yellow.lit { color: #facc15; }
 .lamp-green.lit { color: #22c55e; }
+/* 매거진 칸 (Phase 42) — 공급 순서 칸 8개 + 넣기·비우기. 공작물 색은 실물(은색 금속·흰 플라스틱) */
+.magazine-control {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.magazine-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.magazine-title {
+  font-size: 11px;
+  color: var(--sm-dim);
+}
+.magazine-count {
+  font-size: 12px;
+  color: var(--sm-text);
+  font-variant-numeric: tabular-nums;
+}
+.magazine-queue {
+  display: flex;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wp {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+}
+.wp-metal {
+  background: radial-gradient(circle at 35% 30%, #ffffff 0 12%, #c9d1dc 35%, #7d8796 100%);
+  box-shadow: inset 0 0 0 1px #5d6675;
+}
+.wp-nonmetal {
+  background: radial-gradient(circle at 35% 30%, #ffffff 0 40%, #dfe4ea 100%);
+  box-shadow: inset 0 0 0 1px #9aa4b4;
+}
+.wp-empty {
+  box-shadow: inset 0 0 0 1px var(--sm-line);
+  background: transparent;
+}
+.magazine-buttons {
+  display: flex;
+  gap: 4px;
+}
+.magazine-buttons button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 2px 9px;
+  border: 1px solid var(--sm-line);
+  border-radius: 6px;
+  background: #2b3246;
+  color: var(--sm-text);
+  font-size: 12px;
+}
+.magazine-buttons button:hover:not(:disabled) {
+  background: #354061;
+}
+.magazine-buttons button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.magazine-buttons .wp {
+  width: 11px;
+  height: 11px;
+}
 .station-readouts {
   display: flex;
   gap: clamp(10px, 1.6vw, 22px);
@@ -1642,12 +1715,15 @@ body,
 .station-readouts dd { margin: 2px 0 0; font-size: 15px; font-variant-numeric: tabular-nums; }
 .station-readouts dd.hit { color: #6ee7b7; }
 .station-speed {
-  margin-left: auto;
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
   display: flex;
   gap: 2px;
-  padding: 2px;
+  padding: 3px;
   border-radius: 8px;
-  background: #161b28;
+  background: #121725cc;
+  backdrop-filter: blur(4px);
 }
 
 /* --- PLC 래더 모드 작업 화면 (Phase 38) ---
@@ -1789,6 +1865,14 @@ body,
 /* 좁은 화면(1080~1279px) — 앱 막대가 한 줄에 들어가도록 (Phase 38). 같은 특이도의 앞선 규칙을
    덮도록 파일 끝에 둔다. */
 @media (max-width: 1279px) {
+  /* 컨베이어 아랫단 — 조작 패널·매거진·센서가 1080px에서도 한 줄에 들어가게 간격을 줄인다 (Phase 42) */
+  .station-console {
+    gap: 12px;
+    padding: 8px 10px;
+  }
+  .station-readouts {
+    gap: 10px;
+  }
   .tb-collapsible {
     display: none;
   }

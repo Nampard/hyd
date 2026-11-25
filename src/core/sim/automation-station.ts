@@ -295,6 +295,22 @@ export function cloneAutomationState(s: AutomationStationState): AutomationStati
   };
 }
 
+/**
+ * 매거진 조작 (Phase 42) — 실행 중에도 공작물을 넣거나 비운다.
+ * "magazine:metal" / "magazine:nonmetal": 맨 뒤에 하나 넣기(최대 AUTOMATION_MAGAZINE_MAX — 넘치면 무시),
+ * "magazine:clear": 매거진과 기본동작 때 빼 둔 재료를 모두 비우기. 이미 공급·벨트 위에 있는 물품은 그대로 둔다.
+ */
+export function applyMagazineCommand(state: AutomationStationState, name: string): void {
+  if (name === "magazine:clear") {
+    state.magazine = [];
+    state.setAside = [];
+    return;
+  }
+  const material: WorkpieceMaterial | null =
+    name === "magazine:metal" ? "metal" : name === "magazine:nonmetal" ? "nonmetal" : null;
+  if (material && state.magazine.length < AUTOMATION_MAGAZINE_MAX) state.magazine.push(material);
+}
+
 // ---------- 복합설비 어댑터 등록 (Phase 14 P1-6) ----------
 
 /** PB1~PB4 입력 채널을 조작 패널 버튼 인덱스로 매핑 */
@@ -305,6 +321,7 @@ export const automationStationAdapter: EquipmentAdapter<AutomationStationState> 
   step: (state, out, dt) => stepAutomationStation(state, out as (ch: AutomationOutputChannel) => boolean, dt),
   readInputs: (state) => automationInputs(state),
   snapshot: (state) => cloneAutomationState(state),
+  command: (state, name) => applyMagazineCommand(state, name),
   setDiscreteInput: (state, channel, active) => {
     const i = PB_CHANNELS.indexOf(channel as AutomationInputChannel);
     if (i < 0) return;
